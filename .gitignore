@@ -1,0 +1,6 @@
+build
+deps
+.DS_Store
+*.out
+*.log
+venv
