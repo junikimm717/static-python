@@ -12,6 +12,7 @@ PYTHON := 3.13.3
 PYTHONV := 3.13
 
 ARCH := x86_64-linux-musl
+OPENSSL_ARCH := linux-x86_64
 
 # build steps for musl toolchain.
 
@@ -37,7 +38,7 @@ build/lib64/libssl.a: deps/$(ARCH)-cross/.extracted deps/openssl-$(OPENSSL)/.ext
 	mkdir -p build
 	cd deps/openssl-$(OPENSSL) &&\
 		ARCH="$(ARCH)"\
-		../../configure-wrapper.sh ./Configure linux-x86_64 --prefix=$(ROOT_DIR)build --openssldir=$(ROOT_DIR)build no-shared
+		../../configure-wrapper.sh ./Configure $(OPENSSL_ARCH) --prefix=$(ROOT_DIR)build --openssldir=$(ROOT_DIR)build no-shared no-apps
 	cd deps/openssl-$(OPENSSL) && ../../configure-wrapper.sh make -j4
 	cd deps/openssl-$(OPENSSL) && ../../configure-wrapper.sh make install
 
@@ -121,6 +122,8 @@ build/lib/libncursesw.a: deps/ncurses-$(NCURSES)/.extracted deps/$(ARCH)-cross/.
 		../../configure-wrapper.sh ./configure --without-cxx --without-cxx-binding\
 		--without-shared --prefix=$(ROOT_DIR)build\
 		--exec-prefix=$(ROOT_DIR)build --enable-static\
+		--without-progs\
+		--enable-termcap\
 		--disable-shared
 	cd deps/ncurses-$(NCURSES) && make -j4
 	cd deps/ncurses-$(NCURSES) && make install
