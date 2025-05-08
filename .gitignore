@@ -4,3 +4,4 @@ deps
 *.out
 *.log
 venv
+*.tar.gz
