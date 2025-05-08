@@ -11,16 +11,22 @@ BZIP2 := 1.0.8
 PYTHON := 3.13.3
 PYTHONV := 3.13
 
-ARCH := x86_64-linux-musl
-OPENSSL_ARCH := linux-x86_64
+ARCH := x86_64
+
+DEPS_DIR := "$(ROOT_DIR)/deps"
+
+CC=$(DEPS_DIR)/$(ARCH)-linux-musl-cross/bin/$(ARCH)-linux-musl-gcc
+AR=$DEPS_DIR/$(ARCH)-linux-musl-cross/bin/$(ARCH)-linux-musl-ar
+RANLIB=$DEPS_DIR/$(ARCH)-linux-musl-cross/bin/$(ARCH)-linux-musl-ranlib
+LD=$DEPS_DIR/$(ARCH)-linux-musl-cross/bin/$(ARCH)-linux-musl-ld
 
 # build steps for musl toolchain.
 
-deps/$(ARCH)-cross.tgz:
+deps/$(ARCH)-linux-musl-cross.tgz:
 	mkdir -p deps
-	curl -Lf https://musl.cc/$(ARCH)-cross.tgz -o deps/$(ARCH)-cross.tgz
+	curl -Lf https://musl.cc/$(ARCH)-linux-musl-cross.tgz -o deps/$(ARCH)-linux-musl-cross.tgz
 
-deps/$(ARCH)-cross/.extracted: deps/$(ARCH)-cross.tgz
+deps/$(ARCH)-linux-musl-cross/.extracted: deps/$(ARCH)-linux-musl-cross.tgz
 	tar -xzf $< -C deps
 	touch $@
 
@@ -34,11 +40,11 @@ deps/openssl-$(OPENSSL)/.extracted: deps/openssl-$(OPENSSL).tar.gz
 	cd deps/openssl-$(OPENSSL) && sed -i '1513d' ./Configure
 	touch $@
 
-build/lib64/libssl.a: deps/$(ARCH)-cross/.extracted deps/openssl-$(OPENSSL)/.extracted
+build/lib64/libssl.a: deps/$(ARCH)-linux-musl-cross/.extracted deps/openssl-$(OPENSSL)/.extracted
 	mkdir -p build
 	cd deps/openssl-$(OPENSSL) &&\
 		ARCH="$(ARCH)"\
-		../../configure-wrapper.sh ./Configure $(OPENSSL_ARCH) --prefix=$(ROOT_DIR)build --openssldir=$(ROOT_DIR)build no-shared no-apps
+		../../configure-wrapper.sh ./Configure linux-$(ARCH) --prefix=$(ROOT_DIR)build --openssldir=$(ROOT_DIR)build no-shared no-apps
 	cd deps/openssl-$(OPENSSL) && ../../configure-wrapper.sh make -j4
 	cd deps/openssl-$(OPENSSL) && ../../configure-wrapper.sh make install
 
@@ -55,7 +61,7 @@ deps/libffi-$(LIBFFI)/.extracted: deps/libffi-$(LIBFFI).tar.gz
 	tar -xzf deps/libffi-$(LIBFFI).tar.gz -C deps
 	touch $@
 
-build/lib/libffi.a: deps/$(ARCH)-cross/.extracted deps/libffi-$(LIBFFI)/.extracted
+build/lib/libffi.a: deps/$(ARCH)-linux-musl-cross/.extracted deps/libffi-$(LIBFFI)/.extracted
 	mkdir -p build
 	cd deps/libffi-$(LIBFFI) &&\
 		ARCH="$(ARCH)"\
@@ -75,7 +81,7 @@ deps/xz-$(LIBLZMA)/.extracted: deps/xz-$(LIBLZMA).tar.gz
 	tar -xzf deps/xz-5.8.1.tar.gz -C deps
 	touch $@
 
-build/lib/liblzma.a: deps/xz-$(LIBLZMA)/.extracted deps/$(ARCH)-cross/.extracted
+build/lib/liblzma.a: deps/xz-$(LIBLZMA)/.extracted deps/$(ARCH)-linux-musl-cross/.extracted
 	mkdir -p build
 	cd deps/xz-$(LIBLZMA) &&\
 		ARCH="$(ARCH)"\
@@ -95,7 +101,7 @@ deps/zlib-$(ZLIB)/.extracted: deps/zlib-$(ZLIB).tar.gz
 	tar -xzf deps/zlib-1.3.1.tar.gz -C deps
 	touch $@
 
-build/lib/libz.a: deps/zlib-$(ZLIB)/.extracted deps/$(ARCH)-cross/.extracted
+build/lib/libz.a: deps/zlib-$(ZLIB)/.extracted deps/$(ARCH)-linux-musl-cross/.extracted
 	mkdir -p build
 	cd deps/zlib-$(ZLIB) &&\
 		ARCH="$(ARCH)"\
@@ -116,7 +122,7 @@ deps/ncurses-$(NCURSES)/.extracted: deps/ncurses-$(NCURSES).tar.gz
 	tar -xzf deps/ncurses-$(NCURSES).tar.gz -C deps
 	touch $@
 
-build/lib/libncursesw.a: deps/ncurses-$(NCURSES)/.extracted deps/$(ARCH)-cross/.extracted
+build/lib/libncursesw.a: deps/ncurses-$(NCURSES)/.extracted deps/$(ARCH)-linux-musl-cross/.extracted
 	cd deps/ncurses-$(NCURSES) &&\
 		ARCH="$(ARCH)"\
 		../../configure-wrapper.sh ./configure --without-cxx --without-cxx-binding\
@@ -141,7 +147,7 @@ deps/readline-$(READLINE)/.extracted: deps/readline-$(READLINE).tar.gz
 	tar -xzf deps/readline-$(READLINE).tar.gz -C deps
 	touch $@
 
-build/lib/libreadline.a: deps/$(ARCH)-cross/.extracted deps/readline-$(READLINE)/.extracted
+build/lib/libreadline.a: deps/$(ARCH)-linux-musl-cross/.extracted deps/readline-$(READLINE)/.extracted
 	mkdir -p build
 	cd deps/readline-$(READLINE) &&\
 		ARCH="$(ARCH)"\
@@ -162,7 +168,7 @@ deps/sqlite-src-$(SQLITE)/.extracted: deps/sqlite-src-$(SQLITE).zip
 	cd deps && unzip -o sqlite-src-$(SQLITE).zip
 	touch $@
 
-build/lib/libsqlite3.a: deps/$(ARCH)-cross/.extracted deps/sqlite-src-$(SQLITE)/.extracted
+build/lib/libsqlite3.a: deps/$(ARCH)-linux-musl-cross/.extracted deps/sqlite-src-$(SQLITE)/.extracted
 	mkdir -p build
 	cd deps/sqlite-src-$(SQLITE) &&\
 		ARCH="$(ARCH)"\
@@ -180,16 +186,24 @@ deps/bzip2-$(BZIP2).tar.gz:
 
 deps/bzip2-$(BZIP2)/.extracted: deps/bzip2-$(BZIP2).tar.gz
 	tar -xzf deps/bzip2-$(BZIP2).tar.gz -C deps
+	sed -i \
+		-e 's|^CC=.*||' \
+		-e 's|^AR=.*||' \
+		-e 's|^RANLIB=.*||' \
+		-e 's|^CFLAGS=.*||' \
+		-e 's|^LDFLAGS=.*||' \
+		-e 's|^PREFIX=.*|PREFIX=$(ROOT_DIR)build|' \
+		deps/bzip2-$(BZIP2)/Makefile
 	touch $@
 
-build/lib/libbz2.a: deps/$(ARCH)-cross/.extracted deps/bzip2-$(BZIP2)/.extracted
+build/lib/libbz2.a: deps/$(ARCH)-linux-musl-cross/.extracted deps/bzip2-$(BZIP2)/.extracted
 	mkdir -p build
 	cd deps/bzip2-$(BZIP2) &&\
 		ARCH="$(ARCH)"\
-		../../configure-wrapper.sh make -j4 "CFLAGS=-I$(ROOT_DIR)build/include -g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error -fPIC"
+		../../configure-wrapper.sh make -j4
 	cd deps/bzip2-$(BZIP2) &&\
 		ARCH="$(ARCH)"\
-		../../configure-wrapper.sh make PREFIX=$(ROOT_DIR)build install
+		../../configure-wrapper.sh make install
 
 libbz2: build/lib/libbz2.a
 .PHONY: libbz2
@@ -200,23 +214,23 @@ deps/Python-$(PYTHON).tgz:
 	mkdir -p deps
 	curl -Lf https://www.python.org/ftp/python/$(PYTHON)/Python-$(PYTHON).tgz -o deps/Python-$(PYTHON).tgz
 
-deps/Python-$(PYTHON)/.extracted: deps/Python-$(PYTHON).tgz
+deps/Python-$(PYTHON)/Modules/Setup.local: deps/Python-$(PYTHON).tgz
 	tar -xzf deps/Python-$(PYTHON).tgz -C deps
-	cp ./Setup deps/Python-$(PYTHON)/Modules/Setup.local
 	sed -i "390s/.*/            pass/" ./deps/Python-$(PYTHON)/Lib/ctypes/__init__.py
-	touch $@
+	cp ./Setup deps/Python-$(PYTHON)/Modules/Setup.local
 
-build/bin/python$(PYTHONV): openssl libffi libsqlite liblzma readline zlib libbz2 ncurses deps/Python-$(PYTHON)/.extracted deps/$(ARCH)-cross/.extracted
+build/bin/python$(PYTHONV): openssl libffi libsqlite liblzma readline zlib libbz2 ncurses deps/Python-$(PYTHON)/Modules/Setup.local deps/$(ARCH)-linux-musl-cross/.extracted
 	cd deps/Python-$(PYTHON) &&\
 		ARCH="$(ARCH)"\
+		PYTHON="1"\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build\
 			--exec-prefix=$(ROOT_DIR)build --enable-static --disable-shared\
-  		--with-openssl=$(ROOT_DIR)build\
-      --disable-test-modules\
-      --with-ensurepip=install
+			--with-openssl=$(ROOT_DIR)build\
+			--disable-test-modules\
+			--with-ensurepip=install
 	# ctypes has a dl opener that seems completely unnecessary
-	cd deps/Python-$(PYTHON) && ../../configure-wrapper.sh make -j8
-	cd deps/Python-$(PYTHON) && ../../configure-wrapper.sh make install
+	cd deps/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make -j8
+	cd deps/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make install
 
 python3: build/bin/python$(PYTHONV)
 .PHONY: python3
