@@ -36,7 +36,7 @@ deps/openssl-$(OPENSSL)/.extracted: deps/openssl-$(OPENSSL).tar.gz
 	touch $@
 	cd deps/openssl-$(OPENSSL) && sed -i '1513d' ./Configure
 
-build/lib64/libssl.a: deps/x86_64-linux-musl-cross/.extracted deps/openssl-$(OPENSSL)/.extracted build
+build/lib64/libssl.a: deps/x86_64-linux-musl-cross/.extracted deps/openssl-$(OPENSSL)/.extracted build/.extracted
 	cd deps/openssl-$(OPENSSL) &&\
 		CFLAGS="-static"\
 		../../configure-wrapper.sh ./Configure linux-x86_64 --prefix=$(ROOT_DIR)build --openssldir=$(ROOT_DIR)build no-shared
@@ -55,7 +55,7 @@ deps/libffi-$(LIBFFI)/.extracted: deps/libffi-$(LIBFFI).tar.gz
 	tar -xzf deps/libffi-$(LIBFFI).tar.gz -C deps
 	touch $@
 
-build/lib/libffi.a: deps/x86_64-linux-musl-cross/.extracted deps/libffi-$(LIBFFI)/.extracted build
+build/lib/libffi.a: deps/x86_64-linux-musl-cross/.extracted deps/libffi-$(LIBFFI)/.extracted build/.extracted
 	cd deps/libffi-$(LIBFFI) &&\
 		CFLAGS="-static"\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build --exec-prefix=$(ROOT_DIR)build --enable-static --disable-shared
@@ -73,7 +73,7 @@ deps/xz-$(LIBLZMA)/.extracted: deps/xz-$(LIBLZMA).tar.gz
 	tar -xzf deps/xz-5.8.1.tar.gz -C deps
 	touch $@
 
-build/lib/liblzma.a: deps/xz-$(LIBLZMA)/.extracted deps/x86_64-linux-musl-cross/.extracted build
+build/lib/liblzma.a: deps/xz-$(LIBLZMA)/.extracted deps/x86_64-linux-musl-cross/.extracted build/.extracted
 	cd deps/xz-$(LIBLZMA) &&\
 		CFLAGS="-static"\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build --exec-prefix=$(ROOT_DIR)build --enable-static --disable-shared
@@ -91,7 +91,7 @@ deps/zlib-$(ZLIB)/.extracted: deps/zlib-$(ZLIB).tar.gz
 	tar -xzf deps/zlib-1.3.1.tar.gz -C deps
 	touch $@
 
-build/lib/libz.a: deps/zlib-$(ZLIB)/.extracted deps/x86_64-linux-musl-cross/.extracted build
+build/lib/libz.a: deps/zlib-$(ZLIB)/.extracted deps/x86_64-linux-musl-cross/.extracted build/.extracted
 	cd deps/zlib-$(ZLIB) &&\
 		CFLAGS="-static"\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build --eprefix=$(ROOT_DIR)build --static
@@ -131,7 +131,7 @@ deps/readline-$(READLINE)/.extracted: deps/readline-$(READLINE).tar.gz
 	tar -xzf deps/readline-$(READLINE).tar.gz -C deps
 	touch $@
 
-build/lib/libreadline.a: deps/x86_64-linux-musl-cross/.extracted deps/readline-$(READLINE)/.extracted build
+build/lib/libreadline.a: deps/x86_64-linux-musl-cross/.extracted deps/readline-$(READLINE)/.extracted build/.extracted
 	cd deps/readline-$(READLINE) &&\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build --exec-prefix=$(ROOT_DIR)build --enable-static --disable-shared
 	cd deps/readline-$(READLINE) && ../../configure-wrapper.sh make -j1
@@ -149,7 +149,7 @@ deps/sqlite-src-$(SQLITE)/.extracted: deps/sqlite-src-$(SQLITE).zip
 	cd deps && unzip -o sqlite-src-$(SQLITE).zip
 	touch $@
 
-build/lib/libsqlite3.a: deps/x86_64-linux-musl-cross/.extracted deps/sqlite-src-$(SQLITE)/.extracted build
+build/lib/libsqlite3.a: deps/x86_64-linux-musl-cross/.extracted deps/sqlite-src-$(SQLITE)/.extracted build/.extracted
 	cd deps/sqlite-src-$(SQLITE) &&\
 		CFLAGS="-static"\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build --exec-prefix=$(ROOT_DIR)build --enable-static --disable-shared
