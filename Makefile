@@ -71,7 +71,10 @@ build-$(ARCH)/lib/libffi.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted de
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/libffi-$(LIBFFI) &&\
 		ARCH="$(ARCH)"\
-		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(ARCH) --exec-prefix=$(ROOT_DIR)build-$(ARCH) --enable-static --disable-shared
+		../../configure-wrapper.sh ./configure \
+			--prefix=$(ROOT_DIR)build-$(ARCH) \
+			--exec-prefix=$(ROOT_DIR)build-$(ARCH) \
+			--enable-static --disable-shared
 	cd deps-$(ARCH)/libffi-$(LIBFFI) && ../../configure-wrapper.sh make -j$(JOBS)
 	cd deps-$(ARCH)/libffi-$(LIBFFI) && ../../configure-wrapper.sh make install
 
