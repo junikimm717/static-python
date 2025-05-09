@@ -12,6 +12,7 @@ PYTHON := 3.13.3
 PYTHONV := 3.13
 
 ARCH := $(shell uname -m)
+JOBS := $(shell nproc)
 
 DEPS_DIR := "$(ROOT_DIR)/deps-$(ARCH)"
 
@@ -45,9 +46,13 @@ build-$(ARCH)/lib64/libssl.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted 
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/openssl-$(OPENSSL) &&\
 		ARCH="$(ARCH)"\
-		../../configure-wrapper.sh ./Configure linux-$(ARCH) --prefix=$(ROOT_DIR)build-$(ARCH) --openssldir=$(ROOT_DIR)build-$(ARCH) no-shared no-apps
-	cd deps-$(ARCH)/openssl-$(OPENSSL) && ../../configure-wrapper.sh make -j4
-	cd deps-$(ARCH)/openssl-$(OPENSSL) && ../../configure-wrapper.sh make install
+		../../configure-wrapper.sh \
+		./Configure linux-$(ARCH) \
+			no-shared no-dso no-engine no-tests no-ssl3 no-comp no-idea no-rc5\
+			no-ec2m no-weak-ssl-ciphers no-apps\
+			--prefix=$(ROOT_DIR)build-$(ARCH) --openssldir=$(ROOT_DIR)build-$(ARCH)
+	cd deps-$(ARCH)/openssl-$(OPENSSL) && ../../configure-wrapper.sh make -j$(JOBS)
+	cd deps-$(ARCH)/openssl-$(OPENSSL) && ../../configure-wrapper.sh make install_sw
 
 openssl: build-$(ARCH)/lib64/libssl.a
 .PHONY: openssl
@@ -67,7 +72,7 @@ build-$(ARCH)/lib/libffi.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted de
 	cd deps-$(ARCH)/libffi-$(LIBFFI) &&\
 		ARCH="$(ARCH)"\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(ARCH) --exec-prefix=$(ROOT_DIR)build-$(ARCH) --enable-static --disable-shared
-	cd deps-$(ARCH)/libffi-$(LIBFFI) && ../../configure-wrapper.sh make -j4
+	cd deps-$(ARCH)/libffi-$(LIBFFI) && ../../configure-wrapper.sh make -j$(JOBS)
 	cd deps-$(ARCH)/libffi-$(LIBFFI) && ../../configure-wrapper.sh make install
 
 libffi: build-$(ARCH)/lib/libffi.a
@@ -88,7 +93,7 @@ build-$(ARCH)/lib/liblzma.a: deps-$(ARCH)/xz-$(LIBLZMA)/.extracted deps-$(ARCH)/
 	cd deps-$(ARCH)/xz-$(LIBLZMA) &&\
 		ARCH="$(ARCH)"\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(ARCH) --exec-prefix=$(ROOT_DIR)build-$(ARCH) --enable-static --disable-shared
-	cd deps-$(ARCH)/xz-$(LIBLZMA) && ../../configure-wrapper.sh make V=1 -j4
+	cd deps-$(ARCH)/xz-$(LIBLZMA) && ../../configure-wrapper.sh make V=1 -j$(JOBS)
 	cd deps-$(ARCH)/xz-$(LIBLZMA) && ../../configure-wrapper.sh make install
 
 liblzma: build-$(ARCH)/lib/liblzma.a
@@ -109,7 +114,7 @@ build-$(ARCH)/lib/libz.a: deps-$(ARCH)/zlib-$(ZLIB)/.extracted deps-$(ARCH)/$(AR
 	cd deps-$(ARCH)/zlib-$(ZLIB) &&\
 		ARCH="$(ARCH)"\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(ARCH) --eprefix=$(ROOT_DIR)build-$(ARCH) --static
-	cd deps-$(ARCH)/zlib-$(ZLIB) && ../../configure-wrapper.sh make -j4
+	cd deps-$(ARCH)/zlib-$(ZLIB) && ../../configure-wrapper.sh make -j$(JOBS)
 	cd deps-$(ARCH)/zlib-$(ZLIB) && ../../configure-wrapper.sh make install
 
 zlib: build-$(ARCH)/lib/libz.a
@@ -131,10 +136,13 @@ build-$(ARCH)/lib/libncursesw.a: deps-$(ARCH)/ncurses-$(NCURSES)/.extracted deps
 		../../configure-wrapper.sh ./configure --without-cxx --without-cxx-binding\
 		--without-shared --prefix=$(ROOT_DIR)build-$(ARCH)\
 		--exec-prefix=$(ROOT_DIR)build-$(ARCH) --enable-static\
+		--without-ada \
+		--without-manpages \
+		--without-tests \
 		--without-progs\
 		--enable-termcap\
 		--disable-shared
-	cd deps-$(ARCH)/ncurses-$(NCURSES) && make -j4
+	cd deps-$(ARCH)/ncurses-$(NCURSES) && make -j$(JOBS)
 	cd deps-$(ARCH)/ncurses-$(NCURSES) && make install
 
 ncurses: build-$(ARCH)/lib/libncursesw.a
@@ -154,7 +162,13 @@ build-$(ARCH)/lib/libreadline.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extract
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/readline-$(READLINE) &&\
 		ARCH="$(ARCH)"\
-		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(ARCH) --exec-prefix=$(ROOT_DIR)build-$(ARCH) --enable-static --disable-shared
+		../../configure-wrapper.sh ./configure \
+			--prefix=$(ROOT_DIR)build-$(ARCH)\
+			--exec-prefix=$(ROOT_DIR)build-$(ARCH)\
+			--with-curses\
+			--disable-install-examples\
+			--enable-static\
+			--disable-shared
 	cd deps-$(ARCH)/readline-$(READLINE) && ../../configure-wrapper.sh make -j1
 	cd deps-$(ARCH)/readline-$(READLINE) && ../../configure-wrapper.sh make install
 
@@ -171,12 +185,12 @@ deps-$(ARCH)/sqlite-src-$(SQLITE)/.extracted: deps-$(ARCH)/sqlite-src-$(SQLITE).
 	cd deps-$(ARCH) && unzip -o sqlite-src-$(SQLITE).zip
 	touch $@
 
-build-$(ARCH)/lib/libsqlite3.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted deps-$(ARCH)/sqlite-src-$(SQLITE)/.extracted
+build-$(ARCH)/lib/libsqlite3.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted build-$(ARCH)/lib/libreadline.a deps-$(ARCH)/sqlite-src-$(SQLITE)/.extracted
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/sqlite-src-$(SQLITE) &&\
 		ARCH="$(ARCH)"\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(ARCH) --exec-prefix=$(ROOT_DIR)build-$(ARCH) --enable-static --disable-shared
-	cd deps-$(ARCH)/sqlite-src-$(SQLITE) && ../../configure-wrapper.sh make -j4
+	cd deps-$(ARCH)/sqlite-src-$(SQLITE) && ../../configure-wrapper.sh make -j$(JOBS)
 	cd deps-$(ARCH)/sqlite-src-$(SQLITE) && ../../configure-wrapper.sh make install
 
 libsqlite: build-$(ARCH)/lib/libsqlite3.a
@@ -204,7 +218,7 @@ build-$(ARCH)/lib/libbz2.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted de
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/bzip2-$(BZIP2) &&\
 		ARCH="$(ARCH)"\
-		../../configure-wrapper.sh make -j4
+		../../configure-wrapper.sh make -j$(JOBS)
 	cd deps-$(ARCH)/bzip2-$(BZIP2) &&\
 		ARCH="$(ARCH)"\
 		../../configure-wrapper.sh make install
