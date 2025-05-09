@@ -2,6 +2,7 @@ build
 build-*
 python-static-*
 deps
+deps-*
 .DS_Store
 *.out
 *.log

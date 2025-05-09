@@ -11,22 +11,22 @@ BZIP2 := 1.0.8
 PYTHON := 3.13.3
 PYTHONV := 3.13
 
-ARCH := x86_64
+ARCH := $(shell uname -m)
 
 DEPS_DIR := "$(ROOT_DIR)/deps-$(ARCH)"
 
-CC=$(DEPS_DIR)/$(ARCH)-linux-musl-cross/bin/$(ARCH)-linux-musl-gcc
-AR=$(DEPS_DIR)/$(ARCH)-linux-musl-cross/bin/$(ARCH)-linux-musl-ar
-RANLIB=$(DEPS_DIR)/$(ARCH)-linux-musl-cross/bin/$(ARCH)-linux-musl-ranlib
-LD=$(DEPS_DIR)/$(ARCH)-linux-musl-cross/bin/$(ARCH)-linux-musl-ld
+CC=$(DEPS_DIR)/$(ARCH)-linux-musl-native/bin/gcc
+AR=$(DEPS_DIR)/$(ARCH)-linux-musl-native/bin/ar
+RANLIB=$(DEPS_DIR)/$(ARCH)-linux-musl-native/bin/ranlib
+LD=$(DEPS_DIR)/$(ARCH)-linux-musl-native/bin/ld
 
 # build steps for musl toolchain.
 
-deps-$(ARCH)/$(ARCH)-linux-musl-cross.tgz:
+deps-$(ARCH)/$(ARCH)-linux-musl-native.tgz:
 	mkdir -p deps-$(ARCH)
-	curl -Lf https://musl.cc/$(ARCH)-linux-musl-cross.tgz -o deps-$(ARCH)/$(ARCH)-linux-musl-cross.tgz
+	curl -Lf https://musl.cc/$(ARCH)-linux-musl-native.tgz -o deps-$(ARCH)/$(ARCH)-linux-musl-native.tgz
 
-deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted: deps-$(ARCH)/$(ARCH)-linux-musl-cross.tgz
+deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted: deps-$(ARCH)/$(ARCH)-linux-musl-native.tgz
 	tar -xzf $< -C deps-$(ARCH)
 	touch $@
 
@@ -41,7 +41,7 @@ deps-$(ARCH)/openssl-$(OPENSSL)/.extracted: deps-$(ARCH)/openssl-$(OPENSSL).tar.
 	cd deps-$(ARCH)/openssl-$(OPENSSL) && sed -i '1513d' ./Configure
 	touch $@
 
-build-$(ARCH)/lib64/libssl.a: deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted deps-$(ARCH)/openssl-$(OPENSSL)/.extracted
+build-$(ARCH)/lib64/libssl.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted deps-$(ARCH)/openssl-$(OPENSSL)/.extracted
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/openssl-$(OPENSSL) &&\
 		ARCH="$(ARCH)"\
@@ -62,7 +62,7 @@ deps-$(ARCH)/libffi-$(LIBFFI)/.extracted: deps-$(ARCH)/libffi-$(LIBFFI).tar.gz
 	tar -xzf deps-$(ARCH)/libffi-$(LIBFFI).tar.gz -C deps-$(ARCH)
 	touch $@
 
-build-$(ARCH)/lib/libffi.a: deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted deps-$(ARCH)/libffi-$(LIBFFI)/.extracted
+build-$(ARCH)/lib/libffi.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted deps-$(ARCH)/libffi-$(LIBFFI)/.extracted
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/libffi-$(LIBFFI) &&\
 		ARCH="$(ARCH)"\
@@ -83,7 +83,7 @@ deps-$(ARCH)/xz-$(LIBLZMA)/.extracted: deps-$(ARCH)/xz-$(LIBLZMA).tar.gz
 	tar -xzf deps-$(ARCH)/xz-5.8.1.tar.gz -C deps-$(ARCH)
 	touch $@
 
-build-$(ARCH)/lib/liblzma.a: deps-$(ARCH)/xz-$(LIBLZMA)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted
+build-$(ARCH)/lib/liblzma.a: deps-$(ARCH)/xz-$(LIBLZMA)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/xz-$(LIBLZMA) &&\
 		ARCH="$(ARCH)"\
@@ -104,7 +104,7 @@ deps-$(ARCH)/zlib-$(ZLIB)/.extracted: deps-$(ARCH)/zlib-$(ZLIB).tar.gz
 	tar -xzf deps-$(ARCH)/zlib-1.3.1.tar.gz -C deps-$(ARCH)
 	touch $@
 
-build-$(ARCH)/lib/libz.a: deps-$(ARCH)/zlib-$(ZLIB)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted
+build-$(ARCH)/lib/libz.a: deps-$(ARCH)/zlib-$(ZLIB)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/zlib-$(ZLIB) &&\
 		ARCH="$(ARCH)"\
@@ -125,7 +125,7 @@ deps-$(ARCH)/ncurses-$(NCURSES)/.extracted: deps-$(ARCH)/ncurses-$(NCURSES).tar.
 	tar -xzf deps-$(ARCH)/ncurses-$(NCURSES).tar.gz -C deps-$(ARCH)
 	touch $@
 
-build-$(ARCH)/lib/libncursesw.a: deps-$(ARCH)/ncurses-$(NCURSES)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted
+build-$(ARCH)/lib/libncursesw.a: deps-$(ARCH)/ncurses-$(NCURSES)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted
 	cd deps-$(ARCH)/ncurses-$(NCURSES) &&\
 		ARCH="$(ARCH)"\
 		../../configure-wrapper.sh ./configure --without-cxx --without-cxx-binding\
@@ -150,7 +150,7 @@ deps-$(ARCH)/readline-$(READLINE)/.extracted: deps-$(ARCH)/readline-$(READLINE).
 	tar -xzf deps-$(ARCH)/readline-$(READLINE).tar.gz -C deps-$(ARCH)
 	touch $@
 
-build-$(ARCH)/lib/libreadline.a: deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted deps-$(ARCH)/readline-$(READLINE)/.extracted
+build-$(ARCH)/lib/libreadline.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted deps-$(ARCH)/readline-$(READLINE)/.extracted
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/readline-$(READLINE) &&\
 		ARCH="$(ARCH)"\
@@ -171,7 +171,7 @@ deps-$(ARCH)/sqlite-src-$(SQLITE)/.extracted: deps-$(ARCH)/sqlite-src-$(SQLITE).
 	cd deps-$(ARCH) && unzip -o sqlite-src-$(SQLITE).zip
 	touch $@
 
-build-$(ARCH)/lib/libsqlite3.a: deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted deps-$(ARCH)/sqlite-src-$(SQLITE)/.extracted
+build-$(ARCH)/lib/libsqlite3.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted deps-$(ARCH)/sqlite-src-$(SQLITE)/.extracted
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/sqlite-src-$(SQLITE) &&\
 		ARCH="$(ARCH)"\
@@ -200,7 +200,7 @@ deps-$(ARCH)/bzip2-$(BZIP2)/.extracted: deps-$(ARCH)/bzip2-$(BZIP2).tar.gz
 		deps-$(ARCH)/bzip2-$(BZIP2)/Makefile
 	touch $@
 
-build-$(ARCH)/lib/libbz2.a: deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted deps-$(ARCH)/bzip2-$(BZIP2)/.extracted
+build-$(ARCH)/lib/libbz2.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted deps-$(ARCH)/bzip2-$(BZIP2)/.extracted
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/bzip2-$(BZIP2) &&\
 		ARCH="$(ARCH)"\
@@ -229,7 +229,7 @@ deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local: deps-$(ARCH)/Python-$(PYTHON)
 		./deps-$(ARCH)/Python-$(PYTHON)/Lib/ctypes/__init__.py
 	cp -r ./Setup deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local
 
-python-static-$(ARCH)/bin/python$(PYTHONV): openssl libffi libsqlite liblzma readline zlib libbz2 ncurses deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted
+python-static-$(ARCH)/bin/python$(PYTHONV): openssl libffi libsqlite liblzma readline zlib libbz2 ncurses deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted
 	cd deps-$(ARCH)/Python-$(PYTHON) &&\
 		ARCH="$(ARCH)"\
 		PYTHON="1"\
