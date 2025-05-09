@@ -216,7 +216,7 @@ deps/Python-$(PYTHON).tgz:
 
 deps/Python-$(PYTHON)/Modules/Setup.local: deps/Python-$(PYTHON).tgz
 	tar -xzf deps/Python-$(PYTHON).tgz -C deps
-	# monkey patched code for static symbols skullers
+	# monkey patched code for static symbols in ctypes
 	cp -r ./staticapi deps/Python-$(PYTHON)/Modules/staticapi
 	sed -i \
 		-e "319r ./staticapi/ctypes_patch_1.py"\
@@ -225,18 +225,18 @@ deps/Python-$(PYTHON)/Modules/Setup.local: deps/Python-$(PYTHON).tgz
 		./deps/Python-$(PYTHON)/Lib/ctypes/__init__.py
 	cp -r ./Setup deps/Python-$(PYTHON)/Modules/Setup.local
 
-build/bin/python$(PYTHONV): openssl libffi libsqlite liblzma readline zlib libbz2 ncurses deps/Python-$(PYTHON)/Modules/Setup.local deps/$(ARCH)-linux-musl-cross/.extracted
+python-static-$(ARCH)/bin/python$(PYTHONV): openssl libffi libsqlite liblzma readline zlib libbz2 ncurses deps/Python-$(PYTHON)/Modules/Setup.local deps/$(ARCH)-linux-musl-cross/.extracted
 	cd deps/Python-$(PYTHON) &&\
 		ARCH="$(ARCH)"\
 		PYTHON="1"\
-		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build\
-			--exec-prefix=$(ROOT_DIR)build --enable-static --disable-shared\
+		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)python-static-$(ARCH)\
+			--exec-prefix=$(ROOT_DIR)python-static-$(ARCH) --enable-static --disable-shared\
 			--with-openssl=$(ROOT_DIR)build\
 			--disable-test-modules\
 			--with-ensurepip=install
-	# ctypes has a dl opener that seems completely unnecessary
 	cd deps/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make -j8
+	mkdir -p python-static-$(ARCH)
 	cd deps/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make install
 
-python3: build/bin/python$(PYTHONV)
+python3: python-static-$(ARCH)/bin/python$(PYTHONV)
 .PHONY: python3

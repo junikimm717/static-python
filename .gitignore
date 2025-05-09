@@ -1,4 +1,6 @@
 build
+build-*
+python-static-*
 deps
 .DS_Store
 *.out
