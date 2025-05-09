@@ -5,3 +5,5 @@ deps
 *.log
 venv
 *.tar.gz
+*.o
+compile_flags.txt

@@ -216,8 +216,14 @@ deps/Python-$(PYTHON).tgz:
 
 deps/Python-$(PYTHON)/Modules/Setup.local: deps/Python-$(PYTHON).tgz
 	tar -xzf deps/Python-$(PYTHON).tgz -C deps
-	sed -i "390s/.*/            pass/" ./deps/Python-$(PYTHON)/Lib/ctypes/__init__.py
-	cp ./Setup deps/Python-$(PYTHON)/Modules/Setup.local
+	# monkey patched code for static symbols skullers
+	cp -r ./staticapi deps/Python-$(PYTHON)/Modules/staticapi
+	sed -i \
+		-e "319r ./staticapi/ctypes_patch_1.py"\
+		-e "486r ./staticapi/ctypes_patch_2.py"\
+		-e "390s/.*/            pass/"\
+		./deps/Python-$(PYTHON)/Lib/ctypes/__init__.py
+	cp -r ./Setup deps/Python-$(PYTHON)/Modules/Setup.local
 
 build/bin/python$(PYTHONV): openssl libffi libsqlite liblzma readline zlib libbz2 ncurses deps/Python-$(PYTHON)/Modules/Setup.local deps/$(ARCH)-linux-musl-cross/.extracted
 	cd deps/Python-$(PYTHON) &&\

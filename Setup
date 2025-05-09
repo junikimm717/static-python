@@ -260,17 +260,9 @@ _hashlib _hashopenssl.c $(OPENSSL_INCLUDES) $(OPENSSL_LDFLAGS) -lcrypto
 _curses -lncursesw _cursesmodule.c
 #_curses_panel -lpanel -lncurses _curses_panel.c
 _curses_panel -lpanelw -lncursesw _curses_panel.c
-_sqlite3 _sqlite/blob.c\
-         _sqlite/connection.c\
-         _sqlite/cursor.c\
-         _sqlite/microprotocols.c\
-         _sqlite/module.c\
-         _sqlite/prepare_protocol.c\
-         _sqlite/row.c\
-         _sqlite/statement.c\
-         _sqlite/util.c
-         -lsqlite3
+_sqlite3 _sqlite/blob.c _sqlite/connection.c _sqlite/cursor.c _sqlite/microprotocols.c _sqlite/module.c _sqlite/prepare_protocol.c _sqlite/row.c _sqlite/statement.c _sqlite/util.c -lsqlite3
 
+staticapi staticapi/symbols.c staticapi/staticapi.c
 
 # macOS specific module, needs SystemConfiguration and CoreFoundation framework
 # _scproxy _scproxy.c
