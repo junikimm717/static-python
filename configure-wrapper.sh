@@ -15,10 +15,10 @@ export CC="$DEPS_DIR/$TOOLCHAIN-cross/bin/$TOOLCHAIN-gcc"
 export AR="$DEPS_DIR/$TOOLCHAIN-cross/bin/$TOOLCHAIN-ar"
 export RANLIB="$DEPS_DIR/$TOOLCHAIN-cross/bin/$TOOLCHAIN-ranlib"
 export LD="$DEPS_DIR/$TOOLCHAIN-cross/bin/$TOOLCHAIN-ld"
-export LDFLAGS="-Wl,--export-dynamic -static --static -L$ROOT/build/lib -L$ROOT/build/lib64"
+export LDFLAGS="-Wl,--export-dynamic -static --static -L$ROOT/build-$ARCH/lib -L$ROOT/build-$ARCH/lib64"
 export LINKFORSHARED=" "
-export CFLAGS="-I$ROOT/build/include -I$ROOT/build/include/ncursesw -g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error -fPIC"
-export PREFIX="$ROOT/build"
+export CFLAGS="-I$ROOT/build-$ARCH/include -I$ROOT/build-$ARCH/include/ncursesw -g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error -fPIC"
+export PREFIX="$ROOT/build-$ARCH"
 
 if ! test -z "$PYTHON"; then
   export PREFIX="$ROOT/python-static-$ARCH"

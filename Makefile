@@ -13,230 +13,234 @@ PYTHONV := 3.13
 
 ARCH := x86_64
 
-DEPS_DIR := "$(ROOT_DIR)/deps"
+DEPS_DIR := "$(ROOT_DIR)/deps-$(ARCH)"
 
 CC=$(DEPS_DIR)/$(ARCH)-linux-musl-cross/bin/$(ARCH)-linux-musl-gcc
-AR=$DEPS_DIR/$(ARCH)-linux-musl-cross/bin/$(ARCH)-linux-musl-ar
-RANLIB=$DEPS_DIR/$(ARCH)-linux-musl-cross/bin/$(ARCH)-linux-musl-ranlib
-LD=$DEPS_DIR/$(ARCH)-linux-musl-cross/bin/$(ARCH)-linux-musl-ld
+AR=$(DEPS_DIR)/$(ARCH)-linux-musl-cross/bin/$(ARCH)-linux-musl-ar
+RANLIB=$(DEPS_DIR)/$(ARCH)-linux-musl-cross/bin/$(ARCH)-linux-musl-ranlib
+LD=$(DEPS_DIR)/$(ARCH)-linux-musl-cross/bin/$(ARCH)-linux-musl-ld
 
 # build steps for musl toolchain.
 
-deps/$(ARCH)-linux-musl-cross.tgz:
-	mkdir -p deps
-	curl -Lf https://musl.cc/$(ARCH)-linux-musl-cross.tgz -o deps/$(ARCH)-linux-musl-cross.tgz
+deps-$(ARCH)/$(ARCH)-linux-musl-cross.tgz:
+	mkdir -p deps-$(ARCH)
+	curl -Lf https://musl.cc/$(ARCH)-linux-musl-cross.tgz -o deps-$(ARCH)/$(ARCH)-linux-musl-cross.tgz
 
-deps/$(ARCH)-linux-musl-cross/.extracted: deps/$(ARCH)-linux-musl-cross.tgz
-	tar -xzf $< -C deps
+deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted: deps-$(ARCH)/$(ARCH)-linux-musl-cross.tgz
+	tar -xzf $< -C deps-$(ARCH)
 	touch $@
 
-# build steps for statically building openssl.
-deps/openssl-$(OPENSSL).tar.gz:
-	mkdir -p deps
-	curl -Lf https://github.com/openssl/openssl/releases/download/openssl-$(OPENSSL)/openssl-$(OPENSSL).tar.gz -o deps/openssl-$(OPENSSL).tar.gz
+# compile openssl
 
-deps/openssl-$(OPENSSL)/.extracted: deps/openssl-$(OPENSSL).tar.gz
-	tar -xzf deps/openssl-$(OPENSSL).tar.gz -C deps
-	cd deps/openssl-$(OPENSSL) && sed -i '1513d' ./Configure
+deps-$(ARCH)/openssl-$(OPENSSL).tar.gz:
+	mkdir -p deps-$(ARCH)
+	curl -Lf https://github.com/openssl/openssl/releases/download/openssl-$(OPENSSL)/openssl-$(OPENSSL).tar.gz -o deps-$(ARCH)/openssl-$(OPENSSL).tar.gz
+
+deps-$(ARCH)/openssl-$(OPENSSL)/.extracted: deps-$(ARCH)/openssl-$(OPENSSL).tar.gz
+	tar -xzf deps-$(ARCH)/openssl-$(OPENSSL).tar.gz -C deps-$(ARCH)
+	cd deps-$(ARCH)/openssl-$(OPENSSL) && sed -i '1513d' ./Configure
 	touch $@
 
-build/lib64/libssl.a: deps/$(ARCH)-linux-musl-cross/.extracted deps/openssl-$(OPENSSL)/.extracted
-	mkdir -p build
-	cd deps/openssl-$(OPENSSL) &&\
+build-$(ARCH)/lib64/libssl.a: deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted deps-$(ARCH)/openssl-$(OPENSSL)/.extracted
+	mkdir -p build-$(ARCH)
+	cd deps-$(ARCH)/openssl-$(OPENSSL) &&\
 		ARCH="$(ARCH)"\
-		../../configure-wrapper.sh ./Configure linux-$(ARCH) --prefix=$(ROOT_DIR)build --openssldir=$(ROOT_DIR)build no-shared no-apps
-	cd deps/openssl-$(OPENSSL) && ../../configure-wrapper.sh make -j4
-	cd deps/openssl-$(OPENSSL) && ../../configure-wrapper.sh make install
+		../../configure-wrapper.sh ./Configure linux-$(ARCH) --prefix=$(ROOT_DIR)build-$(ARCH) --openssldir=$(ROOT_DIR)build-$(ARCH) no-shared no-apps
+	cd deps-$(ARCH)/openssl-$(OPENSSL) && ../../configure-wrapper.sh make -j4
+	cd deps-$(ARCH)/openssl-$(OPENSSL) && ../../configure-wrapper.sh make install
 
-openssl: build/lib64/libssl.a
+openssl: build-$(ARCH)/lib64/libssl.a
 .PHONY: openssl
 
-# build steps for libffi
+# compile libffi
 
-deps/libffi-$(LIBFFI).tar.gz:
-	mkdir -p deps
-	curl -Lf https://github.com/libffi/libffi/releases/download/v$(LIBFFI)/libffi-$(LIBFFI).tar.gz -o deps/libffi-$(LIBFFI).tar.gz
+deps-$(ARCH)/libffi-$(LIBFFI).tar.gz:
+	mkdir -p deps-$(ARCH)
+	curl -Lf https://github.com/libffi/libffi/releases/download/v$(LIBFFI)/libffi-$(LIBFFI).tar.gz -o deps-$(ARCH)/libffi-$(LIBFFI).tar.gz
 
-deps/libffi-$(LIBFFI)/.extracted: deps/libffi-$(LIBFFI).tar.gz
-	tar -xzf deps/libffi-$(LIBFFI).tar.gz -C deps
+deps-$(ARCH)/libffi-$(LIBFFI)/.extracted: deps-$(ARCH)/libffi-$(LIBFFI).tar.gz
+	tar -xzf deps-$(ARCH)/libffi-$(LIBFFI).tar.gz -C deps-$(ARCH)
 	touch $@
 
-build/lib/libffi.a: deps/$(ARCH)-linux-musl-cross/.extracted deps/libffi-$(LIBFFI)/.extracted
-	mkdir -p build
-	cd deps/libffi-$(LIBFFI) &&\
+build-$(ARCH)/lib/libffi.a: deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted deps-$(ARCH)/libffi-$(LIBFFI)/.extracted
+	mkdir -p build-$(ARCH)
+	cd deps-$(ARCH)/libffi-$(LIBFFI) &&\
 		ARCH="$(ARCH)"\
-		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build --exec-prefix=$(ROOT_DIR)build --enable-static --disable-shared
-	cd deps/libffi-$(LIBFFI) && ../../configure-wrapper.sh make -j4
-	cd deps/libffi-$(LIBFFI) && ../../configure-wrapper.sh make install
+		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(ARCH) --exec-prefix=$(ROOT_DIR)build-$(ARCH) --enable-static --disable-shared
+	cd deps-$(ARCH)/libffi-$(LIBFFI) && ../../configure-wrapper.sh make -j4
+	cd deps-$(ARCH)/libffi-$(LIBFFI) && ../../configure-wrapper.sh make install
 
-libffi: build/lib/libffi.a
+libffi: build-$(ARCH)/lib/libffi.a
 .PHONY: libffi
 
-# build steps for libffi
-deps/xz-$(LIBLZMA).tar.gz:
-	mkdir -p deps
-	curl -Lf https://github.com/tukaani-project/xz/releases/download/v5.8.1/xz-5.8.1.tar.gz -o deps/xz-5.8.1.tar.gz
+# compile libxz
 
-deps/xz-$(LIBLZMA)/.extracted: deps/xz-$(LIBLZMA).tar.gz
-	tar -xzf deps/xz-5.8.1.tar.gz -C deps
+deps-$(ARCH)/xz-$(LIBLZMA).tar.gz:
+	mkdir -p deps-$(ARCH)
+	curl -Lf https://github.com/tukaani-project/xz/releases/download/v5.8.1/xz-5.8.1.tar.gz -o deps-$(ARCH)/xz-5.8.1.tar.gz
+
+deps-$(ARCH)/xz-$(LIBLZMA)/.extracted: deps-$(ARCH)/xz-$(LIBLZMA).tar.gz
+	tar -xzf deps-$(ARCH)/xz-5.8.1.tar.gz -C deps-$(ARCH)
 	touch $@
 
-build/lib/liblzma.a: deps/xz-$(LIBLZMA)/.extracted deps/$(ARCH)-linux-musl-cross/.extracted
-	mkdir -p build
-	cd deps/xz-$(LIBLZMA) &&\
+build-$(ARCH)/lib/liblzma.a: deps-$(ARCH)/xz-$(LIBLZMA)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted
+	mkdir -p build-$(ARCH)
+	cd deps-$(ARCH)/xz-$(LIBLZMA) &&\
 		ARCH="$(ARCH)"\
-		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build --exec-prefix=$(ROOT_DIR)build --enable-static --disable-shared
-	cd deps/xz-$(LIBLZMA) && ../../configure-wrapper.sh make V=1 -j4
-	cd deps/xz-$(LIBLZMA) && ../../configure-wrapper.sh make install
+		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(ARCH) --exec-prefix=$(ROOT_DIR)build-$(ARCH) --enable-static --disable-shared
+	cd deps-$(ARCH)/xz-$(LIBLZMA) && ../../configure-wrapper.sh make V=1 -j4
+	cd deps-$(ARCH)/xz-$(LIBLZMA) && ../../configure-wrapper.sh make install
 
-liblzma: build/lib/liblzma.a
+liblzma: build-$(ARCH)/lib/liblzma.a
 .PHONY: liblzma
 
-# build steps for zlib
-deps/zlib-$(ZLIB).tar.gz:
-	mkdir -p deps
-	curl -Lf http://zlib.net/zlib-1.3.1.tar.gz -o deps/zlib-1.3.1.tar.gz
+# compile zlib
 
-deps/zlib-$(ZLIB)/.extracted: deps/zlib-$(ZLIB).tar.gz
-	tar -xzf deps/zlib-1.3.1.tar.gz -C deps
+deps-$(ARCH)/zlib-$(ZLIB).tar.gz:
+	mkdir -p deps-$(ARCH)
+	curl -Lf http://zlib.net/zlib-1.3.1.tar.gz -o deps-$(ARCH)/zlib-1.3.1.tar.gz
+
+deps-$(ARCH)/zlib-$(ZLIB)/.extracted: deps-$(ARCH)/zlib-$(ZLIB).tar.gz
+	tar -xzf deps-$(ARCH)/zlib-1.3.1.tar.gz -C deps-$(ARCH)
 	touch $@
 
-build/lib/libz.a: deps/zlib-$(ZLIB)/.extracted deps/$(ARCH)-linux-musl-cross/.extracted
-	mkdir -p build
-	cd deps/zlib-$(ZLIB) &&\
+build-$(ARCH)/lib/libz.a: deps-$(ARCH)/zlib-$(ZLIB)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted
+	mkdir -p build-$(ARCH)
+	cd deps-$(ARCH)/zlib-$(ZLIB) &&\
 		ARCH="$(ARCH)"\
-		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build --eprefix=$(ROOT_DIR)build --static
-	cd deps/zlib-$(ZLIB) && ../../configure-wrapper.sh make -j4
-	cd deps/zlib-$(ZLIB) && ../../configure-wrapper.sh make install
+		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(ARCH) --eprefix=$(ROOT_DIR)build-$(ARCH) --static
+	cd deps-$(ARCH)/zlib-$(ZLIB) && ../../configure-wrapper.sh make -j4
+	cd deps-$(ARCH)/zlib-$(ZLIB) && ../../configure-wrapper.sh make install
 
-zlib: build/lib/libz.a
+zlib: build-$(ARCH)/lib/libz.a
 .PHONY: zlib
 
-# build steps for ncurses
+# compile ncurses
 
-deps/ncurses-$(NCURSES).tar.gz:
-	mkdir -p deps
-	curl -Lf https://invisible-mirror.net/archives/ncurses/ncurses-$(NCURSES).tar.gz -o deps/ncurses-$(NCURSES).tar.gz
+deps-$(ARCH)/ncurses-$(NCURSES).tar.gz:
+	mkdir -p deps-$(ARCH)
+	curl -Lf https://invisible-mirror.net/archives/ncurses/ncurses-$(NCURSES).tar.gz -o deps-$(ARCH)/ncurses-$(NCURSES).tar.gz
 
-deps/ncurses-$(NCURSES)/.extracted: deps/ncurses-$(NCURSES).tar.gz
-	tar -xzf deps/ncurses-$(NCURSES).tar.gz -C deps
+deps-$(ARCH)/ncurses-$(NCURSES)/.extracted: deps-$(ARCH)/ncurses-$(NCURSES).tar.gz
+	tar -xzf deps-$(ARCH)/ncurses-$(NCURSES).tar.gz -C deps-$(ARCH)
 	touch $@
 
-build/lib/libncursesw.a: deps/ncurses-$(NCURSES)/.extracted deps/$(ARCH)-linux-musl-cross/.extracted
-	cd deps/ncurses-$(NCURSES) &&\
+build-$(ARCH)/lib/libncursesw.a: deps-$(ARCH)/ncurses-$(NCURSES)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted
+	cd deps-$(ARCH)/ncurses-$(NCURSES) &&\
 		ARCH="$(ARCH)"\
 		../../configure-wrapper.sh ./configure --without-cxx --without-cxx-binding\
-		--without-shared --prefix=$(ROOT_DIR)build\
-		--exec-prefix=$(ROOT_DIR)build --enable-static\
+		--without-shared --prefix=$(ROOT_DIR)build-$(ARCH)\
+		--exec-prefix=$(ROOT_DIR)build-$(ARCH) --enable-static\
 		--without-progs\
 		--enable-termcap\
 		--disable-shared
-	cd deps/ncurses-$(NCURSES) && make -j4
-	cd deps/ncurses-$(NCURSES) && make install
+	cd deps-$(ARCH)/ncurses-$(NCURSES) && make -j4
+	cd deps-$(ARCH)/ncurses-$(NCURSES) && make install
 
-ncurses: build/lib/libncursesw.a
+ncurses: build-$(ARCH)/lib/libncursesw.a
 .PHONY: ncurses
 
-# build steps for gnu readline
+# compile readline
 
-deps/readline-$(READLINE).tar.gz:
-	mkdir -p deps
-	curl -Lf https://ftp.gnu.org/gnu/readline/readline-$(READLINE).tar.gz -o deps/readline-$(READLINE).tar.gz
+deps-$(ARCH)/readline-$(READLINE).tar.gz:
+	mkdir -p deps-$(ARCH)
+	curl -Lf https://ftp.gnu.org/gnu/readline/readline-$(READLINE).tar.gz -o deps-$(ARCH)/readline-$(READLINE).tar.gz
 
-deps/readline-$(READLINE)/.extracted: deps/readline-$(READLINE).tar.gz 
-	tar -xzf deps/readline-$(READLINE).tar.gz -C deps
+deps-$(ARCH)/readline-$(READLINE)/.extracted: deps-$(ARCH)/readline-$(READLINE).tar.gz 
+	tar -xzf deps-$(ARCH)/readline-$(READLINE).tar.gz -C deps-$(ARCH)
 	touch $@
 
-build/lib/libreadline.a: deps/$(ARCH)-linux-musl-cross/.extracted deps/readline-$(READLINE)/.extracted
-	mkdir -p build
-	cd deps/readline-$(READLINE) &&\
+build-$(ARCH)/lib/libreadline.a: deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted deps-$(ARCH)/readline-$(READLINE)/.extracted
+	mkdir -p build-$(ARCH)
+	cd deps-$(ARCH)/readline-$(READLINE) &&\
 		ARCH="$(ARCH)"\
-		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build --exec-prefix=$(ROOT_DIR)build --enable-static --disable-shared
-	cd deps/readline-$(READLINE) && ../../configure-wrapper.sh make -j1
-	cd deps/readline-$(READLINE) && ../../configure-wrapper.sh make install
+		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(ARCH) --exec-prefix=$(ROOT_DIR)build-$(ARCH) --enable-static --disable-shared
+	cd deps-$(ARCH)/readline-$(READLINE) && ../../configure-wrapper.sh make -j1
+	cd deps-$(ARCH)/readline-$(READLINE) && ../../configure-wrapper.sh make install
 
-readline: build/lib/libreadline.a
+readline: build-$(ARCH)/lib/libreadline.a
 .PHONY: readline
 
-# build steps for libsqlite
+# compile steps for libsqlite
 
-deps/sqlite-src-$(SQLITE).zip:
-	mkdir -p deps
-	curl -Lf https://www.sqlite.org/2025/sqlite-src-$(SQLITE).zip -o deps/sqlite-src-$(SQLITE).zip
+deps-$(ARCH)/sqlite-src-$(SQLITE).zip:
+	mkdir -p deps-$(ARCH)
+	curl -Lf https://www.sqlite.org/2025/sqlite-src-$(SQLITE).zip -o deps-$(ARCH)/sqlite-src-$(SQLITE).zip
 
-deps/sqlite-src-$(SQLITE)/.extracted: deps/sqlite-src-$(SQLITE).zip
-	cd deps && unzip -o sqlite-src-$(SQLITE).zip
+deps-$(ARCH)/sqlite-src-$(SQLITE)/.extracted: deps-$(ARCH)/sqlite-src-$(SQLITE).zip
+	cd deps-$(ARCH) && unzip -o sqlite-src-$(SQLITE).zip
 	touch $@
 
-build/lib/libsqlite3.a: deps/$(ARCH)-linux-musl-cross/.extracted deps/sqlite-src-$(SQLITE)/.extracted
-	mkdir -p build
-	cd deps/sqlite-src-$(SQLITE) &&\
+build-$(ARCH)/lib/libsqlite3.a: deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted deps-$(ARCH)/sqlite-src-$(SQLITE)/.extracted
+	mkdir -p build-$(ARCH)
+	cd deps-$(ARCH)/sqlite-src-$(SQLITE) &&\
 		ARCH="$(ARCH)"\
-		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build --exec-prefix=$(ROOT_DIR)build --enable-static --disable-shared
-	cd deps/sqlite-src-$(SQLITE) && ../../configure-wrapper.sh make -j4
-	cd deps/sqlite-src-$(SQLITE) && ../../configure-wrapper.sh make install
+		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(ARCH) --exec-prefix=$(ROOT_DIR)build-$(ARCH) --enable-static --disable-shared
+	cd deps-$(ARCH)/sqlite-src-$(SQLITE) && ../../configure-wrapper.sh make -j4
+	cd deps-$(ARCH)/sqlite-src-$(SQLITE) && ../../configure-wrapper.sh make install
 
-libsqlite: build/lib/libsqlite3.a
+libsqlite: build-$(ARCH)/lib/libsqlite3.a
 .PHONY: libsqlite
 
-# Bzip2
-deps/bzip2-$(BZIP2).tar.gz:
-	mkdir -p deps
-	curl -Lf https://sourceware.org/pub/bzip2/bzip2-$(BZIP2).tar.gz -o deps/bzip2-$(BZIP2).tar.gz
+# compile bzip2
 
-deps/bzip2-$(BZIP2)/.extracted: deps/bzip2-$(BZIP2).tar.gz
-	tar -xzf deps/bzip2-$(BZIP2).tar.gz -C deps
+deps-$(ARCH)/bzip2-$(BZIP2).tar.gz:
+	mkdir -p deps-$(ARCH)
+	curl -Lf https://sourceware.org/pub/bzip2/bzip2-$(BZIP2).tar.gz -o deps-$(ARCH)/bzip2-$(BZIP2).tar.gz
+
+deps-$(ARCH)/bzip2-$(BZIP2)/.extracted: deps-$(ARCH)/bzip2-$(BZIP2).tar.gz
+	tar -xzf deps-$(ARCH)/bzip2-$(BZIP2).tar.gz -C deps-$(ARCH)
 	sed -i \
 		-e 's|^CC=.*||' \
 		-e 's|^AR=.*||' \
 		-e 's|^RANLIB=.*||' \
 		-e 's|^CFLAGS=.*||' \
 		-e 's|^LDFLAGS=.*||' \
-		-e 's|^PREFIX=.*|PREFIX=$(ROOT_DIR)build|' \
-		deps/bzip2-$(BZIP2)/Makefile
+		-e 's|^PREFIX=.*|PREFIX=$(ROOT_DIR)build-$(ARCH)|' \
+		deps-$(ARCH)/bzip2-$(BZIP2)/Makefile
 	touch $@
 
-build/lib/libbz2.a: deps/$(ARCH)-linux-musl-cross/.extracted deps/bzip2-$(BZIP2)/.extracted
-	mkdir -p build
-	cd deps/bzip2-$(BZIP2) &&\
+build-$(ARCH)/lib/libbz2.a: deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted deps-$(ARCH)/bzip2-$(BZIP2)/.extracted
+	mkdir -p build-$(ARCH)
+	cd deps-$(ARCH)/bzip2-$(BZIP2) &&\
 		ARCH="$(ARCH)"\
 		../../configure-wrapper.sh make -j4
-	cd deps/bzip2-$(BZIP2) &&\
+	cd deps-$(ARCH)/bzip2-$(BZIP2) &&\
 		ARCH="$(ARCH)"\
 		../../configure-wrapper.sh make install
 
-libbz2: build/lib/libbz2.a
+libbz2: build-$(ARCH)/lib/libbz2.a
 .PHONY: libbz2
 
-# Python3 building steps
+# compile python3
 
-deps/Python-$(PYTHON).tgz:
-	mkdir -p deps
-	curl -Lf https://www.python.org/ftp/python/$(PYTHON)/Python-$(PYTHON).tgz -o deps/Python-$(PYTHON).tgz
+deps-$(ARCH)/Python-$(PYTHON).tgz:
+	mkdir -p deps-$(ARCH)
+	curl -Lf https://www.python.org/ftp/python/$(PYTHON)/Python-$(PYTHON).tgz -o deps-$(ARCH)/Python-$(PYTHON).tgz
 
-deps/Python-$(PYTHON)/Modules/Setup.local: deps/Python-$(PYTHON).tgz
-	tar -xzf deps/Python-$(PYTHON).tgz -C deps
+deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local: deps-$(ARCH)/Python-$(PYTHON).tgz
+	tar -xzf deps-$(ARCH)/Python-$(PYTHON).tgz -C deps-$(ARCH)
 	# monkey patched code for static symbols in ctypes
-	cp -r ./staticapi deps/Python-$(PYTHON)/Modules/staticapi
+	cp -r ./staticapi deps-$(ARCH)/Python-$(PYTHON)/Modules/staticapi
 	sed -i \
 		-e "319r ./staticapi/ctypes_patch_1.py"\
 		-e "486r ./staticapi/ctypes_patch_2.py"\
 		-e "390s/.*/            pass/"\
-		./deps/Python-$(PYTHON)/Lib/ctypes/__init__.py
-	cp -r ./Setup deps/Python-$(PYTHON)/Modules/Setup.local
+		./deps-$(ARCH)/Python-$(PYTHON)/Lib/ctypes/__init__.py
+	cp -r ./Setup deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local
 
-python-static-$(ARCH)/bin/python$(PYTHONV): openssl libffi libsqlite liblzma readline zlib libbz2 ncurses deps/Python-$(PYTHON)/Modules/Setup.local deps/$(ARCH)-linux-musl-cross/.extracted
-	cd deps/Python-$(PYTHON) &&\
+python-static-$(ARCH)/bin/python$(PYTHONV): openssl libffi libsqlite liblzma readline zlib libbz2 ncurses deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local deps-$(ARCH)/$(ARCH)-linux-musl-cross/.extracted
+	cd deps-$(ARCH)/Python-$(PYTHON) &&\
 		ARCH="$(ARCH)"\
 		PYTHON="1"\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)python-static-$(ARCH)\
 			--exec-prefix=$(ROOT_DIR)python-static-$(ARCH) --enable-static --disable-shared\
-			--with-openssl=$(ROOT_DIR)build\
+			--with-openssl=$(ROOT_DIR)build-$(ARCH)\
 			--disable-test-modules\
 			--with-ensurepip=install
-	cd deps/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make -j8
+	cd deps-$(ARCH)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make -j8
 	mkdir -p python-static-$(ARCH)
-	cd deps/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make install
+	cd deps-$(ARCH)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make install
 
 python3: python-static-$(ARCH)/bin/python$(PYTHONV)
 .PHONY: python3
