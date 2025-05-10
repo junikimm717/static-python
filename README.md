@@ -1,8 +1,13 @@
 # Statically Linked Python
 
 A stupid project where I attempt to build a functional, dependency-free python
-interpreter on Linux. This project is mostly as a hobby. For almost all intents
-and purposes, you really should use your standard dynamically linked python
+interpreter for Linux. Contrary to a bunch of Stack Overflow/forum posts, this
+was a far more difficult problem than initially anticipated and involved
+extensive fiddling/patching. This repo is the result of my madness while
+procrastinating studying for MIT finals :).
+
+This project is exclusively as a hobby. For basically all
+intents and purposes, you should use your standard dynamically linked python
 interpreter.
 
 Python ABI support is mostly there plus or minus epsilon (No deprecated ABI's
@@ -24,7 +29,7 @@ most of which should be present if you're already building a lot of things:
 - **unzip**
 - **perl** (apparently required by OpenSSL's build system?)
 - **python** (only if you are cross-compiling)
-- cURL, tar, makea
+- cURL, tar, make
 
 A C compiler should not be strictly necessary, as the build system compiles
 eveything with a musl toolchain that it downloads.
