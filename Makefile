@@ -303,8 +303,9 @@ python-static-$(ARCH)/bin/python$(PYTHONV): openssl libffi libuuid libsqlite lib
 	cd deps-$(ARCH)/Python-$(PYTHON) &&\
 		PYTHON="1"\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)python-static-$(ARCH)\
-			--exec-prefix=$(ROOT_DIR)python-static-$(ARCH) --enable-static --disable-shared\
+			--exec-prefix=$(ROOT_DIR)python-static-$(ARCH) --disable-shared\
 			--host=$(ARCH)-linux-musl\
+			--build=$(shell uname -m)-linux-musl\
 			--with-openssl=$(ROOT_DIR)build-$(ARCH)\
 			--disable-test-modules\
 			--with-ensurepip=no
