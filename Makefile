@@ -10,6 +10,7 @@ SQLITE := 3490200
 BZIP2 := 1.0.8
 PYTHON := 3.13.3
 PYTHONV := 3.13
+UTILLINUX := 2.41
 
 ARCH := $(shell uname -m)
 JOBS := $(shell nproc)
@@ -206,7 +207,7 @@ deps-$(ARCH)/bzip2-$(BZIP2).tar.gz:
 	curl -Lf https://sourceware.org/pub/bzip2/bzip2-$(BZIP2).tar.gz -o deps-$(ARCH)/bzip2-$(BZIP2).tar.gz
 
 deps-$(ARCH)/bzip2-$(BZIP2)/.extracted: deps-$(ARCH)/bzip2-$(BZIP2).tar.gz
-	tar -xzf deps-$(ARCH)/bzip2-$(BZIP2).tar.gz -C deps-$(ARCH)
+	tar -xzf $< -C deps-$(ARCH)
 	sed -i \
 		-e 's|^CC=.*||' \
 		-e 's|^AR=.*||' \
@@ -229,6 +230,33 @@ build-$(ARCH)/lib/libbz2.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted de
 libbz2: build-$(ARCH)/lib/libbz2.a
 .PHONY: libbz2
 
+# compile lib uuid
+
+deps-$(ARCH)/util-linux-$(UTILLINUX).tar.gz:
+	mkdir -p deps-$(ARCH)
+	curl -Lf https://github.com/util-linux/util-linux/archive/refs/tags/v$(UTILLINUX).tar.gz -o $@
+
+deps-$(ARCH)/util-linux-$(UTILLINUX)/.extracted: deps-$(ARCH)/util-linux-$(UTILLINUX).tar.gz
+	tar -xzf $< -C deps-$(ARCH)
+	touch $@
+
+build-$(ARCH)/lib/libuuid.a: deps-$(ARCH)/util-linux-$(UTILLINUX)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted
+	cd deps-$(ARCH)/util-linux-$(UTILLINUX) && \
+		grep -E "option(.*),[[:space:]]*type[[:space:]]*:[[:space:]]*'feature'" meson_options.txt \
+			| grep -vE 'build-libuuid' \
+			| sed -E "s/.*option\(['\"]([a-zA-Z0-9_-]+)['\"].*/\1/" \
+			| awk '{print "-D" $$1 "=disabled"}'\
+			> ./build-args.txt &&\
+		echo "--prefix=$(ROOT_DIR)build-$(ARCH) --default-library=static --prefer-static --buildtype=release --backend=ninja"\
+			>> ./build-args.txt
+	cd deps-$(ARCH)/util-linux-$(UTILLINUX) && \
+		../../configure-wrapper.sh meson setup build $$(cat ./build-args.txt)
+	ninja -C deps-$(ARCH)/util-linux-$(UTILLINUX)/build
+	ninja -C deps-$(ARCH)/util-linux-$(UTILLINUX)/build install
+	
+libuuid: build-$(ARCH)/lib/libuuid.a
+.PHONY: libuuid
+
 # compile python3
 
 deps-$(ARCH)/Python-$(PYTHON).tgz:
@@ -246,7 +274,7 @@ deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local: deps-$(ARCH)/Python-$(PYTHON)
 		./deps-$(ARCH)/Python-$(PYTHON)/Lib/ctypes/__init__.py
 	cp -r ./Setup deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local
 
-python-static-$(ARCH)/bin/python$(PYTHONV): openssl libffi libsqlite liblzma readline zlib libbz2 ncurses deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted
+python-static-$(ARCH)/bin/python$(PYTHONV): openssl libffi libuuid libsqlite liblzma readline zlib libbz2 ncurses deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted
 	cd deps-$(ARCH)/Python-$(PYTHON) &&\
 		ARCH="$(ARCH)"\
 		PYTHON="1"\

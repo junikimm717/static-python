@@ -233,7 +233,7 @@ _ctypes _ctypes/_ctypes.c _ctypes/callbacks.c _ctypes/callproc.c _ctypes/stgdict
 #_dbm _dbmmodule.c -lgdbm_compat -DUSE_GDBM_COMPAT
 #_gdbm _gdbmmodule.c -lgdbm
 _lzma _lzmamodule.c -llzma
-#_uuid _uuidmodule.c -luuid
+_uuid _uuidmodule.c -luuid
 zlib  zlibmodule.c -lz
 
 # The readline module also supports libeditline (-leditline).

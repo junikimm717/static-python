@@ -18,6 +18,7 @@ python binary.
 ## Setup
 
 Here's a somewhat comprehensive list of things you should have on your system:
+- **meson and ninja** (for building libuuid)
 - **unzip**
 - **perl** (apparently required by OpenSSL's build system?)
 - cURL, tar, make, other basic utilities
