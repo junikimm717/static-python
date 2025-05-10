@@ -2,19 +2,30 @@
 
 ROOT="$(realpath "$(dirname "$0")")"
 
-if test -z "$ARCH"; then
-  ARCH="x86_64"
-fi
 TOOLCHAIN="$ARCH-linux-musl"
 DEPS_DIR="$(realpath "$(dirname "$0")")/deps-$ARCH"
 echo "====================="
 echo "configure-wrapper.sh: Using Arch $ARCH..."
 echo "====================="
 
-export CC="$DEPS_DIR/$TOOLCHAIN-native/bin/gcc"
-export AR="$DEPS_DIR/$TOOLCHAIN-native/bin/ar"
-export RANLIB="$DEPS_DIR/$TOOLCHAIN-native/bin/ranlib"
-export LD="$DEPS_DIR/$TOOLCHAIN-native/bin/ld"
+case "$TCTYPE" in
+  "native")
+    export CC="$DEPS_DIR/$TOOLCHAIN-native/bin/gcc"
+    export AR="$DEPS_DIR/$TOOLCHAIN-native/bin/ar"
+    export RANLIB="$DEPS_DIR/$TOOLCHAIN-native/bin/ranlib"
+    export LD="$DEPS_DIR/$TOOLCHAIN-native/bin/ld"
+    ;;
+  "cross")
+    export CC="$DEPS_DIR/$TOOLCHAIN-cross/bin/$TOOLCHAIN-gcc"
+    export AR="$DEPS_DIR/$TOOLCHAIN-cross/bin/$TOOLCHAIN-ar"
+    export RANLIB="$DEPS_DIR/$TOOLCHAIN-cross/bin/$TOOLCHAIN-ranlib"
+    export LD="$DEPS_DIR/$TOOLCHAIN-cross/bin/$TOOLCHAIN-ld"
+    ;;
+  *)
+    echo "\$TCTYPE must be either 'cross' or 'native' (set to '$TCTYPE')! Exiting..."
+    exit 1
+    ;;
+esac
 
 export LDFLAGS="-Wl,--export-dynamic -static --static -L$ROOT/build-$ARCH/lib -L$ROOT/build-$ARCH/lib64"
 export LINKFORSHARED=" "

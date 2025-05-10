@@ -15,20 +15,34 @@ UTILLINUX := 2.41
 ARCH := $(shell uname -m)
 JOBS := $(shell nproc)
 
-DEPS_DIR := "$(ROOT_DIR)/deps-$(ARCH)"
+# do a bunch of architecture fiddling.
+ifeq ($(shell uname -m),x86_64)
 
-CC=$(DEPS_DIR)/$(ARCH)-linux-musl-native/bin/gcc
-AR=$(DEPS_DIR)/$(ARCH)-linux-musl-native/bin/ar
-RANLIB=$(DEPS_DIR)/$(ARCH)-linux-musl-native/bin/ranlib
-LD=$(DEPS_DIR)/$(ARCH)-linux-musl-native/bin/ld
+ifneq ($(ARCH),$(shell uname -m))
+$(info Cross-Compiling to $(ARCH) from x86_64...)
+override TCTYPE=cross
+else
+override TCTYPE=native
+$(info Native Compiling in x86_64...)
+endif
+
+else
+
+override TCTYPE=native
+override ARCH=$(shell uname -m)
+$(info Not on x86_64, you must native compile on $(ARCH) because musl does not have the necesssary cross-compiling toolchains)
+
+endif
+
+DEPS_DIR := "$(ROOT_DIR)/deps-$(ARCH)"
 
 # build steps for musl toolchain.
 
-deps-$(ARCH)/$(ARCH)-linux-musl-native.tgz:
+deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE).tgz:
 	mkdir -p deps-$(ARCH)
-	curl -Lf https://musl.cc/$(ARCH)-linux-musl-native.tgz -o deps-$(ARCH)/$(ARCH)-linux-musl-native.tgz
+	curl -Lf https://musl.cc/$(ARCH)-linux-musl-$(TCTYPE).tgz -o deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE).tgz
 
-deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted: deps-$(ARCH)/$(ARCH)-linux-musl-native.tgz
+deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE).tgz
 	tar -xzf $< -C deps-$(ARCH)
 	touch $@
 
@@ -43,19 +57,20 @@ deps-$(ARCH)/openssl-$(OPENSSL)/.extracted: deps-$(ARCH)/openssl-$(OPENSSL).tar.
 	cd deps-$(ARCH)/openssl-$(OPENSSL) && sed -i '1513d' ./Configure
 	touch $@
 
-build-$(ARCH)/lib64/libssl.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted deps-$(ARCH)/openssl-$(OPENSSL)/.extracted
+build-$(ARCH)/include/openssl/ssl.h: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted deps-$(ARCH)/openssl-$(OPENSSL)/.extracted
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/openssl-$(OPENSSL) &&\
 		ARCH="$(ARCH)"\
+		TCTYPE="$(TCTYPE)"\
 		../../configure-wrapper.sh \
 		./Configure linux-$(ARCH) \
 			no-shared no-dso no-engine no-tests no-ssl3 no-comp no-idea no-rc5\
 			no-ec2m no-weak-ssl-ciphers no-apps\
 			--prefix=$(ROOT_DIR)build-$(ARCH) --openssldir=$(ROOT_DIR)build-$(ARCH)
-	cd deps-$(ARCH)/openssl-$(OPENSSL) && ../../configure-wrapper.sh make -j$(JOBS)
-	cd deps-$(ARCH)/openssl-$(OPENSSL) && ../../configure-wrapper.sh make install_sw
+	cd deps-$(ARCH)/openssl-$(OPENSSL) && TCTYPE="$(TCTYPE)" ../../configure-wrapper.sh make -j$(JOBS)
+	cd deps-$(ARCH)/openssl-$(OPENSSL) && TCTYPE="$(TCTYPE)" ../../configure-wrapper.sh make install
 
-openssl: build-$(ARCH)/lib64/libssl.a
+openssl: build-$(ARCH)/include/openssl/ssl.h
 .PHONY: openssl
 
 # compile libffi
@@ -68,16 +83,18 @@ deps-$(ARCH)/libffi-$(LIBFFI)/.extracted: deps-$(ARCH)/libffi-$(LIBFFI).tar.gz
 	tar -xzf deps-$(ARCH)/libffi-$(LIBFFI).tar.gz -C deps-$(ARCH)
 	touch $@
 
-build-$(ARCH)/lib/libffi.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted deps-$(ARCH)/libffi-$(LIBFFI)/.extracted
+build-$(ARCH)/lib/libffi.a: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted deps-$(ARCH)/libffi-$(LIBFFI)/.extracted
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/libffi-$(LIBFFI) &&\
 		ARCH="$(ARCH)"\
+		TCTYPE="$(TCTYPE)"\
 		../../configure-wrapper.sh ./configure \
 			--prefix=$(ROOT_DIR)build-$(ARCH) \
+			--host=$(ARCH)-linux-musl
 			--exec-prefix=$(ROOT_DIR)build-$(ARCH) \
 			--enable-static --disable-shared
-	cd deps-$(ARCH)/libffi-$(LIBFFI) && ../../configure-wrapper.sh make -j$(JOBS)
-	cd deps-$(ARCH)/libffi-$(LIBFFI) && ../../configure-wrapper.sh make install
+	cd deps-$(ARCH)/libffi-$(LIBFFI) && ARCH="$(ARCH)" TCTYPE="$(TCTYPE)" ../../configure-wrapper.sh make -j$(JOBS)
+	cd deps-$(ARCH)/libffi-$(LIBFFI) && ARCH="$(ARCH)" TCTYPE="$(TCTYPE)" ../../configure-wrapper.sh make install
 
 libffi: build-$(ARCH)/lib/libffi.a
 .PHONY: libffi
@@ -92,13 +109,14 @@ deps-$(ARCH)/xz-$(LIBLZMA)/.extracted: deps-$(ARCH)/xz-$(LIBLZMA).tar.gz
 	tar -xzf deps-$(ARCH)/xz-5.8.1.tar.gz -C deps-$(ARCH)
 	touch $@
 
-build-$(ARCH)/lib/liblzma.a: deps-$(ARCH)/xz-$(LIBLZMA)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted
+build-$(ARCH)/lib/liblzma.a: deps-$(ARCH)/xz-$(LIBLZMA)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/xz-$(LIBLZMA) &&\
 		ARCH="$(ARCH)"\
+		TCTYPE="$(TCTYPE)"\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(ARCH) --exec-prefix=$(ROOT_DIR)build-$(ARCH) --enable-static --disable-shared
-	cd deps-$(ARCH)/xz-$(LIBLZMA) && ../../configure-wrapper.sh make V=1 -j$(JOBS)
-	cd deps-$(ARCH)/xz-$(LIBLZMA) && ../../configure-wrapper.sh make install
+	cd deps-$(ARCH)/xz-$(LIBLZMA) && TCTYPE="$(TCTYPE)" ../../configure-wrapper.sh make V=1 -j$(JOBS)
+	cd deps-$(ARCH)/xz-$(LIBLZMA) && TCTYPE="$(TCTYPE)" ../../configure-wrapper.sh make install
 
 liblzma: build-$(ARCH)/lib/liblzma.a
 .PHONY: liblzma
@@ -113,13 +131,14 @@ deps-$(ARCH)/zlib-$(ZLIB)/.extracted: deps-$(ARCH)/zlib-$(ZLIB).tar.gz
 	tar -xzf deps-$(ARCH)/zlib-1.3.1.tar.gz -C deps-$(ARCH)
 	touch $@
 
-build-$(ARCH)/lib/libz.a: deps-$(ARCH)/zlib-$(ZLIB)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted
+build-$(ARCH)/lib/libz.a: deps-$(ARCH)/zlib-$(ZLIB)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/zlib-$(ZLIB) &&\
 		ARCH="$(ARCH)"\
+		TCTYPE="$(TCTYPE)"\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(ARCH) --eprefix=$(ROOT_DIR)build-$(ARCH) --static
-	cd deps-$(ARCH)/zlib-$(ZLIB) && ../../configure-wrapper.sh make -j$(JOBS)
-	cd deps-$(ARCH)/zlib-$(ZLIB) && ../../configure-wrapper.sh make install
+	cd deps-$(ARCH)/zlib-$(ZLIB) && TCTYPE="$(TCTYPE)" ../../configure-wrapper.sh make -j$(JOBS)
+	cd deps-$(ARCH)/zlib-$(ZLIB) && TCTYPE="$(TCTYPE)" ../../configure-wrapper.sh make install
 
 zlib: build-$(ARCH)/lib/libz.a
 .PHONY: zlib
@@ -134,18 +153,19 @@ deps-$(ARCH)/ncurses-$(NCURSES)/.extracted: deps-$(ARCH)/ncurses-$(NCURSES).tar.
 	tar -xzf deps-$(ARCH)/ncurses-$(NCURSES).tar.gz -C deps-$(ARCH)
 	touch $@
 
-build-$(ARCH)/lib/libncursesw.a: deps-$(ARCH)/ncurses-$(NCURSES)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted
+build-$(ARCH)/lib/libncursesw.a: deps-$(ARCH)/ncurses-$(NCURSES)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted
 	cd deps-$(ARCH)/ncurses-$(NCURSES) &&\
 		ARCH="$(ARCH)"\
+		TCTYPE="$(TCTYPE)"\
 		../../configure-wrapper.sh ./configure --without-cxx --without-cxx-binding\
-		--without-shared --prefix=$(ROOT_DIR)build-$(ARCH)\
-		--exec-prefix=$(ROOT_DIR)build-$(ARCH) --enable-static\
-		--without-ada \
-		--without-manpages \
-		--without-tests \
-		--without-progs\
-		--enable-termcap\
-		--disable-shared
+			--without-shared --prefix=$(ROOT_DIR)build-$(ARCH)\
+			--exec-prefix=$(ROOT_DIR)build-$(ARCH) --enable-static\
+			--without-ada \
+			--without-manpages \
+			--without-tests \
+			--without-progs\
+			--enable-termcap\
+			--disable-shared
 	cd deps-$(ARCH)/ncurses-$(NCURSES) && make -j$(JOBS)
 	cd deps-$(ARCH)/ncurses-$(NCURSES) && make install
 
@@ -162,10 +182,11 @@ deps-$(ARCH)/readline-$(READLINE)/.extracted: deps-$(ARCH)/readline-$(READLINE).
 	tar -xzf deps-$(ARCH)/readline-$(READLINE).tar.gz -C deps-$(ARCH)
 	touch $@
 
-build-$(ARCH)/lib/libreadline.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted deps-$(ARCH)/readline-$(READLINE)/.extracted
+build-$(ARCH)/lib/libreadline.a: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted deps-$(ARCH)/readline-$(READLINE)/.extracted
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/readline-$(READLINE) &&\
 		ARCH="$(ARCH)"\
+		TCTYPE="$(TCTYPE)"\
 		../../configure-wrapper.sh ./configure \
 			--prefix=$(ROOT_DIR)build-$(ARCH)\
 			--exec-prefix=$(ROOT_DIR)build-$(ARCH)\
@@ -173,8 +194,8 @@ build-$(ARCH)/lib/libreadline.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extract
 			--disable-install-examples\
 			--enable-static\
 			--disable-shared
-	cd deps-$(ARCH)/readline-$(READLINE) && ../../configure-wrapper.sh make -j$(JOBS)
-	cd deps-$(ARCH)/readline-$(READLINE) && ../../configure-wrapper.sh make install
+	cd deps-$(ARCH)/readline-$(READLINE) && TCTYPE="$(TCTYPE)" ../../configure-wrapper.sh make -j$(JOBS)
+	cd deps-$(ARCH)/readline-$(READLINE) && TCTYPE="$(TCTYPE)" ../../configure-wrapper.sh make install
 
 readline: build-$(ARCH)/lib/libreadline.a
 .PHONY: readline
@@ -189,13 +210,14 @@ deps-$(ARCH)/sqlite-src-$(SQLITE)/.extracted: deps-$(ARCH)/sqlite-src-$(SQLITE).
 	cd deps-$(ARCH) && unzip -o sqlite-src-$(SQLITE).zip
 	touch $@
 
-build-$(ARCH)/lib/libsqlite3.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted build-$(ARCH)/lib/libreadline.a deps-$(ARCH)/sqlite-src-$(SQLITE)/.extracted
+build-$(ARCH)/lib/libsqlite3.a: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted build-$(ARCH)/lib/libreadline.a deps-$(ARCH)/sqlite-src-$(SQLITE)/.extracted
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/sqlite-src-$(SQLITE) &&\
+		TCTYPE="$(TCTYPE)"\
 		ARCH="$(ARCH)"\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(ARCH) --exec-prefix=$(ROOT_DIR)build-$(ARCH) --enable-static --disable-shared
-	cd deps-$(ARCH)/sqlite-src-$(SQLITE) && ../../configure-wrapper.sh make -j$(JOBS)
-	cd deps-$(ARCH)/sqlite-src-$(SQLITE) && ../../configure-wrapper.sh make install
+	cd deps-$(ARCH)/sqlite-src-$(SQLITE) && TCTYPE="$(TCTYPE)" ../../configure-wrapper.sh make -j$(JOBS)
+	cd deps-$(ARCH)/sqlite-src-$(SQLITE) && TCTYPE="$(TCTYPE)" ../../configure-wrapper.sh make install
 
 libsqlite: build-$(ARCH)/lib/libsqlite3.a
 .PHONY: libsqlite
@@ -218,13 +240,15 @@ deps-$(ARCH)/bzip2-$(BZIP2)/.extracted: deps-$(ARCH)/bzip2-$(BZIP2).tar.gz
 		deps-$(ARCH)/bzip2-$(BZIP2)/Makefile
 	touch $@
 
-build-$(ARCH)/lib/libbz2.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted deps-$(ARCH)/bzip2-$(BZIP2)/.extracted
+build-$(ARCH)/lib/libbz2.a: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted deps-$(ARCH)/bzip2-$(BZIP2)/.extracted
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/bzip2-$(BZIP2) &&\
 		ARCH="$(ARCH)"\
+		TCTYPE="$(TCTYPE)"\
 		../../configure-wrapper.sh make -j$(JOBS)
 	cd deps-$(ARCH)/bzip2-$(BZIP2) &&\
 		ARCH="$(ARCH)"\
+		TCTYPE="$(TCTYPE)"\
 		../../configure-wrapper.sh make install
 
 libbz2: build-$(ARCH)/lib/libbz2.a
@@ -240,7 +264,7 @@ deps-$(ARCH)/util-linux-$(UTILLINUX)/.extracted: deps-$(ARCH)/util-linux-$(UTILL
 	tar -xzf $< -C deps-$(ARCH)
 	touch $@
 
-build-$(ARCH)/lib/libuuid.a: deps-$(ARCH)/util-linux-$(UTILLINUX)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted
+build-$(ARCH)/lib/libuuid.a: deps-$(ARCH)/util-linux-$(UTILLINUX)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted
 	cd deps-$(ARCH)/util-linux-$(UTILLINUX) && \
 		grep -E "option(.*),[[:space:]]*type[[:space:]]*:[[:space:]]*'feature'" meson_options.txt \
 			| grep -vE 'build-libuuid' \
@@ -250,6 +274,8 @@ build-$(ARCH)/lib/libuuid.a: deps-$(ARCH)/util-linux-$(UTILLINUX)/.extracted dep
 		echo "--prefix=$(ROOT_DIR)build-$(ARCH) --default-library=static --prefer-static --buildtype=release --backend=ninja"\
 			>> ./build-args.txt
 	cd deps-$(ARCH)/util-linux-$(UTILLINUX) && \
+		ARCH="$(ARCH)"\
+		TCTYPE="$(TCTYPE)"\
 		../../configure-wrapper.sh meson setup build $$(cat ./build-args.txt)
 	ninja -C deps-$(ARCH)/util-linux-$(UTILLINUX)/build
 	ninja -C deps-$(ARCH)/util-linux-$(UTILLINUX)/build install
@@ -274,18 +300,19 @@ deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local: deps-$(ARCH)/Python-$(PYTHON)
 		./deps-$(ARCH)/Python-$(PYTHON)/Lib/ctypes/__init__.py
 	cp -r ./Setup deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local
 
-python-static-$(ARCH)/bin/python$(PYTHONV): openssl libffi libuuid libsqlite liblzma readline zlib libbz2 ncurses deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local deps-$(ARCH)/$(ARCH)-linux-musl-native/.extracted
+python-static-$(ARCH)/bin/python$(PYTHONV): openssl libffi libuuid libsqlite liblzma readline zlib libbz2 ncurses deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted
 	cd deps-$(ARCH)/Python-$(PYTHON) &&\
 		ARCH="$(ARCH)"\
 		PYTHON="1"\
+		TCTYPE="$(TCTYPE)"\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)python-static-$(ARCH)\
 			--exec-prefix=$(ROOT_DIR)python-static-$(ARCH) --enable-static --disable-shared\
 			--with-openssl=$(ROOT_DIR)build-$(ARCH)\
 			--disable-test-modules\
 			--with-ensurepip=install
-	cd deps-$(ARCH)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make -j$(JOBS)
+	cd deps-$(ARCH)/Python-$(PYTHON) && ARCH="$(ARCH)" PYTHON=1 TCTYPE="$(TCTYPE)" ../../configure-wrapper.sh make -j$(JOBS)
 	mkdir -p python-static-$(ARCH)
-	cd deps-$(ARCH)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make bininstall
+	cd deps-$(ARCH)/Python-$(PYTHON) && ARCH="$(ARCH)" PYTHON=1 TCTYPE="$(TCTYPE)" ../../configure-wrapper.sh make bininstall
 
 python3: python-static-$(ARCH)/bin/python$(PYTHONV)
 .PHONY: python3

@@ -3,8 +3,7 @@
 A stupid project where I attempt to build a functional, dependency-free python
 interpreter on Linux.
 
-Only native toolchains are supported because the resulting python binary needs
-to be executed on the host system + a bunch of other stupid errors.
+Cross-compiling is now supported from x86_64!
 
 Python ABI support is mostly there plus or minus epsilon (No deprecated ABI's
 are included in my hacked module). The Makefile injects some code into the
@@ -21,6 +20,7 @@ Here's a somewhat comprehensive list of things you should have on your system:
 - **meson and ninja** (for building libuuid)
 - **unzip**
 - **perl** (apparently required by OpenSSL's build system?)
+- **python** (only if you are cross-compiling)
 - cURL, tar, make, other basic utilities
 
 A C compiler should not be strictly necessary, as the build system compiles
