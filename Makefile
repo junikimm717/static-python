@@ -289,6 +289,7 @@ libuuid: build-$(ARCH)/lib/libuuid.a
 
 ifeq ($(TCTYPE),cross)
 override NATIVE_PATH := python-static-$(shell uname -m)/bin/python$(PYTHONV)
+# include these flags iff cross compilation
 override PYTHON_CONFIG_FLAGS := --host=$(ARCH)-linux-musl --build=$(shell uname -m)-linux-musl --with-build-python=$(ROOT_DIR)$(NATIVE_PATH)
 native-interpreter:
 	make python-static-$(shell uname -m)/bin/python$(PYTHONV)
@@ -320,9 +321,7 @@ python-static-$(ARCH)/bin/python$(PYTHONV):\
 	cd deps-$(ARCH)/Python-$(PYTHON) &&\
 		PYTHON="1"\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)python-static-$(ARCH)\
-			--exec-prefix=$(ROOT_DIR)python-static-$(ARCH) --disable-shared\
-			--host=$(ARCH)-linux-musl\
-			--build=$(shell uname -m)-linux-musl\
+			--exec-prefix=$(ROOT_DIR)python-static-$(ARCH) --disable-shared $(PYTHON_CONFIG_FLAGS)\
 			--with-openssl=$(ROOT_DIR)build-$(ARCH)\
 			--disable-test-modules\
 			--with-ensurepip=no
