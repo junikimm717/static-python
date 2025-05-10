@@ -172,7 +172,7 @@ build-$(ARCH)/lib/libreadline.a: deps-$(ARCH)/$(ARCH)-linux-musl-native/.extract
 			--disable-install-examples\
 			--enable-static\
 			--disable-shared
-	cd deps-$(ARCH)/readline-$(READLINE) && ../../configure-wrapper.sh make -j1
+	cd deps-$(ARCH)/readline-$(READLINE) && ../../configure-wrapper.sh make -j$(JOBS)
 	cd deps-$(ARCH)/readline-$(READLINE) && ../../configure-wrapper.sh make install
 
 readline: build-$(ARCH)/lib/libreadline.a
@@ -255,9 +255,9 @@ python-static-$(ARCH)/bin/python$(PYTHONV): openssl libffi libsqlite liblzma rea
 			--with-openssl=$(ROOT_DIR)build-$(ARCH)\
 			--disable-test-modules\
 			--with-ensurepip=install
-	cd deps-$(ARCH)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make -j8
+	cd deps-$(ARCH)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make -j$(JOBS)
 	mkdir -p python-static-$(ARCH)
-	cd deps-$(ARCH)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make install
+	cd deps-$(ARCH)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make bininstall
 
 python3: python-static-$(ARCH)/bin/python$(PYTHONV)
 .PHONY: python3
