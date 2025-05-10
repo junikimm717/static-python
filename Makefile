@@ -295,7 +295,7 @@ python-static-$(ARCH)/bin/python$(PYTHONV): openssl libffi libuuid libsqlite lib
 			--exec-prefix=$(ROOT_DIR)python-static-$(ARCH) --enable-static --disable-shared\
 			--with-openssl=$(ROOT_DIR)build-$(ARCH)\
 			--disable-test-modules\
-			--with-ensurepip=install
+			--with-ensurepip=no
 	cd deps-$(ARCH)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make -j$(JOBS)
 	mkdir -p python-static-$(ARCH)
 	cd deps-$(ARCH)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make bininstall
