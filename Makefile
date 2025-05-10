@@ -293,6 +293,7 @@ override PYTHON_CONFIG_FLAGS := --host=$(ARCH)-linux-musl --build=$(NATIVE_ARCH)
 native-interpreter:
 	make python3 ARCH=$(NATIVE_ARCH)
 else
+override PYTHON_CONFIG_FLAGS :=
 native-interpreter:
 endif
 .PHONY: native-interpreter
