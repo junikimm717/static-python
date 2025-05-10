@@ -35,8 +35,12 @@ Cross-compiling is now supported from x86_64!
 
 To build, just use the Makefile and run `make python3 ARCH={insert}`. You
 should be able to find the resulting output in `./python-static-$(ARCH)`, where
-`$(ARCH)` is the architecture that you chose (defaults to native architecture).
+`$(ARCH)` is the architecture that you chose (defaults to native architecture if
+blank).
 
 You can view supported architectures in the Makefile under the `SUPPORTED`
-variable. (I assume if you are actually trying to run this project, you know
-what you are doing)
+variable. (I assume if you are actually trying to run this project, you for sure
+know what you are doing 😇)
+
+It turns out that a limitation to further support is OpenSSL injecting custom
+assembly that the musl toolchains don't support :/
