@@ -247,7 +247,7 @@ deps-$(ARCH)/bzip2-$(BZIP2)/.extracted: deps-$(ARCH)/bzip2-$(BZIP2).tar.gz
 
 build-$(ARCH)/lib/libbz2.a: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted deps-$(ARCH)/bzip2-$(BZIP2)/.extracted
 	mkdir -p build-$(ARCH)
-	cd deps-$(ARCH)/bzip2-$(BZIP2) && ../../configure-wrapper.sh make -j$(JOBS)
+	cd deps-$(ARCH)/bzip2-$(BZIP2) && ../../configure-wrapper.sh make libbz2.a bzip2 bzip2recover -j$(JOBS)
 	cd deps-$(ARCH)/bzip2-$(BZIP2) && ../../configure-wrapper.sh make install
 
 libbz2: build-$(ARCH)/lib/libbz2.a
