@@ -256,12 +256,14 @@ deps-$(ARCH)/util-linux-$(UTILLINUX)/.extracted: deps-$(ARCH)/util-linux-$(UTILL
 
 build-$(ARCH)/lib/libuuid.a: deps-$(ARCH)/util-linux-$(UTILLINUX)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted
 	cd deps-$(ARCH)/util-linux-$(UTILLINUX) && \
+		echo -e "[properties]\nneeds_exe_wrapper = true" > ./cross.ini
+	cd deps-$(ARCH)/util-linux-$(UTILLINUX) && \
 		grep -E "option(.*),[[:space:]]*type[[:space:]]*:[[:space:]]*'feature'" meson_options.txt \
 			| grep -vE 'build-libuuid' \
 			| sed -E "s/.*option\(['\"]([a-zA-Z0-9_-]+)['\"].*/\1/" \
 			| awk '{print "-D" $$1 "=disabled"}'\
 			> ./build-args.txt &&\
-		echo "--prefix=$(ROOT_DIR)build-$(ARCH) --default-library=static --prefer-static --buildtype=release --backend=ninja"\
+		echo "--prefix=$(ROOT_DIR)build-$(ARCH) --default-library=static --prefer-static --buildtype=release --backend=ninja --cross-file cross.ini"\
 			>> ./build-args.txt
 	cd deps-$(ARCH)/util-linux-$(UTILLINUX) && \
 		../../configure-wrapper.sh meson setup build $$(cat ./build-args.txt)

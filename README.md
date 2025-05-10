@@ -27,7 +27,7 @@ most of which should be present if you're already building a lot of things:
 
 - **meson and ninja** (for libuuid)
 - **unzip**
-- **perl** (apparently required by OpenSSL's build system?)
+- **perl** with **FindBin.pm**
 - **python** (only if you are cross-compiling)
 - cURL, tar, make
 
