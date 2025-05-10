@@ -118,7 +118,11 @@ build-$(ARCH)/lib/liblzma.a: deps-$(ARCH)/xz-$(LIBLZMA)/.extracted deps-$(ARCH)/
 	cd deps-$(ARCH)/xz-$(LIBLZMA) &&\
 		ARCH="$(ARCH)"\
 		TCTYPE="$(TCTYPE)"\
-		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(ARCH) --exec-prefix=$(ROOT_DIR)build-$(ARCH) --enable-static --disable-shared
+		../../configure-wrapper.sh ./configure \
+			--prefix=$(ROOT_DIR)build-$(ARCH) \
+			--host=$(ARCH)-linux-musl\
+			--exec-prefix=$(ROOT_DIR)build-$(ARCH)\
+			--enable-static --disable-shared
 	cd deps-$(ARCH)/xz-$(LIBLZMA) && ../../configure-wrapper.sh make V=1 -j$(JOBS)
 	cd deps-$(ARCH)/xz-$(LIBLZMA) && ../../configure-wrapper.sh make install
 
@@ -160,6 +164,7 @@ build-$(ARCH)/lib/libncursesw.a: deps-$(ARCH)/ncurses-$(NCURSES)/.extracted deps
 		../../configure-wrapper.sh ./configure --without-cxx --without-cxx-binding\
 			--without-shared --prefix=$(ROOT_DIR)build-$(ARCH)\
 			--exec-prefix=$(ROOT_DIR)build-$(ARCH) --enable-static\
+			--host=$(ARCH)-linux-musl\
 			--without-ada \
 			--without-manpages \
 			--without-tests \
@@ -189,6 +194,7 @@ build-$(ARCH)/lib/libreadline.a: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extr
 			--prefix=$(ROOT_DIR)build-$(ARCH)\
 			--exec-prefix=$(ROOT_DIR)build-$(ARCH)\
 			--with-curses\
+			--host=$(ARCH)-linux-musl\
 			--disable-install-examples\
 			--enable-static\
 			--disable-shared
@@ -211,7 +217,10 @@ deps-$(ARCH)/sqlite-src-$(SQLITE)/.extracted: deps-$(ARCH)/sqlite-src-$(SQLITE).
 build-$(ARCH)/lib/libsqlite3.a: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted build-$(ARCH)/lib/libreadline.a deps-$(ARCH)/sqlite-src-$(SQLITE)/.extracted
 	mkdir -p build-$(ARCH)
 	cd deps-$(ARCH)/sqlite-src-$(SQLITE) &&\
-		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(ARCH) --exec-prefix=$(ROOT_DIR)build-$(ARCH) --enable-static --disable-shared
+		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(ARCH)\
+			--exec-prefix=$(ROOT_DIR)build-$(ARCH)\
+			--host=$(ARCH)-linux-musl\
+			--enable-static --disable-shared
 	cd deps-$(ARCH)/sqlite-src-$(SQLITE) && ../../configure-wrapper.sh make -j$(JOBS)
 	cd deps-$(ARCH)/sqlite-src-$(SQLITE) && ../../configure-wrapper.sh make install
 
@@ -295,6 +304,7 @@ python-static-$(ARCH)/bin/python$(PYTHONV): openssl libffi libuuid libsqlite lib
 		PYTHON="1"\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)python-static-$(ARCH)\
 			--exec-prefix=$(ROOT_DIR)python-static-$(ARCH) --enable-static --disable-shared\
+			--host=$(ARCH)-linux-musl\
 			--with-openssl=$(ROOT_DIR)build-$(ARCH)\
 			--disable-test-modules\
 			--with-ensurepip=no
