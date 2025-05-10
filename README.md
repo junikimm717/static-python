@@ -27,8 +27,8 @@ most of which should be present if you're already building a lot of things:
 
 - **meson and ninja** (for libuuid)
 - **unzip**
-- **perl** with **FindBin.pm**
-- **python** (only if you are cross-compiling)
+- **perl** with **FindBin.pm** (apparently on some distros you need to install
+  perl-core?)
 - cURL, tar, make
 
 A C compiler should not be strictly necessary, as the build system compiles
@@ -36,7 +36,8 @@ eveything with a musl toolchain that it downloads.
 
 ## Building
 
-Cross-compiling is now supported from x86_64!
+Cross-compiling is now supported from x86_64! It turns out though that to
+do cross-compilation, a native interpreter must first get built 💀
 
 To build, just use the Makefile and run `make python3 ARCH={insert}`. You
 should be able to find the resulting output in `./python-static-$(ARCH)`, where
@@ -48,4 +49,6 @@ variable. (I assume if you are actually trying to run this project, you for sure
 know what you are doing 😇)
 
 It turns out that a limitation to further support is OpenSSL injecting custom
-assembly that the musl toolchains don't support :/
+assembly that the musl toolchains don't support :/ In any case, x86 and aarch64
+should cover most modern devices, with the other architectures being supported
+for vanity reasons :)
