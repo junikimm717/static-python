@@ -278,7 +278,7 @@ deps-$(ARCH)/util-linux-$(UTILLINUX)/.extracted: tarballs/util-linux-$(UTILLINUX
 
 build-$(ARCH)/lib/libuuid.a: deps-$(ARCH)/util-linux-$(UTILLINUX)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted
 	cd deps-$(ARCH)/util-linux-$(UTILLINUX) && \
-		echo -e "[properties]\nneeds_exe_wrapper = true" > ./cross.ini
+		printf "[properties]\nneeds_exe_wrapper = true\n" > ./cross.ini
 	cd deps-$(ARCH)/util-linux-$(UTILLINUX) && \
 		grep -E "option(.*),[[:space:]]*type[[:space:]]*:[[:space:]]*'feature'" meson_options.txt \
 			| grep -vE 'build-libuuid' \
