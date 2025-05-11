@@ -3,6 +3,7 @@ build-*
 python-static-*
 deps
 deps-*
+tarballs
 .DS_Store
 *.out
 *.log

@@ -60,12 +60,13 @@ deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted: deps-$(ARCH)/$(ARCH)-linux
 
 # compile openssl
 
-deps-$(ARCH)/openssl-$(OPENSSL).tar.gz:
-	mkdir -p deps-$(ARCH)
-	curl -Lf https://github.com/openssl/openssl/releases/download/openssl-$(OPENSSL)/openssl-$(OPENSSL).tar.gz -o deps-$(ARCH)/openssl-$(OPENSSL).tar.gz
+tarballs/openssl-$(OPENSSL).tar.gz:
+	mkdir -p tarballs
+	curl -Lf https://github.com/openssl/openssl/releases/download/openssl-$(OPENSSL)/openssl-$(OPENSSL).tar.gz -o $@
 
-deps-$(ARCH)/openssl-$(OPENSSL)/.extracted: deps-$(ARCH)/openssl-$(OPENSSL).tar.gz
-	tar -xzf deps-$(ARCH)/openssl-$(OPENSSL).tar.gz -C deps-$(ARCH)
+deps-$(ARCH)/openssl-$(OPENSSL)/.extracted: tarballs/openssl-$(OPENSSL).tar.gz
+	mkdir -p deps-$(ARCH)
+	tar -xzf $< -C deps-$(ARCH)
 	cd deps-$(ARCH)/openssl-$(OPENSSL) && sed -i '1513d' ./Configure
 	touch $@
 
@@ -85,12 +86,13 @@ openssl: build-$(ARCH)/include/openssl/ssl.h
 
 # compile libffi
 
-deps-$(ARCH)/libffi-$(LIBFFI).tar.gz:
-	mkdir -p deps-$(ARCH)
-	curl -Lf https://github.com/libffi/libffi/releases/download/v$(LIBFFI)/libffi-$(LIBFFI).tar.gz -o deps-$(ARCH)/libffi-$(LIBFFI).tar.gz
+tarballs/libffi-$(LIBFFI).tar.gz:
+	mkdir -p tarballs
+	curl -Lf https://github.com/libffi/libffi/releases/download/v$(LIBFFI)/libffi-$(LIBFFI).tar.gz -o $@
 
-deps-$(ARCH)/libffi-$(LIBFFI)/.extracted: deps-$(ARCH)/libffi-$(LIBFFI).tar.gz
-	tar -xzf deps-$(ARCH)/libffi-$(LIBFFI).tar.gz -C deps-$(ARCH)
+deps-$(ARCH)/libffi-$(LIBFFI)/.extracted: tarballs/libffi-$(LIBFFI).tar.gz
+	mkdir -p deps-$(ARCH)
+	tar -xzf $< -C deps-$(ARCH)
 	touch $@
 
 build-$(ARCH)/lib/libffi.a: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted deps-$(ARCH)/libffi-$(LIBFFI)/.extracted
@@ -109,12 +111,13 @@ libffi: build-$(ARCH)/lib/libffi.a
 
 # compile libxz
 
-deps-$(ARCH)/xz-$(LIBLZMA).tar.gz:
-	mkdir -p deps-$(ARCH)
-	curl -Lf https://github.com/tukaani-project/xz/releases/download/v5.8.1/xz-5.8.1.tar.gz -o deps-$(ARCH)/xz-5.8.1.tar.gz
+tarballs/xz-$(LIBLZMA).tar.gz:
+	mkdir -p tarballs
+	curl -Lf https://github.com/tukaani-project/xz/releases/download/v$(LIBLZMA)/xz-$(LIBLZMA).tar.gz -o $@
 
-deps-$(ARCH)/xz-$(LIBLZMA)/.extracted: deps-$(ARCH)/xz-$(LIBLZMA).tar.gz
-	tar -xzf deps-$(ARCH)/xz-5.8.1.tar.gz -C deps-$(ARCH)
+deps-$(ARCH)/xz-$(LIBLZMA)/.extracted: tarballs/xz-$(LIBLZMA).tar.gz
+	mkdir -p deps-$(ARCH)
+	tar -xzf $< -C deps-$(ARCH)
 	touch $@
 
 build-$(ARCH)/lib/liblzma.a: deps-$(ARCH)/xz-$(LIBLZMA)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted
@@ -135,12 +138,13 @@ liblzma: build-$(ARCH)/lib/liblzma.a
 
 # compile zlib
 
-deps-$(ARCH)/zlib-$(ZLIB).tar.gz:
-	mkdir -p deps-$(ARCH)
-	curl -Lf http://zlib.net/zlib-1.3.1.tar.gz -o deps-$(ARCH)/zlib-1.3.1.tar.gz
+tarballs/zlib-$(ZLIB).tar.gz:
+	mkdir -p tarballs
+	curl -Lf http://zlib.net/zlib-$(ZLIB).tar.gz -o $@
 
-deps-$(ARCH)/zlib-$(ZLIB)/.extracted: deps-$(ARCH)/zlib-$(ZLIB).tar.gz
-	tar -xzf deps-$(ARCH)/zlib-1.3.1.tar.gz -C deps-$(ARCH)
+deps-$(ARCH)/zlib-$(ZLIB)/.extracted: tarballs/zlib-$(ZLIB).tar.gz
+	mkdir -p deps-$(ARCH)
+	tar -xzf $< -C deps-$(ARCH)
 	touch $@
 
 build-$(ARCH)/lib/libz.a: deps-$(ARCH)/zlib-$(ZLIB)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted
@@ -155,12 +159,13 @@ zlib: build-$(ARCH)/lib/libz.a
 
 # compile ncurses
 
-deps-$(ARCH)/ncurses-$(NCURSES).tar.gz:
-	mkdir -p deps-$(ARCH)
-	curl -Lf https://invisible-mirror.net/archives/ncurses/ncurses-$(NCURSES).tar.gz -o deps-$(ARCH)/ncurses-$(NCURSES).tar.gz
+tarballs/ncurses-$(NCURSES).tar.gz:
+	mkdir -p tarballs
+	curl -Lf https://invisible-mirror.net/archives/ncurses/ncurses-$(NCURSES).tar.gz -o $@
 
-deps-$(ARCH)/ncurses-$(NCURSES)/.extracted: deps-$(ARCH)/ncurses-$(NCURSES).tar.gz
-	tar -xzf deps-$(ARCH)/ncurses-$(NCURSES).tar.gz -C deps-$(ARCH)
+deps-$(ARCH)/ncurses-$(NCURSES)/.extracted: tarballs/ncurses-$(NCURSES).tar.gz
+	mkdir -p deps-$(ARCH)
+	tar -xzf $< -C deps-$(ARCH)
 	touch $@
 
 build-$(ARCH)/lib/libncursesw.a: deps-$(ARCH)/ncurses-$(NCURSES)/.extracted deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted
@@ -183,12 +188,13 @@ ncurses: build-$(ARCH)/lib/libncursesw.a
 
 # compile readline
 
-deps-$(ARCH)/readline-$(READLINE).tar.gz:
-	mkdir -p deps-$(ARCH)
-	curl -Lf https://ftp.gnu.org/gnu/readline/readline-$(READLINE).tar.gz -o deps-$(ARCH)/readline-$(READLINE).tar.gz
+tarballs/readline-$(READLINE).tar.gz:
+	mkdir -p tarballs
+	curl -Lf https://ftp.gnu.org/gnu/readline/readline-$(READLINE).tar.gz -o $@
 
-deps-$(ARCH)/readline-$(READLINE)/.extracted: deps-$(ARCH)/readline-$(READLINE).tar.gz 
-	tar -xzf deps-$(ARCH)/readline-$(READLINE).tar.gz -C deps-$(ARCH)
+deps-$(ARCH)/readline-$(READLINE)/.extracted: tarballs/readline-$(READLINE).tar.gz 
+	mkdir -p deps-$(ARCH)
+	tar -xzf $< -C deps-$(ARCH)
 	touch $@
 
 build-$(ARCH)/lib/libreadline.a: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted deps-$(ARCH)/readline-$(READLINE)/.extracted
@@ -210,12 +216,13 @@ readline: build-$(ARCH)/lib/libreadline.a
 
 # compile steps for libsqlite
 
-deps-$(ARCH)/sqlite-src-$(SQLITE).zip:
-	mkdir -p deps-$(ARCH)
-	curl -Lf https://www.sqlite.org/2025/sqlite-src-$(SQLITE).zip -o deps-$(ARCH)/sqlite-src-$(SQLITE).zip
+tarballs/sqlite-src-$(SQLITE).zip:
+	mkdir -p tarballs
+	curl -Lf https://www.sqlite.org/2025/sqlite-src-$(SQLITE).zip -o $@
 
-deps-$(ARCH)/sqlite-src-$(SQLITE)/.extracted: deps-$(ARCH)/sqlite-src-$(SQLITE).zip
-	cd deps-$(ARCH) && unzip -o sqlite-src-$(SQLITE).zip
+deps-$(ARCH)/sqlite-src-$(SQLITE)/.extracted: tarballs/sqlite-src-$(SQLITE).zip
+	mkdir -p deps-$(ARCH)
+	cd deps-$(ARCH) && unzip -o ../tarballs/sqlite-src-$(SQLITE).zip
 	touch $@
 
 build-$(ARCH)/lib/libsqlite3.a: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted build-$(ARCH)/lib/libreadline.a deps-$(ARCH)/sqlite-src-$(SQLITE)/.extracted
@@ -233,11 +240,12 @@ libsqlite: build-$(ARCH)/lib/libsqlite3.a
 
 # compile bzip2
 
-deps-$(ARCH)/bzip2-$(BZIP2).tar.gz:
-	mkdir -p deps-$(ARCH)
-	curl -Lf https://sourceware.org/pub/bzip2/bzip2-$(BZIP2).tar.gz -o deps-$(ARCH)/bzip2-$(BZIP2).tar.gz
+tarballs/bzip2-$(BZIP2).tar.gz:
+	mkdir -p tarballs
+	curl -Lf https://sourceware.org/pub/bzip2/bzip2-$(BZIP2).tar.gz -o $@
 
-deps-$(ARCH)/bzip2-$(BZIP2)/.extracted: deps-$(ARCH)/bzip2-$(BZIP2).tar.gz
+deps-$(ARCH)/bzip2-$(BZIP2)/.extracted: tarballs/bzip2-$(BZIP2).tar.gz
+	mkdir -p deps-$(ARCH)
 	tar -xzf $< -C deps-$(ARCH)
 	sed -i \
 		-e 's|^CC=.*||' \
@@ -257,13 +265,14 @@ build-$(ARCH)/lib/libbz2.a: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted
 libbz2: build-$(ARCH)/lib/libbz2.a
 .PHONY: libbz2
 
-# compile lib uuid
+# compile libuuid
 
-deps-$(ARCH)/util-linux-$(UTILLINUX).tar.gz:
-	mkdir -p deps-$(ARCH)
+tarballs/util-linux-$(UTILLINUX).tar.gz:
+	mkdir -p tarballs
 	curl -Lf https://github.com/util-linux/util-linux/archive/refs/tags/v$(UTILLINUX).tar.gz -o $@
 
-deps-$(ARCH)/util-linux-$(UTILLINUX)/.extracted: deps-$(ARCH)/util-linux-$(UTILLINUX).tar.gz
+deps-$(ARCH)/util-linux-$(UTILLINUX)/.extracted: tarballs/util-linux-$(UTILLINUX).tar.gz
+	mkdir -p deps-$(ARCH)
 	tar -xzf $< -C deps-$(ARCH)
 	touch $@
 
@@ -289,12 +298,13 @@ libuuid: build-$(ARCH)/lib/libuuid.a
 # compile python3
 
 
-deps-$(ARCH)/Python-$(PYTHON).tgz:
-	mkdir -p deps-$(ARCH)
-	curl -Lf https://www.python.org/ftp/python/$(PYTHON)/Python-$(PYTHON).tgz -o deps-$(ARCH)/Python-$(PYTHON).tgz
+tarballs/Python-$(PYTHON).tgz:
+	mkdir -p tarballs
+	curl -Lf https://www.python.org/ftp/python/$(PYTHON)/Python-$(PYTHON).tgz -o $@
 
-deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local: deps-$(ARCH)/Python-$(PYTHON).tgz
-	tar -xzf deps-$(ARCH)/Python-$(PYTHON).tgz -C deps-$(ARCH)
+deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local: tarballs/Python-$(PYTHON).tgz
+	mkdir -p deps-$(ARCH)
+	tar -xzf $< -C deps-$(ARCH)
 	# monkey patched code for static symbols in ctypes
 	cp -r ./staticapi deps-$(ARCH)/Python-$(PYTHON)/Modules/staticapi
 	sed -i \
