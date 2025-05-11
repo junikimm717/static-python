@@ -34,20 +34,35 @@ most of which should be present if you're already building a lot of things:
 A C compiler should not be strictly necessary, as the build system compiles
 eveything with a musl toolchain that it downloads.
 
-## Building
+## Building Native
 
-Cross-compiling is now supported from x86_64! It turns out though that to
-do cross-compilation, a native interpreter must first get built 💀
+```sh
+make python3
+```
 
-If you are cross compiling, **You MUST first build the native interpreter** by
-running `make python3`. Cross-compiled python versions can't be run on the
+The above command should just work out of the box...
+
+## Cross Compiling
+
+```sh
+# If you are trying to compile to an aarch64 target
+make python3 && make python3 ARCH=aarch64
+# compiling to a mips64 target
+make python3 && make python3 ARCH=mips64
+```
+
+Cross-compiling is now supported from x86_64! This took soooo long to do, and
+it doesn't seem like that I will be able to support all the architectures I
+initially wanted to :/ (issues with libatomic and endian)
+
+As seen above, if you are cross compiling, **You MUST build the native
+interpreter first**. Cross-compiled python interpreters can't be run on the
 system, so you need a native python to install all your libraries correctly.
 
-To build, just use the Makefile and run `make python3 ARCH={insert}`. You
-should be able to find the resulting output in `./python-static-$(ARCH)`, where
+The resulting output should be found in in `./python-static-$(ARCH)`, where
 `$(ARCH)` is the architecture that you chose (defaults to native architecture if
 blank).
 
-You can view supported architectures in the Makefile under the `SUPPORTED`
+You can also view supported architectures in the Makefile under the `SUPPORTED`
 variable. (I assume if you are actually trying to run this project, you for sure
 know what you are doing 😇)
