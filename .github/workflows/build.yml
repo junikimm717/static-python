@@ -14,7 +14,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential perl unzip make meson curl tara
+          sudo apt-get install -y build-essential perl unzip make meson curl tar
 
       - name: Build native
         run: make python3 ARCH=x86_64
