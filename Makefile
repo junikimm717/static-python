@@ -326,6 +326,8 @@ python-static-$(ARCH)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
 		-e 's|$(NATIVE_ARCH)|$(ARCH)|g'\
 		-e 's|^PYTHON_FOR_BUILD=.*|PYTHON_FOR_BUILD=$(ROOT_DIR)$(NATIVE_PATH) -E|g'\
 		-e 's|^PYTHON_FOR_BUILD_DEPS=.*|PYTHON_FOR_BUILD_DEPS=|g'\
+		-e 's|^FREEZE_MODULE_BOOTSTRAP=.*|FREEZE_MODULE_BOOTSTRAP=$(ROOT_DIR)deps-$(NATIVE_ARCH)/Python-$(PYTHON)/Programs/_freeze_module|g'\
+		-e 's|^FREEZE_MODULE_BOOTSTRAP_DEPS=.*|FREEZE_MODULE_BOOTSTRAP_DEPS=|g'\
 		-e '/^[[:space:]]*\$$(MAKE) -f Makefile\.pre.*Makefile/d'\
 		deps-$(NATIVE_ARCH)/Python-$(PYTHON)/Makefile\
 		> deps-$(ARCH)/Python-$(PYTHON)/Makefile
@@ -335,6 +337,8 @@ python-static-$(ARCH)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
 		-e 's|$(NATIVE_ARCH)|$(ARCH)|g'\
 		-e 's|^PYTHON_FOR_BUILD=.*|PYTHON_FOR_BUILD=$(ROOT_DIR)$(NATIVE_PATH) -E|g'\
 		-e 's|^PYTHON_FOR_BUILD_DEPS=.*|PYTHON_FOR_BUILD_DEPS=|g'\
+		-e 's|^FREEZE_MODULE_BOOTSTRAP=.*|FREEZE_MODULE_BOOTSTRAP=$(ROOT_DIR)deps-$(NATIVE_ARCH)/Python-$(PYTHON)/Programs/_freeze_module|g'\
+		-e 's|^FREEZE_MODULE_BOOTSTRAP_DEPS=.*|FREEZE_MODULE_BOOTSTRAP_DEPS=|g'\
 		-e '/^[[:space:]]*\$$(MAKE) -f Makefile\.pre.*Makefile/d'\
 		deps-$(NATIVE_ARCH)/Python-$(PYTHON)/Makefile.pre\
 		> deps-$(ARCH)/Python-$(PYTHON)/Makefile.pre
