@@ -285,18 +285,6 @@ libuuid: build-$(ARCH)/lib/libuuid.a
 
 # compile python3
 
-# apparently you need the native interpreter for cross compilation sob
-ifeq ($(TCTYPE),cross)
-override NATIVE_PATH := python-static-$(NATIVE_ARCH)/bin/python$(PYTHONV)
-# include these flags iff cross compilation
-override PYTHON_CONFIG_FLAGS := --host=$(ARCH)-linux-musl --build=$(NATIVE_ARCH)-linux-musl --with-build-python=$(ROOT_DIR)$(NATIVE_PATH)
-native-interpreter:
-	make python3 ARCH=$(NATIVE_ARCH)
-else
-override PYTHON_CONFIG_FLAGS :=
-native-interpreter:
-endif
-.PHONY: native-interpreter
 
 deps-$(ARCH)/Python-$(PYTHON).tgz:
 	mkdir -p deps-$(ARCH)
@@ -313,21 +301,76 @@ deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local: deps-$(ARCH)/Python-$(PYTHON)
 		./deps-$(ARCH)/Python-$(PYTHON)/Lib/ctypes/__init__.py
 	cp -r ./Setup deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local
 
-python-static-$(ARCH)/bin/python$(PYTHONV):\
-	native-interpreter\
-	openssl libffi libuuid libsqlite liblzma readline zlib libbz2 ncurses \
-	deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local \
-	deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted
+# you must distinguish between cross and native compilation.
+# apparently you need the native interpreter for cross compilation sob
+
+PYTHON_DEPS = deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted\
+		openssl libffi libuuid libsqlite liblzma readline zlib libbz2 ncurses \
+		deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local
+
+ifeq ($(TCTYPE),cross)
+# cross-compiling case; use python-specific flags.
+override NATIVE_PATH := python-static-$(NATIVE_ARCH)/bin/python$(PYTHONV)
+native-interpreter:
+	make python3 ARCH=$(NATIVE_ARCH)
+# After the source tree is copied over, just rip the ./configure generated files.
+# basically replace every instance of our native arch with our actual arch.
+python-static-$(ARCH)/bin/python$(PYTHONV): $(PYTHON_DEPS)
+	cp ./config.status deps-$(ARCH)/Python-$(PYTHON)/config.status\
+		&& chmod +x deps-$(ARCH)/Python-$(PYTHON)/config.status
+	@sed\
+		-e '/^CC=/d' \
+		-e '/^AR=/d' \
+		-e 's|$(NATIVE_ARCH)|$(ARCH)|g'\
+		-e 's|^PYTHON_FOR_BUILD=.*|PYTHON_FOR_BUILD=$(ROOT_DIR)$(NATIVE_PATH) -E|g'\
+		-e 's|^PYTHON_FOR_BUILD_DEPS=.*|PYTHON_FOR_BUILD_DEPS=|g'\
+		-e '/^[[:space:]]*\$$(MAKE) -f Makefile\.pre.*Makefile/d'\
+		deps-$(NATIVE_ARCH)/Python-$(PYTHON)/Makefile\
+		> deps-$(ARCH)/Python-$(PYTHON)/Makefile
+	@sed\
+		-e '/^CC=/d' \
+		-e '/^AR=/d' \
+		-e 's|$(NATIVE_ARCH)|$(ARCH)|g'\
+		-e 's|^PYTHON_FOR_BUILD=.*|PYTHON_FOR_BUILD=$(ROOT_DIR)$(NATIVE_PATH) -E|g'\
+		-e 's|^PYTHON_FOR_BUILD_DEPS=.*|PYTHON_FOR_BUILD_DEPS=|g'\
+		-e '/^[[:space:]]*\$$(MAKE) -f Makefile\.pre.*Makefile/d'\
+		deps-$(NATIVE_ARCH)/Python-$(PYTHON)/Makefile.pre\
+		> deps-$(ARCH)/Python-$(PYTHON)/Makefile.pre
+
+	test -f deps-$(NATIVE_ARCH)/Python-$(PYTHON)/pyconfig.h
+	cp -p deps-$(NATIVE_ARCH)/Python-$(PYTHON)/pyconfig.h\
+		deps-$(ARCH)/Python-$(PYTHON)/pyconfig.h
+	cat ./pyconfig-patches.h >> deps-$(ARCH)/Python-$(PYTHON)/pyconfig.h
+	touch deps-$(ARCH)/Python-$(PYTHON)/Makefile
+	touch deps-$(ARCH)/Python-$(PYTHON)/Makefile.pre
+
+	cd deps-$(ARCH)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make -j$(JOBS) python
+
+	mkdir -p python-static-$(ARCH)/bin python-static-$(ARCH)/lib
+	cp -r python-static-$(NATIVE_ARCH)/include python-static-$(ARCH)/include
+	cp -r python-static-$(NATIVE_ARCH)/share python-static-$(ARCH)/share
+	cp -r python-static-$(NATIVE_ARCH)/lib/python$(PYTHONV) python-static-$(ARCH)/lib/python$(PYTHONV)
+
+	cp -r deps-$(ARCH)/Python-$(PYTHON)/python python-static-$(ARCH)/bin/python$(PYTHONV)
+	ln -sf python$(PYTHONV) python-static-$(ARCH)/bin/python3
+else
+# native case; basically just stub everyting.
+python-static-$(ARCH)/bin/python$(PYTHONV): $(PYTHON_DEPS)
 	cd deps-$(ARCH)/Python-$(PYTHON) &&\
 		PYTHON="1"\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)python-static-$(ARCH)\
-			--exec-prefix=$(ROOT_DIR)python-static-$(ARCH) --disable-shared $(PYTHON_CONFIG_FLAGS)\
+			--exec-prefix=$(ROOT_DIR)python-static-$(ARCH) --disable-shared\
 			--with-openssl=$(ROOT_DIR)build-$(ARCH)\
+			--build=$(ARCH)-linux-musl\
 			--disable-test-modules\
 			--with-ensurepip=no
 	cd deps-$(ARCH)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make -j$(JOBS)
 	mkdir -p python-static-$(ARCH)
 	cd deps-$(ARCH)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make bininstall
+endif
+
+.PHONY: native-interpreter python-configure
+
 
 python3: python-static-$(ARCH)/bin/python$(PYTHONV)
 .PHONY: python3

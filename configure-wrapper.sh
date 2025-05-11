@@ -4,9 +4,6 @@ ROOT="$(realpath "$(dirname "$0")")"
 
 TOOLCHAIN="$ARCH-linux-musl"
 DEPS_DIR="$(realpath "$(dirname "$0")")/deps-$ARCH"
-echo "====================="
-echo "configure-wrapper.sh: Using Arch $ARCH..."
-echo "====================="
 
 case "$TCTYPE" in
   "native")
@@ -26,6 +23,10 @@ case "$TCTYPE" in
     exit 1
     ;;
 esac
+
+echo "====================="
+echo "configure-wrapper.sh: Using Arch $ARCH in configuration $TCTYPE..."
+echo "====================="
 
 export LDFLAGS="-Wl,--export-dynamic -static --static -L$ROOT/build-$ARCH/lib -L$ROOT/build-$ARCH/lib64"
 export LINKFORSHARED=" "
