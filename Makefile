@@ -12,6 +12,8 @@ PYTHON := 3.13.3
 PYTHONV := 3.13
 UTILLINUX := 2.41
 
+export PATH := $(PATH)
+
 ARCH := $(shell uname -m)
 JOBS := $(shell nproc)
 
