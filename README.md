@@ -39,6 +39,10 @@ eveything with a musl toolchain that it downloads.
 Cross-compiling is now supported from x86_64! It turns out though that to
 do cross-compilation, a native interpreter must first get built 💀
 
+If you are cross compiling, **You MUST first build the native interpreter** by
+running `make python3`. Cross-compiled python versions can't be run on the
+system, so you need a native python to install all your libraries correctly.
+
 To build, just use the Makefile and run `make python3 ARCH={insert}`. You
 should be able to find the resulting output in `./python-static-$(ARCH)`, where
 `$(ARCH)` is the architecture that you chose (defaults to native architecture if
@@ -47,8 +51,3 @@ blank).
 You can view supported architectures in the Makefile under the `SUPPORTED`
 variable. (I assume if you are actually trying to run this project, you for sure
 know what you are doing 😇)
-
-It turns out that a limitation to further support is OpenSSL injecting custom
-assembly that the musl toolchains don't support :/ In any case, x86 and aarch64
-should cover most modern devices, with the other architectures being supported
-for vanity reasons :)
