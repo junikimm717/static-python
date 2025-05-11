@@ -1,0 +1,45 @@
+name: Static Python Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential perl unzip make meson curl tara
+
+      - name: Build native
+        run: make python3 ARCH=x86_64
+
+      - name: Cross-compile aarch64
+        run: make python3 ARCH=aarch64
+
+      - name: Package binaries
+        run: |
+          tar -czf python-static-x86_64.tar.gz python-static-x86_64/
+          tar -czf python-static-aarch64.tar.gz python-static-aarch64/
+
+      - name: Delete existing release assets
+        run: |
+          gh release delete-asset build-latest python-static-x86_64.tar.gz || true
+          gh release delete-asset build-latest python-static-aarch64.tar.gz || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: binaries
+          name: "Latest Static Binaries"
+          body_path: ./notes.md
+          files: |
+            python-static-x86_64.tar.gz
+            python-static-aarch64.tar.gz
