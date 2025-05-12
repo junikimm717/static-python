@@ -8,9 +8,10 @@ READLINE := 8.2
 NCURSES := 6.5
 SQLITE := 3490200
 BZIP2 := 1.0.8
-PYTHON := 3.13.3
-PYTHONV := 3.13
 UTILLINUX := 2.41
+
+PYTHON := 3.13.3
+PYTHONV := $(word 1, $(PYTHON)).$(word 2, $(PYTHON))
 
 export PATH := $(PATH)
 
@@ -297,7 +298,6 @@ libuuid: build-$(ARCH)/lib/libuuid.a
 
 # compile python3
 
-
 tarballs/Python-$(PYTHON).tgz:
 	mkdir -p tarballs
 	curl -Lf https://www.python.org/ftp/python/$(PYTHON)/Python-$(PYTHON).tgz -o $@
@@ -306,13 +306,14 @@ deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local: tarballs/Python-$(PYTHON).tgz
 	mkdir -p deps-$(ARCH)
 	tar -xzf $< -C deps-$(ARCH)
 	# monkey patched code for static symbols in ctypes
-	cp -r ./staticapi deps-$(ARCH)/Python-$(PYTHON)/Modules/staticapi
+	cp -r ./python/staticapi deps-$(ARCH)/Python-$(PYTHON)/Modules/staticapi
+	# This seems EXTRMEMELY fragile, should patch later probably.
 	sed -i \
-		-e "319r ./staticapi/ctypes_patch_1.py"\
-		-e "486r ./staticapi/ctypes_patch_2.py"\
+		-e "319r ./python/ctypes_patch_1.py"\
+		-e "486r ./python/ctypes_patch_2.py"\
 		-e "390s/.*/            pass/"\
 		./deps-$(ARCH)/Python-$(PYTHON)/Lib/ctypes/__init__.py
-	cp -r ./Setup deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local
+	cp -r ./python/Setup deps-$(ARCH)/Python-$(PYTHON)/Modules/Setup.local
 
 # you must distinguish between cross and native compilation.
 # apparently you need the native interpreter for cross compilation sob
@@ -328,7 +329,7 @@ override NATIVE_PATH := python-static-$(NATIVE_ARCH)/bin/python$(PYTHONV)
 check_native:
 	test -f $(NATIVE_PATH) -a -d deps-$(NATIVE_ARCH)/Python-$(PYTHON)
 python-static-$(ARCH)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
-	cp ./config.status deps-$(ARCH)/Python-$(PYTHON)/config.status\
+	cp ./python/config.status deps-$(ARCH)/Python-$(PYTHON)/config.status\
 		&& chmod +x deps-$(ARCH)/Python-$(PYTHON)/config.status
 	@sed\
 		-e '/^CC=/d' \
@@ -358,10 +359,10 @@ python-static-$(ARCH)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
 	test -f deps-$(NATIVE_ARCH)/Python-$(PYTHON)/pyconfig.h
 	cp -p deps-$(NATIVE_ARCH)/Python-$(PYTHON)/pyconfig.h\
 		deps-$(ARCH)/Python-$(PYTHON)/pyconfig.h
-	if test -f ./pyconfig/$(ARCH)-patches.h; then \
-		cat ./pyconfig/$(ARCH)-patches.h >> deps-$(ARCH)/Python-$(PYTHON)/pyconfig.h; \
+	if test -f ./python/pyconfig/$(ARCH)-patches.h; then \
+		cat ./python/pyconfig/$(ARCH)-patches.h >> deps-$(ARCH)/Python-$(PYTHON)/pyconfig.h; \
 	else \
-		cat ./pyconfig-patches.h >> deps-$(ARCH)/Python-$(PYTHON)/pyconfig.h; \
+		cat ./python/pyconfig-patches.h >> deps-$(ARCH)/Python-$(PYTHON)/pyconfig.h; \
 	fi
 	touch deps-$(ARCH)/Python-$(PYTHON)/Makefile
 	touch deps-$(ARCH)/Python-$(PYTHON)/Makefile.pre
