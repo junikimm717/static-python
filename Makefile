@@ -1,24 +1,23 @@
 ROOT_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
-OPENSSL := 3.5.0
-LIBFFI := 3.4.8
-LIBLZMA := 5.8.1
-ZLIB := 1.3.1
-READLINE := 8.2
-NCURSES := 6.5
-SQLITE := 3490200
-BZIP2 := 1.0.8
-UTILLINUX := 2.41
+OPENSSL = 3.5.0
+LIBFFI = 3.4.8
+LIBLZMA = 5.8.1
+ZLIB = 1.3.1
+READLINE = 8.2
+NCURSES = 6.5
+SQLITE = 3490200
+BZIP2 = 1.0.8
+UTILLINUX = 2.41
+PYTHON = 3.13.3
 
-PYTHON := 3.13.3
-PYTHONV := $(word 1, $(PYTHON)).$(word 2, $(PYTHON))
-
-export PATH := $(PATH)
+SPLIT := $(subst ., ,$(PYTHON))
+PYTHONV := $(word 1, $(SPLIT)).$(word 2, $(SPLIT))
 
 ARCH := $(shell uname -m)
 JOBS := $(shell nproc)
 
-# s390x riscv64 apparently have atomics in hardware
+# s390x riscv64 apparently need atomics in software
 # powerpc64 is screwed unless I figure out how to get endians to work :/
 override SUPPORTED := x86_64 aarch64 mips64 powerpc64le
 override NATIVE_ARCH := $(shell uname -m)
