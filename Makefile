@@ -18,9 +18,9 @@ PYTHONV := $(word 1, $(SPLIT)).$(word 2, $(SPLIT))
 ARCH := $(shell uname -m)
 JOBS := $(shell nproc)
 
-# s390x riscv64 apparently need atomics in software
+# riscv64 apparently need atomics in software
 # powerpc64 is screwed unless I figure out how to get endians to work :/
-override SUPPORTED := x86_64 aarch64 mips64 powerpc64le
+override SUPPORTED := x86_64 aarch64 mips64 powerpc64le s390x
 override NATIVE_ARCH := $(shell uname -m)
 override NEED_CROSSMAKE := 0
 
@@ -51,8 +51,15 @@ DEPS_DIR := "$(ROOT_DIR)/deps-$(ARCH)"
 
 # first target should be python3
 
+.PHONY: python3 clean distclean
+
 python3: python-static-$(ARCH)/bin/python$(PYTHONV)
-.PHONY: python3
+
+clean:
+	rm -rf deps-* build-* python-static-*
+
+distclean: clean
+	rm -rf tarballs
 
 # build steps for musl toolchain.
 # if not on an x86_64 machine, toolchains must get manually built.
@@ -64,6 +71,7 @@ tarballs/musl-cross-make-$(CROSSMAKE).tar.gz:
 deps-$(ARCH)/musl-cross-make-$(CROSSMAKE)/.extracted: tarballs/musl-cross-make-$(CROSSMAKE).tar.gz
 	mkdir -p deps-$(ARCH)
 	tar -xzf $< -C deps-$(ARCH)
+	ln -sfn $(ROOT_DIR)/tarballs deps-$(ARCH)/musl-cross-make-$(CROSSMAKE)/sources
 	touch $@
 
 deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE).tgz:
@@ -78,6 +86,10 @@ deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted: deps-$(ARCH)/musl-cross-ma
 		-e 's|^OUTPUT=.*|OUTPUT=$(ROOT_DIR)deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)|g'\
 		./cross-make/config.mak\
 		> deps-$(ARCH)/musl-cross-make-$(CROSSMAKE)/config.mak
+	sed -i\
+		-e 's/\([jJz]x\)vf/\1f/g'\
+		-e 's|^LINUX_VER =.*|LINUX_VER = 5.8.5|g'\
+		deps-$(ARCH)/musl-cross-make-$(CROSSMAKE)/Makefile
 	cd deps-$(ARCH)/musl-cross-make-$(CROSSMAKE) && make -j$(JOBS)
 	cd deps-$(ARCH)/musl-cross-make-$(CROSSMAKE) && make install
 	touch $@
@@ -360,12 +372,14 @@ override NATIVE_PATH := python-static-$(NATIVE_ARCH)/bin/python$(PYTHONV)
 check_native:
 	test -f $(NATIVE_PATH) -a -d deps-$(NATIVE_ARCH)/Python-$(PYTHON)
 python-static-$(ARCH)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
+	mkdir -p deps-$(ARCH)/Python-$(PYTHON)/build
 	cp ./python/config.status deps-$(ARCH)/Python-$(PYTHON)/config.status\
 		&& chmod +x deps-$(ARCH)/Python-$(PYTHON)/config.status
 	sed\
 		-e '/^CC=/d' \
 		-e '/^AR=/d' \
 		-e 's|$(NATIVE_ARCH)|$(ARCH)|g'\
+		-e 's|^BUILDPYTHON=.*|BUILDPYTHON=build/python|g'\
 		-e 's|^PYTHON_FOR_BUILD=.*|PYTHON_FOR_BUILD=$(ROOT_DIR)$(NATIVE_PATH) -E|g'\
 		-e 's|^PYTHON_FOR_BUILD_DEPS=.*|PYTHON_FOR_BUILD_DEPS=|g'\
 		-e 's|^PYTHON_FOR_FREEZE=.*|PYTHON_FOR_FREEZE=$(ROOT_DIR)$(NATIVE_PATH)|g'\
@@ -378,6 +392,7 @@ python-static-$(ARCH)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
 		-e '/^CC=/d' \
 		-e '/^AR=/d' \
 		-e 's|$(NATIVE_ARCH)|$(ARCH)|g'\
+		-e 's|^BUILDPYTHON=.*|BUILDPYTHON=build/python|g'\
 		-e 's|^PYTHON_FOR_BUILD=.*|PYTHON_FOR_BUILD=$(ROOT_DIR)$(NATIVE_PATH) -E|g'\
 		-e 's|^PYTHON_FOR_BUILD_DEPS=.*|PYTHON_FOR_BUILD_DEPS=|g'\
 		-e 's|^PYTHON_FOR_FREEZE=.*|PYTHON_FOR_FREEZE=$(ROOT_DIR)$(NATIVE_PATH)|g'\
@@ -398,7 +413,7 @@ python-static-$(ARCH)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
 	touch deps-$(ARCH)/Python-$(PYTHON)/Makefile
 	touch deps-$(ARCH)/Python-$(PYTHON)/Makefile.pre
 
-	cd deps-$(ARCH)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make -j$(JOBS) python
+	cd deps-$(ARCH)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make -j$(JOBS) build/python
 
 	# so...it turns out you need endianness to be correct here
 	mkdir -p python-static-$(ARCH)/bin python-static-$(ARCH)/lib
@@ -406,7 +421,7 @@ python-static-$(ARCH)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
 	cp -r python-static-$(NATIVE_ARCH)/share python-static-$(ARCH)/share
 	cp -r python-static-$(NATIVE_ARCH)/lib/python$(PYTHONV) python-static-$(ARCH)/lib/python$(PYTHONV)
 
-	cp -r deps-$(ARCH)/Python-$(PYTHON)/python python-static-$(ARCH)/bin/python$(PYTHONV)
+	cp -r deps-$(ARCH)/Python-$(PYTHON)/build/python python-static-$(ARCH)/bin/python$(PYTHONV)
 	ln -sf python$(PYTHONV) python-static-$(ARCH)/bin/python3
 else
 # native case; basically just stub everyting.

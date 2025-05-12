@@ -25,35 +25,35 @@ universal coverage is impossible.
 Here's a somewhat comprehensive list of things you should have on your system,
 most of which should be present if you're already building a lot of things:
 
-- **meson and ninja** (for libuuid)
+- **meson, ninja, flex, bison** (for libuuid)
+- **ncurses** (stupid terminfo things)
 - **unzip**
 - **perl** with **FindBin.pm** (apparently on some distros you need to install
   perl-core?)
 - cURL, tar, make
 
-A C compiler should not be strictly necessary, as the build system compiles
-eveything with a musl toolchain that it downloads.
+Alternatively, you can just use the docker configs provided and run
+```sh
+docker compose up -d
+./dev.sh
+```
 
 ## Building Native
 
 ```sh
-make python3
+make
 ```
-
-The above command should just work out of the box...
 
 ## Cross Compiling
 
 ```sh
 # If you are trying to compile to an aarch64 target
-make python3 && make python3 ARCH=aarch64
-# compiling to a mips64 target
-make python3 && make python3 ARCH=mips64
+make && make python3 ARCH=aarch64
 ```
 
 Cross-compiling is now supported from x86_64! This took soooo long to do, and
 it doesn't seem like that I will be able to support all the architectures I
-initially wanted to :/ (issues with libatomic and endian)
+initially wanted to :/
 
 As seen above, if you are cross compiling, **You MUST build the native
 interpreter first**. Cross-compiled python interpreters can't be run on the
