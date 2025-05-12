@@ -1,0 +1,9 @@
+services:
+  spython:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/workspace
+    entrypoint: /bin/sh -c "trap 'exit 0' SIGTERM; while :; do sleep 1; done"
+    tty: true

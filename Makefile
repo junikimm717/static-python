@@ -1,5 +1,6 @@
 ROOT_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
+CROSSMAKE = 0.9.10
 OPENSSL = 3.5.0
 LIBFFI = 3.4.8
 LIBLZMA = 5.8.1
@@ -21,42 +22,72 @@ JOBS := $(shell nproc)
 # powerpc64 is screwed unless I figure out how to get endians to work :/
 override SUPPORTED := x86_64 aarch64 mips64 powerpc64le
 override NATIVE_ARCH := $(shell uname -m)
+override NEED_CROSSMAKE := 0
 
 ifeq ($(filter $(ARCH),$(SUPPORTED)),)
 $(error ARCH '$(ARCH)' is not one of the allowed values: $(SUPPORTED))
 endif
 
 # do a bunch of architecture fiddling.
-ifeq ($(NATIVE_ARCH),x86_64)
+
 ifneq ($(ARCH),$(NATIVE_ARCH))
-$(info Cross-Compiling to $(ARCH) from x86_64...)
 override TCTYPE=cross
-export TCTYPE
-else
-override TCTYPE=native
-export TCTYPE
-$(info Native Compiling in x86_64...)
+$(info Cross-Compiling to $(ARCH) from $(NATIVE_ARCH)...)
+ifneq ($(NATIVE_ARCH),x86_64)
+# you need musl crossmake if cross-compiling from non-x86 architecture.
+override NEED_CROSSMAKE = 1
+$(info Not x86_64, musl-cross-make will be required)
 endif
 else
 override TCTYPE=native
-export TCTYPE
-override ARCH=$(NATIVE_ARCH)
-$(info Not on x86_64, you must native compile on $(ARCH) because musl does not have the necesssary cross-compiling toolchains)
+$(info Native Compiling in $(NATIVE_ARCH)...)
 endif
 
+
+export TCTYPE
 export ARCH
 
 DEPS_DIR := "$(ROOT_DIR)/deps-$(ARCH)"
 
+# first target should be python3
+
+python3: python-static-$(ARCH)/bin/python$(PYTHONV)
+.PHONY: python3
+
 # build steps for musl toolchain.
+# if not on an x86_64 machine, toolchains must get manually built.
+
+tarballs/musl-cross-make-$(CROSSMAKE).tar.gz:
+	mkdir -p tarballs
+	curl -Lf https://github.com/richfelker/musl-cross-make/archive/refs/tags/v$(CROSSMAKE).tar.gz -o $@
+
+deps-$(ARCH)/musl-cross-make-$(CROSSMAKE)/.extracted: tarballs/musl-cross-make-$(CROSSMAKE).tar.gz
+	mkdir -p deps-$(ARCH)
+	tar -xzf $< -C deps-$(ARCH)
+	touch $@
 
 deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE).tgz:
 	mkdir -p deps-$(ARCH)
 	curl -Lf https://musl.cc/$(ARCH)-linux-musl-$(TCTYPE).tgz -o deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE).tgz
 
+ifeq ($(NEED_CROSSMAKE),1)
+# manually compile the toolchain.
+deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted: deps-$(ARCH)/musl-cross-make-$(CROSSMAKE)/.extracted
+	sed\
+		-e 's|^TARGET=.*|TARGET=$(ARCH)-linux-musl|g'\
+		-e 's|^OUTPUT=.*|OUTPUT=$(ROOT_DIR)deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)|g'\
+		./cross-make/config.mak\
+		> deps-$(ARCH)/musl-cross-make-$(CROSSMAKE)/config.mak
+	cd deps-$(ARCH)/musl-cross-make-$(CROSSMAKE) && make -j$(JOBS)
+	cd deps-$(ARCH)/musl-cross-make-$(CROSSMAKE) && make install
+	touch $@
+.PHONY: crossmake
+crossmake: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted
+else
 deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE).tgz
 	tar -xzf $< -C deps-$(ARCH)
 	touch $@
+endif
 
 # compile openssl
 
@@ -181,7 +212,8 @@ build-$(ARCH)/lib/libncursesw.a: deps-$(ARCH)/ncurses-$(NCURSES)/.extracted deps
 			--enable-termcap\
 			--disable-shared
 	cd deps-$(ARCH)/ncurses-$(NCURSES) && make -j$(JOBS)
-	cd deps-$(ARCH)/ncurses-$(NCURSES) && make install
+	cd deps-$(ARCH)/ncurses-$(NCURSES) &&\
+		TIC_PATH=$(shell command -v tic) make install
 
 ncurses: build-$(ARCH)/lib/libncursesw.a
 .PHONY: ncurses
@@ -330,7 +362,7 @@ check_native:
 python-static-$(ARCH)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
 	cp ./python/config.status deps-$(ARCH)/Python-$(PYTHON)/config.status\
 		&& chmod +x deps-$(ARCH)/Python-$(PYTHON)/config.status
-	@sed\
+	sed\
 		-e '/^CC=/d' \
 		-e '/^AR=/d' \
 		-e 's|$(NATIVE_ARCH)|$(ARCH)|g'\
@@ -342,7 +374,7 @@ python-static-$(ARCH)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
 		-e '/^[[:space:]]*\$$(MAKE) -f Makefile\.pre.*Makefile/d'\
 		deps-$(NATIVE_ARCH)/Python-$(PYTHON)/Makefile\
 		> deps-$(ARCH)/Python-$(PYTHON)/Makefile
-	@sed\
+	sed\
 		-e '/^CC=/d' \
 		-e '/^AR=/d' \
 		-e 's|$(NATIVE_ARCH)|$(ARCH)|g'\
@@ -393,7 +425,3 @@ python-static-$(ARCH)/bin/python$(PYTHONV): $(PYTHON_DEPS)
 endif
 
 .PHONY: native-interpreter python-configure
-
-
-python3: python-static-$(ARCH)/bin/python$(PYTHONV)
-.PHONY: python3
