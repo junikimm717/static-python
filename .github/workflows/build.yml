@@ -39,7 +39,7 @@ jobs:
         with:
           tag_name: binaries
           name: "Latest Static Binaries"
-          body_path: ./notes.md
+          body_path: .github/workflows/notes.md
           files: |
             python-static-x86_64.tar.gz
             python-static-aarch64.tar.gz
