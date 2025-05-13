@@ -205,7 +205,7 @@ zlib: build-$(ARCH)/lib/libz.a
 
 tarballs/ncurses-$(NCURSES).tar.gz:
 	mkdir -p tarballs
-	curl -Lf https://invisible-mirror.net/archives/ncurses/ncurses-$(NCURSES).tar.gz -o $@
+	curl -Lf https://ftp.gnu.org/gnu/ncurses/ncurses-$(NCURSES).tar.gz -o $@
 
 deps-$(ARCH)/ncurses-$(NCURSES)/.extracted: tarballs/ncurses-$(NCURSES).tar.gz
 	mkdir -p deps-$(ARCH)
