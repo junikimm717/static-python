@@ -20,7 +20,7 @@ JOBS := $(shell nproc)
 
 override SUPPORTED := x86_64 aarch64 mips64 powerpc64le s390x riscv64 powerpc64
 override NATIVE_ARCH := $(shell uname -m)
-CROSSMAKE = 0
+USE_CROSSMAKE = 0
 
 ifeq ($(filter $(ARCH),$(SUPPORTED)),)
 $(error ARCH '$(ARCH)' is not one of the allowed values: $(SUPPORTED))
@@ -77,7 +77,10 @@ deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE).tgz:
 	mkdir -p deps-$(ARCH)
 	curl -Lf $(shell ./musl-source.sh)$(ARCH)-linux-musl-$(TCTYPE).tgz -o deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE).tgz
 
-ifeq ($(CROSSMAKE),1)
+.PHONY: crossmake
+crossmake: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted
+
+ifeq ($(USE_CROSSMAKE),1)
 # manually compile the toolchain.
 deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted: deps-$(ARCH)/musl-cross-make-$(CROSSMAKE)/.extracted
 	sed\
@@ -92,8 +95,6 @@ deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted: deps-$(ARCH)/musl-cross-ma
 	cd deps-$(ARCH)/musl-cross-make-$(CROSSMAKE) && make -j$(JOBS)
 	cd deps-$(ARCH)/musl-cross-make-$(CROSSMAKE) && make install
 	touch $@
-.PHONY: crossmake
-crossmake: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted
 else
 deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE).tgz
 	tar -xzf $< -C deps-$(ARCH)

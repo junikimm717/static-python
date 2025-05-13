@@ -64,7 +64,7 @@ system, so you need a native python to install all your libraries correctly.
 
 The resulting output should be findable in `./python-static-$(ARCH)`, where
 `$(ARCH)` is the architecture that you chose (defaults to native architecture if
-blank). You can also supply `NEED_CROSSMAKE` to force building the musl
+blank). You can also supply `USE_CROSSMAKE` to force building the musl
 toolchain from scratch.
 
 You can also view supported architectures in the Makefile under the `SUPPORTED`
