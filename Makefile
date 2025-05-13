@@ -22,7 +22,7 @@ JOBS := $(shell nproc)
 # powerpc64 is screwed unless I figure out how to get endians to work :/
 override SUPPORTED := x86_64 aarch64 mips64 powerpc64le s390x
 override NATIVE_ARCH := $(shell uname -m)
-override NEED_CROSSMAKE := 0
+NEED_CROSSMAKE = 0
 
 ifeq ($(filter $(ARCH),$(SUPPORTED)),)
 $(error ARCH '$(ARCH)' is not one of the allowed values: $(SUPPORTED))
