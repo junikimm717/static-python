@@ -75,7 +75,8 @@ deps-$(ARCH)/musl-cross-make-$(CROSSMAKE)/.extracted: tarballs/musl-cross-make-$
 override FILENAME = $(ARCH)-linux-musl-$(TCTYPE).tgz
 deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE).tgz:
 	mkdir -p deps-$(ARCH)
-	curl -Lf $(shell ./musl-source.sh)$(ARCH)-linux-musl-$(TCTYPE).tgz -o deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE).tgz
+	curl -Lf $(shell TCTYPE=$(TCTYPE) NATIVE_ARCH=$(NATIVE_ARCH) ARCH=$(ARCH) ./musl-source.sh)$(ARCH)-linux-musl-$(TCTYPE).tgz\
+		-o deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE).tgz
 
 .PHONY: crossmake
 crossmake: deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted
