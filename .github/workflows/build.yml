@@ -23,20 +23,25 @@ jobs:
       - name: Cross-compile aarch64
         run: make python3 ARCH=aarch64
 
-      - name: Cross-compile riscv
+      - name: Cross-compile riscv64
         run: make python3 ARCH=riscv64
+
+      - name: Cross-compile powerpc64
+        run: make python3 ARCH=powerpc64
 
       - name: Package binaries
         run: |
           tar -czf python-static-x86_64.tar.gz python-static-x86_64/
           tar -czf python-static-aarch64.tar.gz python-static-aarch64/
           tar -czf python-static-riscv64.tar.gz python-static-riscv64/
+          tar -czf python-static-powerpc64.tar.gz python-static-powerpc64/
 
       - name: Delete existing release assets
         run: |
           gh release delete-asset build-latest python-static-x86_64.tar.gz || true
           gh release delete-asset build-latest python-static-aarch64.tar.gz || true
           gh release delete-asset build-latest python-static-riscv64.tar.gz || true
+          gh release delete-asset build-latest python-static-powerpc64.tar.gz || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -49,3 +54,5 @@ jobs:
           files: |
             python-static-x86_64.tar.gz
             python-static-aarch64.tar.gz
+            python-static-riscv64.tar.gz
+            python-static-powerpc64.tar.gz
