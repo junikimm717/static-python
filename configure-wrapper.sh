@@ -28,9 +28,19 @@ echo "====================="
 echo "configure-wrapper.sh: Using Arch $ARCH in configuration $TCTYPE..."
 echo "====================="
 
-export LDFLAGS="-Wl,--export-dynamic -static --static -L$ROOT/build-$ARCH/lib -L$ROOT/build-$ARCH/lib64"
+LDFLAGS="-Wl,--export-dynamic -static -no-pie \
+  --static -L$ROOT/build-$ARCH/lib \
+  -L$ROOT/build-$ARCH/lib64"
+if test "$ARCH" = "riscv64"; then
+  LDFLAGS="$LDFLAGS -L$DEPS_DIR/$TOOLCHAIN-$TCTYPE/$TOOLCHAIN/lib"
+fi
+
+export LDFLAGS
 export LINKFORSHARED=" "
-export CFLAGS="-I$ROOT/build-$ARCH/include -I$ROOT/build-$ARCH/include/ncursesw -g0 -O2 -fno-align-functions -fno-align-jumps -fno-align-loops -fno-align-labels -Wno-error -fPIC"
+export CFLAGS="-I$ROOT/build-$ARCH/include \
+  -I$ROOT/build-$ARCH/include/ncursesw \
+  -g0 -O2 -fno-align-functions -fno-align-jumps \
+  -fno-align-loops -fno-align-labels -Wno-error -no-pie"
 export PREFIX="$ROOT/build-$ARCH"
 
 if ! test -z "$PYTHON"; then

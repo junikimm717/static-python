@@ -20,7 +20,7 @@ JOBS := $(shell nproc)
 
 # riscv64 apparently need atomics in software
 # powerpc64 is screwed unless I figure out how to get endians to work :/
-override SUPPORTED := x86_64 aarch64 mips64 powerpc64le s390x
+override SUPPORTED := x86_64 aarch64 mips64 powerpc64le s390x riscv64
 override NATIVE_ARCH := $(shell uname -m)
 NEED_CROSSMAKE = 0
 
@@ -401,6 +401,15 @@ python-static-$(ARCH)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
 		-e '/^[[:space:]]*\$$(MAKE) -f Makefile\.pre.*Makefile/d'\
 		deps-$(NATIVE_ARCH)/Python-$(PYTHON)/Makefile.pre\
 		> deps-$(ARCH)/Python-$(PYTHON)/Makefile.pre
+	# absolutely cursed patch
+	if test "$(ARCH)" = "riscv64"; then\
+		sed -i\
+			-e 's|^LIBS=.*|LIBS=-latomic|g'\
+			deps-$(ARCH)/Python-$(PYTHON)/Makefile.pre ;\
+		sed -i\
+			-e 's|^LIBS=.*|LIBS=-latomic|g'\
+			deps-$(ARCH)/Python-$(PYTHON)/Makefile ;\
+	fi
 
 	test -f deps-$(NATIVE_ARCH)/Python-$(PYTHON)/pyconfig.h
 	cp -p deps-$(NATIVE_ARCH)/Python-$(PYTHON)/pyconfig.h\
