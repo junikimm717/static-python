@@ -20,7 +20,7 @@ JOBS := $(shell nproc)
 
 override SUPPORTED := x86_64 aarch64 mips64 powerpc64le s390x riscv64 powerpc64
 override NATIVE_ARCH := $(shell uname -m)
-NEED_CROSSMAKE = 0
+CROSSMAKE = 0
 
 ifeq ($(filter $(ARCH),$(SUPPORTED)),)
 $(error ARCH '$(ARCH)' is not one of the allowed values: $(SUPPORTED))
@@ -33,7 +33,6 @@ override TCTYPE=cross
 $(info Cross-Compiling to $(ARCH) from $(NATIVE_ARCH)...)
 ifneq ($(NATIVE_ARCH),x86_64)
 # you need musl crossmake if cross-compiling from non-x86 architecture.
-override NEED_CROSSMAKE = 1
 $(info Not x86_64, musl-cross-make will be required)
 endif
 else
@@ -44,6 +43,7 @@ endif
 
 export TCTYPE
 export ARCH
+export NATIVE_ARCH
 
 DEPS_DIR := "$(ROOT_DIR)/deps-$(ARCH)"
 
@@ -72,11 +72,12 @@ deps-$(ARCH)/musl-cross-make-$(CROSSMAKE)/.extracted: tarballs/musl-cross-make-$
 	ln -sfn $(ROOT_DIR)/tarballs deps-$(ARCH)/musl-cross-make-$(CROSSMAKE)/sources
 	touch $@
 
+override FILENAME = $(ARCH)-linux-musl-$(TCTYPE).tgz
 deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE).tgz:
 	mkdir -p deps-$(ARCH)
-	curl -Lf https://musl.cc/$(ARCH)-linux-musl-$(TCTYPE).tgz -o deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE).tgz
+	curl -Lf $(shell ./musl-source.sh)$(ARCH)-linux-musl-$(TCTYPE).tgz -o deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE).tgz
 
-ifeq ($(NEED_CROSSMAKE),1)
+ifeq ($(CROSSMAKE),1)
 # manually compile the toolchain.
 deps-$(ARCH)/$(ARCH)-linux-musl-$(TCTYPE)/.extracted: deps-$(ARCH)/musl-cross-make-$(CROSSMAKE)/.extracted
 	sed\

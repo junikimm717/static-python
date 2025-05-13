@@ -41,17 +41,20 @@ docker compose up -d
 ## Building Native
 
 ```sh
+# using the standard binary toolchains from the internet
 make
+# manually compiling your own gcc toolchain
+make CROSSMAKE=1
 ```
 
 ## Cross Compiling
 
 ```sh
-# If you are trying to compile to an aarch64 target
+# If you are trying to compile to an aarch64 target from x86_64
 make && make python3 ARCH=aarch64
 ```
 
-Cross-compiling is now supported from x86_64 and aarch64 (confirmed)! This took
+Cross-compiling is now officially supported from x86_64 and aarch64! This took
 soooo long to do, and it doesn't seem like that I will be able to support all
 the architectures I initially wanted to :/
 
@@ -59,7 +62,7 @@ As seen above, if you are cross compiling, **You MUST build the native
 interpreter first**. Cross-compiled python interpreters can't be run on the
 system, so you need a native python to install all your libraries correctly.
 
-The resulting output should be found in in `./python-static-$(ARCH)`, where
+The resulting output should be findable in `./python-static-$(ARCH)`, where
 `$(ARCH)` is the architecture that you chose (defaults to native architecture if
 blank). You can also supply `NEED_CROSSMAKE` to force building the musl
 toolchain from scratch.
