@@ -30,7 +30,7 @@ most of which should be present if you're already building a lot of things:
 - **unzip**
 - **perl** with **FindBin.pm** (apparently on some distros you need to install
   perl-core?)
-- cURL, tar, make
+- cURL, tar, make, rsync
 
 Alternatively, you can just use the docker configs provided and run
 ```sh
@@ -51,9 +51,9 @@ make
 make && make python3 ARCH=aarch64
 ```
 
-Cross-compiling is now supported from x86_64! This took soooo long to do, and
-it doesn't seem like that I will be able to support all the architectures I
-initially wanted to :/
+Cross-compiling is now supported from x86_64 and aarch64 (confirmed)! This took
+soooo long to do, and it doesn't seem like that I will be able to support all
+the architectures I initially wanted to :/
 
 As seen above, if you are cross compiling, **You MUST build the native
 interpreter first**. Cross-compiled python interpreters can't be run on the
@@ -61,7 +61,8 @@ system, so you need a native python to install all your libraries correctly.
 
 The resulting output should be found in in `./python-static-$(ARCH)`, where
 `$(ARCH)` is the architecture that you chose (defaults to native architecture if
-blank).
+blank). You can also supply `NEED_CROSSMAKE` to force building the musl
+toolchain from scratch.
 
 You can also view supported architectures in the Makefile under the `SUPPORTED`
 variable. (I assume if you are actually trying to run this project, you for sure

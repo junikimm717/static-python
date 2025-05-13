@@ -18,9 +18,7 @@ PYTHONV := $(word 1, $(SPLIT)).$(word 2, $(SPLIT))
 ARCH := $(shell uname -m)
 JOBS := $(shell nproc)
 
-# riscv64 apparently need atomics in software
-# powerpc64 is screwed unless I figure out how to get endians to work :/
-override SUPPORTED := x86_64 aarch64 mips64 powerpc64le s390x riscv64
+override SUPPORTED := x86_64 aarch64 mips64 powerpc64le s390x riscv64 powerpc64
 override NATIVE_ARCH := $(shell uname -m)
 NEED_CROSSMAKE = 0
 
@@ -424,11 +422,12 @@ python-static-$(ARCH)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
 
 	cd deps-$(ARCH)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make -j$(JOBS) build/python
 
-	# so...it turns out you need endianness to be correct here
 	mkdir -p python-static-$(ARCH)/bin python-static-$(ARCH)/lib
 	cp -r python-static-$(NATIVE_ARCH)/include python-static-$(ARCH)/include
 	cp -r python-static-$(NATIVE_ARCH)/share python-static-$(ARCH)/share
-	cp -r python-static-$(NATIVE_ARCH)/lib/python$(PYTHONV) python-static-$(ARCH)/lib/python$(PYTHONV)
+	rsync -a --exclude='__pycache__/' \
+		python-static-$(NATIVE_ARCH)/lib/python$(PYTHONV) \
+		python-static-$(ARCH)/lib
 
 	cp -r deps-$(ARCH)/Python-$(PYTHON)/build/python python-static-$(ARCH)/bin/python$(PYTHONV)
 	ln -sf python$(PYTHONV) python-static-$(ARCH)/bin/python3
