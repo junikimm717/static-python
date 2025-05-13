@@ -41,7 +41,6 @@ docker compose up -d
 ## Building Native
 
 ```sh
-# using the standard binary toolchains from the internet
 make
 # manually compiling your own gcc toolchain
 make CROSSMAKE=1
@@ -64,8 +63,13 @@ system, so you need a native python to install all your libraries correctly.
 
 The resulting output should be findable in `./python-static-$(ARCH)`, where
 `$(ARCH)` is the architecture that you chose (defaults to native architecture if
-blank). You can also supply `USE_CROSSMAKE` to force building the musl
-toolchain from scratch.
+blank). 
+
+If you would not like to build gcc from scratch, the build system will install
+toolchains from either musl.cc or
+[dev.mit.junic.kim](https://dev.mit.junic.kim/cross), where I have pre-built
+cross-compiling toolchains from aarch64. Otherwise, supply the `USE_CROSSMAKE`
+argument to make to build the cross-compiling toolchain.
 
 You can also view supported architectures in the Makefile under the `SUPPORTED`
 variable. (I assume if you are actually trying to run this project, you for sure

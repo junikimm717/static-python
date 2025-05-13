@@ -16,23 +16,27 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential perl unzip make meson curl tar
-
+          sudo apt-get install -y build-essential git perl unzip make meson curl tar rsync flex bison
       - name: Build native
         run: make python3 ARCH=x86_64
 
       - name: Cross-compile aarch64
         run: make python3 ARCH=aarch64
 
+      - name: Cross-compile riscv
+        run: make python3 ARCH=riscv64
+
       - name: Package binaries
         run: |
           tar -czf python-static-x86_64.tar.gz python-static-x86_64/
           tar -czf python-static-aarch64.tar.gz python-static-aarch64/
+          tar -czf python-static-riscv64.tar.gz python-static-riscv64/
 
       - name: Delete existing release assets
         run: |
           gh release delete-asset build-latest python-static-x86_64.tar.gz || true
           gh release delete-asset build-latest python-static-aarch64.tar.gz || true
+          gh release delete-asset build-latest python-static-riscv64.tar.gz || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
