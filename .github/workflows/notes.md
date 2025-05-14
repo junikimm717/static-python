@@ -1,4 +1,1 @@
-# Precompiled Binaries for Static Python
-
-Binaries are provided for Linux only (obviously). You don't need to trust random
-binaries on the internet tho :)
+Precompiled binaries for Python 3.13 are provided exclusively for Linux (the intended scope of this project). The executable should always sit in `python-static-$ARCH/bin/python3.13` for you to enjoy :)

@@ -1,29 +1,45 @@
-# Statically Linked Python
+# Statically Linked + Cross Compiled Python
 
-A stupid project where I attempt to build a functional, dependency-free python
-interpreter for Linux. Contrary to a bunch of Stack Overflow/forum posts, this
-was a far more difficult problem than initially anticipated and involved
-extensive fiddling/patching. This repo is the result of my madness while
-procrastinating studying for MIT finals :).
+An absolutely stupid project where I attempt to build a functional python
+interpreter with zero shared libraries (those pesky .so/.dll files). It also
+cross-compiles to a bunch of architectures!
 
-This project is exclusively as a hobby. For basically all
+**Warning:** this project is almost exclusively as a hobby. For basically all
 intents and purposes, you should use your standard dynamically linked python
 interpreter.
 
-Python ABI support is mostly there plus or minus epsilon (No deprecated ABI's
-are included in my hacked module). The Makefile injects some monkey-patched code
-into the Python source tree to make all of this work^^.
+Contrary to a bunch of Stack Overflow/forum posts, this was far harder than
+initially anticipated and involved extensive fiddling/patching. This repo is the
+result of my madness while procrastinating studying for MIT finals :).
+
+Python ABI (Application Binary Interface) support through `ctypes` is mostly
+there plus or minus epsilon (No deprecated ABI's are included in my hacked
+module). The Makefile injects some monkey-patched code into the Python source
+tree to make all of this work^^.
 
 The resulting build comes with almost the entire standard library supported, so
-you can actually install packages (mostly) as normal. But any modules dependent
-on C/Rust shared libraries for performance (e.g. numpy) will obviously
-fail immediately. It may be a future goal to bundle some of these modules, but
-universal coverage is impossible.
+pure python packages should just work (It runs a django app perfectly). But any
+modules dependent on C/Rust shared libraries for performance (e.g. numpy) will
+just fail. It may be a future goal to bundle some of these modules, but
+universal coverage will be impossible. The python ecosystem just depends way too
+much on dynamic loading.
+
+## Usage
+
+Binaries should be ready to use in [the releases
+page](https://github.com/junikimm717/static-python/releases).
+Only Linux (5.8+) is supported.
 
 ## Setup
 
-Here's a somewhat comprehensive list of things you should have on your system,
-most of which should be present if you're already building a lot of things:
+If you have a sufficiently modern version of docker, just run
+```sh
+docker compose up -d
+./dev.sh
+```
+
+Alternatively, make sure you have all of the following packages on your system
+(mostly just common build tools).
 
 - **meson, ninja, flex, bison** (for libuuid)
 - **ncurses** (stupid terminfo things)
@@ -32,25 +48,26 @@ most of which should be present if you're already building a lot of things:
   perl-core?)
 - cURL, tar, make, rsync
 
-Alternatively, you can just use the docker configs provided and run
-```sh
-docker compose up -d
-./dev.sh
-```
-
 ## Building Native
 
 ```sh
+# Build python while downloading gcc binaries from musl.cc
 make
-# manually compiling your own gcc toolchain
+# Or build python while manually compiling your own gcc toolchain
 make CROSSMAKE=1
+# run your statically linked python3!
+./python-static-$(uname -m)/bin/python3
 ```
 
 ## Cross Compiling
 
 ```sh
-# If you are trying to compile to an aarch64 target from x86_64
-make && make python3 ARCH=aarch64
+# First, compile a native python interpreter (assuming on x86_64 system).
+make
+# Next, cross-compile to aarch64 while downloading gcc binaries.
+make ARCH=aarch64
+# Then, compile to riscv64 while bootstrapping the toolchain.
+make ARCH=riscv64 USE_CROSSMAKE=1
 ```
 
 Cross-compiling is now officially supported from x86_64 and aarch64! This took
@@ -59,13 +76,13 @@ the architectures I initially wanted to :/
 
 As seen above, if you are cross compiling, **You MUST build the native
 interpreter first**. Cross-compiled python interpreters can't be run on the
-system, so you need a native python to install all your libraries correctly.
+system, so you'll need a native python to install all your libraries correctly.
 
 The resulting output should be findable in `./python-static-$(ARCH)`, where
 `$(ARCH)` is the architecture that you chose (defaults to native architecture if
-blank). 
+blank).
 
-If you would not like to build gcc from scratch, the build system will install
+If you don't want to build gcc from scratch, the build system will install
 toolchains from either musl.cc or
 [dev.mit.junic.kim](https://dev.mit.junic.kim/cross), where I have pre-built
 cross-compiling toolchains from aarch64. Otherwise, supply the `USE_CROSSMAKE`

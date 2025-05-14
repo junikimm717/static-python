@@ -56,3 +56,4 @@ jobs:
             python-static-aarch64.tar.gz
             python-static-riscv64.tar.gz
             python-static-powerpc64.tar.gz
+          prerelease: true
