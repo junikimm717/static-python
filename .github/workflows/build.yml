@@ -38,12 +38,17 @@ jobs:
 
       - name: Delete existing release assets
         run: |
-          gh release delete-asset build-latest python-static-x86_64.tar.gz || true
-          gh release delete-asset build-latest python-static-aarch64.tar.gz || true
-          gh release delete-asset build-latest python-static-riscv64.tar.gz || true
-          gh release delete-asset build-latest python-static-powerpc64.tar.gz || true
+          gh release delete-asset binaries python-static-x86_64.tar.gz || true
+          gh release delete-asset binaries python-static-aarch64.tar.gz || true
+          gh release delete-asset binaries python-static-riscv64.tar.gz || true
+          gh release delete-asset binaries python-static-powerpc64.tar.gz || true
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete release
+        run: |
+          gh release delete binaries --yes || true
+          git push origin :binaries || true
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
