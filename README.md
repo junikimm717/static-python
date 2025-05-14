@@ -27,7 +27,7 @@ much on dynamic loading.
 ## Usage
 
 Binaries should be ready to use in [the releases
-page](https://github.com/junikimm717/static-python/releases).
+page](https://github.com/junikimm717/static-python/releases/tag/binaries).
 Only Linux (5.8+) is supported.
 
 ## Setup
