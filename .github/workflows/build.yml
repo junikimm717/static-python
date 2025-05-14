@@ -49,6 +49,8 @@ jobs:
         run: |
           gh release delete binaries --yes || true
           git push origin :binaries || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
