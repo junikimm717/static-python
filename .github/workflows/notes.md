@@ -1,1 +1,1 @@
-Precompiled binaries for Python 3.13 are provided exclusively for Linux (the intended scope of this project). The executable should always sit in `python-static-$ARCH/bin/python3.13` for you to enjoy :)
+Precompiled binaries for Python 3.13 are provided exclusively for Linux (the intended scope of this project).

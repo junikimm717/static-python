@@ -18,32 +18,23 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential git perl unzip make meson curl tar rsync flex bison
       - name: Build native
-        run: make python3 ARCH=x86_64
+        run: make ARCH=x86_64
 
       - name: Cross-compile aarch64
-        run: make python3 ARCH=aarch64
+        run: make ARCH=aarch64
 
       - name: Cross-compile riscv64
-        run: make python3 ARCH=riscv64
+        run: make ARCH=riscv64
 
       - name: Cross-compile powerpc64
-        run: make python3 ARCH=powerpc64
+        run: make ARCH=powerpc64
 
       - name: Package binaries
         run: |
-          tar -czf python-static-x86_64.tar.gz python-static-x86_64/
-          tar -czf python-static-aarch64.tar.gz python-static-aarch64/
-          tar -czf python-static-riscv64.tar.gz python-static-riscv64/
-          tar -czf python-static-powerpc64.tar.gz python-static-powerpc64/
-
-      - name: Delete existing release assets
-        run: |
-          gh release delete-asset binaries python-static-x86_64.tar.gz || true
-          gh release delete-asset binaries python-static-aarch64.tar.gz || true
-          gh release delete-asset binaries python-static-riscv64.tar.gz || true
-          gh release delete-asset binaries python-static-powerpc64.tar.gz || true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          tar -czf python-static-x86_64-linux-musl.tar.gz python-static-x86_64-linux-musl/
+          tar -czf python-static-aarch64-linux-musl.tar.gz python-static-aarch64-linux-musl/
+          tar -czf python-static-riscv64-linux-musl.tar.gz python-static-riscv64-linux-musl/
+          tar -czf python-static-powerpc64-linux-musl.tar.gz python-static-powerpc64-linux-musl/
 
       - name: Delete release
         run: |
@@ -59,8 +50,8 @@ jobs:
           name: "Latest Static Binaries"
           body_path: .github/workflows/notes.md
           files: |
-            python-static-x86_64.tar.gz
-            python-static-aarch64.tar.gz
-            python-static-riscv64.tar.gz
-            python-static-powerpc64.tar.gz
+            python-static-x86_64-linux-musl.tar.gz
+            python-static-aarch64-linux-musl.tar.gz
+            python-static-riscv64-linux-musl.tar.gz
+            python-static-powerpc64-linux-musl.tar.gz
           prerelease: true
