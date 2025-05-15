@@ -2,21 +2,21 @@
 
 ROOT="$(realpath "$(dirname "$0")")"
 
-TOOLCHAIN="$ARCH-linux-musl"
-DEPS_DIR="$(realpath "$(dirname "$0")")/deps-$ARCH"
+TARGET="$ARCH-linux-$MUSLABI"
+DEPS_DIR="$(realpath "$(dirname "$0")")/deps-$TARGET"
 
 case "$TCTYPE" in
   "native")
-    export CC="$DEPS_DIR/$TOOLCHAIN-native/bin/gcc"
-    export AR="$DEPS_DIR/$TOOLCHAIN-native/bin/ar"
-    export RANLIB="$DEPS_DIR/$TOOLCHAIN-native/bin/ranlib"
-    export LD="$DEPS_DIR/$TOOLCHAIN-native/bin/ld"
+    export CC="$DEPS_DIR/$TARGET-native/bin/gcc"
+    export AR="$DEPS_DIR/$TARGET-native/bin/ar"
+    export RANLIB="$DEPS_DIR/$TARGET-native/bin/ranlib"
+    export LD="$DEPS_DIR/$TARGET-native/bin/ld"
     ;;
   "cross")
-    export CC="$DEPS_DIR/$TOOLCHAIN-cross/bin/$TOOLCHAIN-gcc"
-    export AR="$DEPS_DIR/$TOOLCHAIN-cross/bin/$TOOLCHAIN-ar"
-    export RANLIB="$DEPS_DIR/$TOOLCHAIN-cross/bin/$TOOLCHAIN-ranlib"
-    export LD="$DEPS_DIR/$TOOLCHAIN-cross/bin/$TOOLCHAIN-ld"
+    export CC="$DEPS_DIR/$TARGET-cross/bin/$TARGET-gcc"
+    export AR="$DEPS_DIR/$TARGET-cross/bin/$TARGET-ar"
+    export RANLIB="$DEPS_DIR/$TARGET-cross/bin/$TARGET-ranlib"
+    export LD="$DEPS_DIR/$TARGET-cross/bin/$TARGET-ld"
     ;;
   *)
     echo "\$TCTYPE must be either 'cross' or 'native' (set to '$TCTYPE')! Exiting..."
@@ -25,23 +25,21 @@ case "$TCTYPE" in
 esac
 
 echo "====================="
-echo "configure-wrapper.sh: Using Arch $ARCH in configuration $TCTYPE..."
+echo "configure-wrapper.sh: Using target $TARGET in configuration $TCTYPE..."
 echo "====================="
 
 LDFLAGS="-Wl,--export-dynamic -static -no-pie \
-  --static -L$ROOT/build-$ARCH/lib \
-  -L$ROOT/build-$ARCH/lib64"
-if test "$ARCH" = "riscv64"; then
-  LDFLAGS="$LDFLAGS -L$DEPS_DIR/$TOOLCHAIN-$TCTYPE/$TOOLCHAIN/lib"
-fi
+  --static -L$ROOT/build-$TARGET/lib \
+  -L$ROOT/build-$TARGET/lib64\
+  -L$DEPS_DIR/$TARGET-$TCTYPE/$TARGET/lib"
 
 export LDFLAGS
 export LINKFORSHARED=" "
-export CFLAGS="-I$ROOT/build-$ARCH/include \
-  -I$ROOT/build-$ARCH/include/ncursesw \
+export CFLAGS="-I$ROOT/build-$TARGET/include \
+  -I$ROOT/build-$TARGET/include/ncursesw \
   -g0 -O2 -fno-align-functions -fno-align-jumps \
-  -fno-align-loops -fno-align-labels -Wno-error -no-pie"
-export PREFIX="$ROOT/build-$ARCH"
+  -fno-align-loops -fno-align-labels -Wno-error -no-pie -w"
+export PREFIX="$ROOT/build-$TARGET"
 
 if ! test -z "$PYTHON"; then
   export PREFIX="$ROOT/python-static-$ARCH"

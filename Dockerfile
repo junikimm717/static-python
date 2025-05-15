@@ -10,6 +10,9 @@ RUN apk add --no-cache\
   qemu-ppc64le\
   qemu-s390x\
   qemu-aarch64\
+  qemu-arm\
+  qemu-armeb\
+  qemu-i386\
   qemu-mips64
 
 WORKDIR /workspace

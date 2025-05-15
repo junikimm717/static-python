@@ -80,7 +80,9 @@ system, so you'll need a native python to install all your libraries correctly.
 
 The resulting output should be findable in `./python-static-$(ARCH)`, where
 `$(ARCH)` is the architecture that you chose (defaults to native architecture if
-blank).
+blank). If you are on some weird architecture, you might want to additionally
+specify ABI type through `$(ABI)`. You can check ABI Types at
+[musl.cc](https://musl.cc/)
 
 If you don't want to build gcc from scratch, the build system will install
 toolchains from either musl.cc or

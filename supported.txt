@@ -1,0 +1,9 @@
+x86_64-linux-musl
+aarch64-linux-musl
+mips64-linux-musl
+powerpc64le-linux-musl
+s390x-linux-musl
+riscv64-linux-musl
+powerpc64-linux-musl
+arm-linux-musleabihf
+i386-linux-musl

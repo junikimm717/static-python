@@ -17,5 +17,6 @@ case "$NATIVE_ARCH" in
     echo "https://dev.mit.junic.kim/cross/aarch64/"
     ;;
   *)
+    echo ""
     exit 1
 esac
