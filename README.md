@@ -78,10 +78,11 @@ As seen above, if you are cross compiling, **You MUST build the native
 interpreter first**. Cross-compiled python interpreters can't be run on the
 system, so you'll need a native python to install all your libraries correctly.
 
-The resulting output should be findable in `./python-static-$(ARCH)`, where
-`$(ARCH)` is the architecture that you chose (defaults to native architecture if
-blank). If you are on some weird architecture, you might want to additionally
-specify ABI type through `$(ABI)`. You can check ABI Types at
+The resulting output should be findable in
+`./python-static-$(ARCH)-linux-$(MUSLABI)`, where `$(ARCH)` is the architecture
+that you chose (defaults to native architecture if blank). If you are on some
+weird architecture, you might want to additionally specify ABI type through
+`$(MUSLABI)`. You can check out different musl ABI types at
 [musl.cc](https://musl.cc/)
 
 If you don't want to build gcc from scratch, the build system will install
@@ -90,6 +91,6 @@ toolchains from either musl.cc or
 cross-compiling toolchains from aarch64. Otherwise, supply the `USE_CROSSMAKE`
 argument to make to build the cross-compiling toolchain.
 
-You can also view supported architectures in the Makefile under the `SUPPORTED`
-variable. (I assume if you are actually trying to run this project, you for sure
-know what you are doing 😇)
+You can also view supported architectures in the `supported.txt` file. (I assume
+if you are actually trying to run this project, you for sure know what you are
+doing 😇)
