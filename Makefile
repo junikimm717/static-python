@@ -415,7 +415,7 @@ python-static-$(TARGET)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
 		> deps-$(TARGET)/Python-$(PYTHON)/Makefile.pre
 
 	# absolutely cursed patch to force atomics LMAO.
-	if echo "$(ARCH)" | grep -E "i[3-6]86|arm[^6]|mips[^6]|microblaze|sh|m68k|or1k|riscv(32|64)"; then\
+	if echo "$(ARCH)" | grep -E "i[3-6]86|arm[^6]?|mips[^6]?|microblaze|sh|m68k|or1k|riscv(32|64)"; then\
 		sed -i\
 			-e '/^SYSLIBS=.*/ s/$$/ -latomic/g'\
 			deps-$(TARGET)/Python-$(PYTHON)/Makefile.pre ;\
