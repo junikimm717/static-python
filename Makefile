@@ -26,7 +26,7 @@ override NATIVE_TARGET := $(NATIVE_ARCH)-linux-musl
 USE_CROSSMAKE = 0
 
 ifeq ($(shell grep '$(TARGET)' ./supported.txt),)
-$(error Platform '$(ARCH)-linux-$(MUSLABI)' is not supported)
+$(error Platform '$(TARGET)' is not supported)
 endif
 
 # do a bunch of architecture fiddling.
@@ -78,10 +78,10 @@ deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/.extracted: tarballs/musl-cross-make
 	touch $@
 
 override FILENAME = $(ARCH)-linux-$(MUSLABI)-$(TCTYPE).tgz
-deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE).tgz:
-	mkdir -p deps-$(TARGET)
+tarballs/$(TARGET)-$(TCTYPE).tgz:
+	mkdir -p tarballs
 	curl -Lf $(shell TCTYPE=$(TCTYPE) NATIVE_ARCH=$(NATIVE_ARCH) ARCH=$(ARCH) ./musl-source.sh)$(ARCH)-linux-$(MUSLABI)-$(TCTYPE).tgz\
-		-o deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE).tgz
+		-o tarballs/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE).tgz
 
 .PHONY: crossmake
 crossmake: deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted
@@ -102,7 +102,7 @@ deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted: deps-$(TARGET)/mus
 	cd deps-$(TARGET)/musl-cross-make-$(CROSSMAKE) && make install
 	touch $@
 else
-deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted: deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE).tgz
+deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted: tarballs/$(TARGET)-$(TCTYPE).tgz
 	tar -xzf $< -C deps-$(TARGET)
 	touch $@
 endif
@@ -343,6 +343,7 @@ build-$(TARGET)/lib/libuuid.a: deps-$(TARGET)/util-linux-$(UTILLINUX)/.extracted
 		echo "--prefix=$(ROOT_DIR)build-$(TARGET) --default-library=static --prefer-static --buildtype=release --backend=ninja --cross-file cross.ini"\
 			>> ./build-args.txt
 	cd deps-$(TARGET)/util-linux-$(UTILLINUX) && \
+		MESON=1\
 		../../configure-wrapper.sh meson setup build $$(cat ./build-args.txt)
 	ninja -C deps-$(TARGET)/util-linux-$(UTILLINUX)/build
 	ninja -C deps-$(TARGET)/util-linux-$(UTILLINUX)/build install
@@ -452,7 +453,7 @@ python-static-$(TARGET)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
 	touch deps-$(TARGET)/Python-$(PYTHON)/Makefile
 	touch deps-$(TARGET)/Python-$(PYTHON)/Makefile.pre
 
-	cd deps-$(TARGET)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make -j$(JOBS) build/python
+	cd deps-$(TARGET)/Python-$(PYTHON) && PYTHON_BUILD=1 ../../configure-wrapper.sh make -j$(JOBS) build/python
 
 	mkdir -p python-static-$(TARGET)/bin python-static-$(TARGET)/lib
 	cp -r python-static-$(NATIVE_TARGET)/include python-static-$(TARGET)/include
@@ -474,7 +475,7 @@ python-static-$(TARGET)/bin/python$(PYTHONV): $(PYTHON_DEPS)
 			--build=$(ARCH)-linux-$(MUSLABI)\
 			--disable-test-modules\
 			--with-ensurepip=no
-	cd deps-$(TARGET)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make -j$(JOBS)
+	cd deps-$(TARGET)/Python-$(PYTHON) && PYTHON_BUILD=1 ../../configure-wrapper.sh make -j$(JOBS)
 	mkdir -p python-static-$(TARGET)
-	cd deps-$(TARGET)/Python-$(PYTHON) && PYTHON=1 ../../configure-wrapper.sh make bininstall
+	cd deps-$(TARGET)/Python-$(PYTHON) && PYTHON_BUILD=1 ../../configure-wrapper.sh make bininstall
 endif

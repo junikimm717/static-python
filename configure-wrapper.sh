@@ -41,9 +41,11 @@ export CFLAGS="-I$ROOT/build-$TARGET/include \
   -fno-align-loops -fno-align-labels -Wno-error -no-pie -w"
 export PREFIX="$ROOT/build-$TARGET"
 
-if ! test -z "$PYTHON"; then
+if ! test -z "$PYTHON_BUILD"; then
   export PREFIX="$ROOT/python-static-$ARCH"
   exec "$@" LDFLAGS="$LDFLAGS" CFLAGS="$CFLAGS"
+elif ! test -z "$MESON"; then
+  exec "$@" -Dc_link_args="$LDFLAGS" -Dc_args="$CFLAGS" --prefix="$PREFIX"
 else
   exec "$@"
 fi
