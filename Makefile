@@ -65,7 +65,6 @@ distclean: clean
 	rm -rf tarballs
 
 # build steps for musl toolchain.
-# if not on an x86_64 machine, toolchains must get manually built.
 
 tarballs/musl-cross-make-$(CROSSMAKE).tar.gz:
 	mkdir -p tarballs
@@ -103,6 +102,7 @@ deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted: deps-$(TARGET)/mus
 	touch $@
 else
 deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted: tarballs/$(TARGET)-$(TCTYPE).tgz
+	mkdir -p deps-$(TARGET)
 	tar -xzf $< -C deps-$(TARGET)
 	touch $@
 endif
