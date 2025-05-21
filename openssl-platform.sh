@@ -6,6 +6,9 @@ case "$1" in
   x86_64|aarch64)
     echo "linux-$1"
     ;;
+  arm)
+    echo "linux-armv4"
+    ;;
   powerpc64)
     echo "linux-ppc64"
     ;;

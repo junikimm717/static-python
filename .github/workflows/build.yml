@@ -20,17 +20,18 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential git perl unzip make meson curl tar rsync flex bison
+
       - name: Build native
         run: make ARCH=x86_64
+
+      - name: Cross-compile
+        run: make ARCH=arm MUSLABI=musleabihf
 
       - name: Cross-compile aarch64
         run: make ARCH=aarch64
 
       - name: Cross-compile riscv64
         run: make ARCH=riscv64
-
-      - name: Cross-compile
-        run: make ARCH=arm MUSLABI=musleabihf
 
       - name: Package binaries
         run: |
