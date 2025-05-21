@@ -29,15 +29,15 @@ jobs:
       - name: Cross-compile riscv64
         run: make ARCH=riscv64
 
-      - name: Cross-compile powerpc64
-        run: make ARCH=powerpc64
+      - name: Cross-compile
+        run: make ARCH=arm MUSLABI=musleabihf
 
       - name: Package binaries
         run: |
           tar -czf python-static-x86_64-linux-musl.tar.gz python-static-x86_64-linux-musl/
           tar -czf python-static-aarch64-linux-musl.tar.gz python-static-aarch64-linux-musl/
           tar -czf python-static-riscv64-linux-musl.tar.gz python-static-riscv64-linux-musl/
-          tar -czf python-static-powerpc64-linux-musl.tar.gz python-static-powerpc64-linux-musl/
+          tar -czf python-static-arm-linux-musleabihf.tar.gz python-static-arm-linux-musleabihf/
 
       - name: Delete release
         run: |
@@ -56,5 +56,5 @@ jobs:
             python-static-x86_64-linux-musl.tar.gz
             python-static-aarch64-linux-musl.tar.gz
             python-static-riscv64-linux-musl.tar.gz
-            python-static-powerpc64-linux-musl.tar.gz
+            python-static-arm-linux-musleabihf.tar.gz
           prerelease: true
