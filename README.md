@@ -1,8 +1,8 @@
-# Statically Linked + Cross Compiled Python
+# Python with Static + Cross + LTO
 
 An absolutely stupid project where I attempt to build a functional python
 interpreter with zero shared libraries (those pesky .so/.dll files). It also
-cross-compiles to a bunch of architectures!
+cross-compiles with full link-time optimization!
 
 **Warning:** this project is almost exclusively as a hobby. For basically all
 intents and purposes, you should use your standard dynamically linked python
