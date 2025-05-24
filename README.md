@@ -71,7 +71,7 @@ make ARCH=aarch64
 make ARCH=riscv64 USE_CROSSMAKE=1
 ```
 
-Cross-compiling+LTO is now officially supported from x86_64 and aarch64! This
+Cross-compiling is now officially supported from x86_64 and aarch64! This
 took soooo long to do, and it doesn't seem like that I will be able to support
 all the architectures I initially wanted to :/
 

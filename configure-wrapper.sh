@@ -7,15 +7,15 @@ DEPS_DIR="$(realpath "$(dirname "$0")")/deps-$TARGET"
 
 case "$TCTYPE" in
   "native")
-    export CC="$DEPS_DIR/$TARGET-native/bin/gcc"
-    export AR="$DEPS_DIR/$TARGET-native/bin/ar"
-    export RANLIB="$DEPS_DIR/$TARGET-native/bin/ranlib"
-    export LD="$DEPS_DIR/$TARGET-native/bin/ld"
+    export CC="$DEPS_DIR/$TARGET-native/bin/$TARGET-gcc"
+    export AR="$DEPS_DIR/$TARGET-native/bin/$TARGET-gcc-ar"
+    export RANLIB="$DEPS_DIR/$TARGET-native/bin/$TARGET-gcc-ranlib"
+    export LD="$DEPS_DIR/$TARGET-native/bin/$TARGET-ld"
     ;;
   "cross")
     export CC="$DEPS_DIR/$TARGET-cross/bin/$TARGET-gcc"
-    export AR="$DEPS_DIR/$TARGET-cross/bin/$TARGET-ar"
-    export RANLIB="$DEPS_DIR/$TARGET-cross/bin/$TARGET-ranlib"
+    export AR="$DEPS_DIR/$TARGET-cross/bin/$TARGET-gcc-ar"
+    export RANLIB="$DEPS_DIR/$TARGET-cross/bin/$TARGET-gcc-ranlib"
     export LD="$DEPS_DIR/$TARGET-cross/bin/$TARGET-ld"
     ;;
   *)
@@ -28,17 +28,15 @@ echo "====================="
 echo "configure-wrapper.sh: Using target $TARGET in configuration $TCTYPE..."
 echo "====================="
 
-LDFLAGS="-Wl,--export-dynamic -static -no-pie \
-  --static -L$ROOT/build-$TARGET/lib \
+export LDFLAGS="-Wl,--export-dynamic -static -no-pie -flto \
+  -s --static -L$ROOT/build-$TARGET/lib \
   -L$ROOT/build-$TARGET/lib64\
   -L$DEPS_DIR/$TARGET-$TCTYPE/$TARGET/lib"
 
-export LDFLAGS
 export LINKFORSHARED=" "
 export CFLAGS="-I$ROOT/build-$TARGET/include \
   -I$ROOT/build-$TARGET/include/ncursesw \
-  -g0 -O3 -fno-align-functions -fno-align-jumps \
-  -fno-align-loops -fno-align-labels -Wno-error -no-pie -w"
+  -O2 -flto -Wno-error -no-pie -w"
 export PREFIX="$ROOT/build-$TARGET"
 
 if ! test -z "$PYTHON_BUILD"; then
