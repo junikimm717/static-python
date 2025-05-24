@@ -6,6 +6,8 @@ use warnings;
 use FindBin qw($RealDir);
 
 my $nativearch = `uname -m`;
+chomp $nativearch;
+
 my $cores = int(`nproc`);
 my $jobs = $cores > 8 ? 8 : $cores;
 
@@ -38,7 +40,7 @@ sub build {
   $kernel eq "linux" || die "Did not get a linux platform";
   $abi =~ /^musl(eabihf)?$/ || die "did not get an appropriate musl abi $abi";
   $platform = "$arch-$kernel-$abi";
-  print "compiling toolchain for platform $platform...";
+  print "compiling toolchain for platform $platform...\n";
 
   my $tctype = "cross";
   if ($nativearch eq $arch) {
