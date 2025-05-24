@@ -451,7 +451,6 @@ python-static-$(TARGET)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
 	touch deps-$(TARGET)/Python-$(PYTHON)/Makefile
 	touch deps-$(TARGET)/Python-$(PYTHON)/Makefile.pre
 
-	cd deps-$(TARGET)/Python-$(PYTHON) && PYTHON_BUILD=1 ../../configure-wrapper.sh make -j$(JOBS) build/python
 
 	mkdir -p python-static-$(TARGET)/bin python-static-$(TARGET)/lib
 	cp -r python-static-$(NATIVE_TARGET)/include python-static-$(TARGET)/include
@@ -459,6 +458,14 @@ python-static-$(TARGET)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
 	rsync -a --exclude='__pycache__/' \
 		python-static-$(NATIVE_TARGET)/lib/python$(PYTHONV) \
 		python-static-$(TARGET)/lib
+	# sysconfig bullshit
+	mv python-static-$(TARGET)/lib/python$(PYTHONV)/_sysconfigdata__linux_$(NATIVE_TARGET).py\
+		python-static-$(TARGET)/lib/python$(PYTHONV)/_sysconfigdata__linux_$(TARGET).py
+	sed -i \
+		"s/$(NATIVE_TARGET)/$(TARGET)/g"\
+		python-static-$(TARGET)/lib/python$(PYTHONV)/_sysconfigdata__linux_$(TARGET).py
+
+	cd deps-$(TARGET)/Python-$(PYTHON) && PYTHON_BUILD=1 ../../configure-wrapper.sh make -j$(JOBS) build/python
 
 	cp -r deps-$(TARGET)/Python-$(PYTHON)/build/python python-static-$(TARGET)/bin/python$(PYTHONV)
 	ln -sf python$(PYTHONV) python-static-$(TARGET)/bin/python3
