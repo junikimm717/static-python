@@ -477,4 +477,5 @@ python-static-$(TARGET)/bin/python$(PYTHONV): $(PYTHON_DEPS)
 	mkdir -p python-static-$(TARGET)
 	cd deps-$(TARGET)/Python-$(PYTHON) && PYTHON_BUILD=1 ../../configure-wrapper.sh make bininstall
 	rm -rf python-static-$(TARGET)/lib/libpython$(PYTHONV).a
+	rm -rf python-static-$(TARGET)/lib/python$(PYTHONV)/config-$(PYTHONV)-$(TARGET)
 endif
