@@ -37,7 +37,7 @@ export LDFLAGS
 export LINKFORSHARED=" "
 export CFLAGS="-I$ROOT/build-$TARGET/include \
   -I$ROOT/build-$TARGET/include/ncursesw \
-  -g0 -O2 -fno-align-functions -fno-align-jumps \
+  -g0 -O3 -fno-align-functions -fno-align-jumps \
   -fno-align-loops -fno-align-labels -Wno-error -no-pie -w"
 export PREFIX="$ROOT/build-$TARGET"
 
