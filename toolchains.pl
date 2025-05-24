@@ -46,8 +46,6 @@ sub build {
   if ($nativearch eq $arch) {
     $tctype = "native";
   }
-  print"tctype is $tctype\n";
-  return 0;
 
   system("make crossmake JOBS=$jobs USE_CROSSMAKE=1 ARCH=\"$arch\" MUSLABI=\"$abi\"")
     == 0 || die "failed at make, aborting...";
