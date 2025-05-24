@@ -36,7 +36,7 @@ export LDFLAGS="-Wl,--export-dynamic -static -no-pie -flto \
 export LINKFORSHARED=" "
 export CFLAGS="-I$ROOT/build-$TARGET/include \
   -I$ROOT/build-$TARGET/include/ncursesw \
-  -O2 -flto -Wno-error -no-pie -w"
+  -O3 -flto -Wno-error -no-pie -w -pipe"
 export PREFIX="$ROOT/build-$TARGET"
 
 if ! test -z "$PYTHON_BUILD"; then

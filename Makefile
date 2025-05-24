@@ -23,7 +23,7 @@ override TARGET = $(ARCH)-linux-$(MUSLABI)
 override NATIVE_ARCH := $(shell uname -m)
 override NATIVE_TARGET := $(NATIVE_ARCH)-linux-musl
 
-USE_CROSSMAKE = 0
+USE_CROSSMAKE := 0
 
 ifeq ($(shell grep '$(TARGET)' ./supported.txt),)
 $(error Platform '$(TARGET)' is not supported)
@@ -34,13 +34,7 @@ endif
 ifneq ($(ARCH),$(NATIVE_ARCH))
 override TCTYPE=cross
 $(info Cross-Compiling to $(ARCH) from $(NATIVE_ARCH)...)
-
-ifeq ($(shell TCTYPE=cross NATIVE_ARCH=$(NATIVE_ARCH) MUSLABI=$(MUSLABI) ./musl-source.sh),)
-# you need musl crossmake if cross-compiling from non-x86 architecture.
-$(info Not x86_64 or arm, musl-cross-make will be required)
-override USE_CROSSMAKE=1
-endif
-
+# TODO: conditions where you have to force musl cross make
 else
 override TCTYPE=native
 $(info Native Compiling in $(NATIVE_ARCH)...)
@@ -76,11 +70,10 @@ deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/.extracted: tarballs/musl-cross-make
 	ln -sfn $(ROOT_DIR)/tarballs deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/sources
 	touch $@
 
-override FILENAME = $(ARCH)-linux-$(MUSLABI)-$(TCTYPE).tgz
 tarballs/$(TARGET)-$(TCTYPE).tgz:
 	mkdir -p tarballs
-	curl -Lf $(shell TCTYPE=$(TCTYPE) NATIVE_ARCH=$(NATIVE_ARCH) ARCH=$(ARCH) ./musl-source.sh)$(ARCH)-linux-$(MUSLABI)-$(TCTYPE).tgz\
-		-o tarballs/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE).tgz
+	curl -Lf https://dev.mit.junic.kim/cross/$(NATIVE_ARCH)/$(TARGET)-$(TCTYPE).tgz\
+		-o tarballs/$(TARGET)-$(TCTYPE).tgz
 
 .PHONY: crossmake
 crossmake: deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted
@@ -111,6 +104,7 @@ deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted: tarballs/$(TARGET)-$(TCTYPE).tgz
 	touch $@
 endif
 
+# stupid patcher script that takes a cross-compiled toolchain and gives us info.
 .PHONY: patcher
 patcher:
 	mkdir -p build-$(TARGET)
@@ -482,4 +476,6 @@ python-static-$(TARGET)/bin/python$(PYTHONV): $(PYTHON_DEPS)
 	cd deps-$(TARGET)/Python-$(PYTHON) && PYTHON_BUILD=1 ../../configure-wrapper.sh make -j$(JOBS)
 	mkdir -p python-static-$(TARGET)
 	cd deps-$(TARGET)/Python-$(PYTHON) && PYTHON_BUILD=1 ../../configure-wrapper.sh make bininstall
+	rm -rf python-static-$(TARGET)/lib/libpython$(PYTHONV).a
+	rm -rf python-static-$(TARGET)/lib/python$(PYTHONV)/config-$(PYTHONV)-$(TARGET)
 endif
