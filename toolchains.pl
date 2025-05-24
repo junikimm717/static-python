@@ -46,12 +46,14 @@ sub build {
   if ($nativearch eq $arch) {
     $tctype = "native";
   }
+  print"tctype is $tctype\n";
+  return 0;
 
   system("make crossmake JOBS=$jobs USE_CROSSMAKE=1 ARCH=\"$arch\" MUSLABI=\"$abi\"")
     == 0 || die "failed at make, aborting...";
   chdir "deps-$platform" || die "could not cd";
   system(
-    "tar -czf ../tarballs/$platform-$tctype.tar.gz $platform-$tctype"
+    "tar -czf ../tarballs/$platform-$tctype.tgz $platform-$tctype"
   ) == 0 || die "failed to make a tarball";
 }
 
