@@ -1,6 +1,6 @@
 ROOT_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 
-CROSSMAKE := 0.9.10
+CROSSMAKE := master
 OPENSSL := 3.5.0
 LIBFFI := 3.4.8
 LIBLZMA := 5.8.1
@@ -11,6 +11,7 @@ SQLITE := 3490200
 BZIP2 := 1.0.8
 UTILLINUX := 2.41
 PYTHON := 3.13.3
+LINUX_VER := 5.15.184
 
 SPLIT := $(subst ., ,$(PYTHON))
 PYTHONV := $(word 1, $(SPLIT)).$(word 2, $(SPLIT))
@@ -60,14 +61,16 @@ distclean: clean
 
 # build steps for musl toolchain.
 
-tarballs/musl-cross-make-$(CROSSMAKE).tar.gz:
+tarballs/musl-cross-make-master.tar.gz:
 	mkdir -p tarballs
-	curl -Lf https://github.com/richfelker/musl-cross-make/archive/refs/tags/v$(CROSSMAKE).tar.gz -o $@
+	curl -Lf https://github.com/richfelker/musl-cross-make/archive/$(CROSSMAKE).tar.gz -o $@
 
-deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/.extracted: tarballs/musl-cross-make-$(CROSSMAKE).tar.gz
+deps-$(TARGET)/musl-cross-make-master/.extracted: tarballs/musl-cross-make-$(CROSSMAKE).tar.gz
 	mkdir -p deps-$(TARGET)
 	tar -xzf $< -C deps-$(TARGET)
-	ln -sfn $(ROOT_DIR)/tarballs deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/sources
+	cp -a ./cross-make/hashes/. deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/hashes/
+	cp -a ./cross-make/patches/. deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/patches/
+	ln -sfn $(ROOT_DIR)tarballs deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/sources
 	touch $@
 
 tarballs/$(TARGET)-$(TCTYPE).tgz:
@@ -88,7 +91,7 @@ deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted: deps-$(TARGET)/mus
 		> deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/config.mak
 	sed -i\
 		-e 's/\([jJz]x\)vf/\1f/g'\
-		-e 's|^LINUX_VER =.*|LINUX_VER = 5.8.5|g'\
+		-e 's|^LINUX_VER =.*|LINUX_VER = $(LINUX_VER)|g'\
 		deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/Makefile
 	sed -i\
 		-e 's/--enable-languages=c,c++/--enable-languages=c/g'\
@@ -122,7 +125,7 @@ deps-$(TARGET)/openssl-$(OPENSSL)/.extracted: tarballs/openssl-$(OPENSSL).tar.gz
 	cd deps-$(TARGET)/openssl-$(OPENSSL) && sed -i '1513d' ./Configure
 	touch $@
 
-build-$(TARGET)/include/openssl/ssl.h: deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted deps-$(TARGET)/openssl-$(OPENSSL)/.extracted
+build-$(TARGET)/include/openssl/ssl.h: deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted deps-$(TARGET)/openssl-$(OPENSSL)/.extracted
 	mkdir -p build-$(TARGET)
 	cd deps-$(TARGET)/openssl-$(OPENSSL) &&\
 		../../configure-wrapper.sh \
