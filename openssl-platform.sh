@@ -15,7 +15,7 @@ case "$1" in
   powerpc64le)
     echo "linux-ppc64le"
     ;;
-  mips64|riscv64|s390x|sparcv9)
+  mips64|riscv64|s390x|sparcv9|riscv32)
     echo "linux64-$1"
     ;;
   *)
