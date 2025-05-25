@@ -1,11 +1,10 @@
 # Python with Static + Cross + LTO
 
-An absolutely stupid project where I attempt to build a functional python
-interpreter with zero shared libraries (those pesky .so/.dll files). It also
-cross-compiles with full link-time optimization!
+Building a (mostly) functional cross-compiled python interpreter with zero
+shared libraries and full link-time optimization (-O3 -flto).
 
-**Warning:** this project is almost exclusively as a hobby. For basically all
-intents and purposes, you should use your standard dynamically linked python
+**Warning:** this project is exclusively as a hobby. For basically all intents
+and purposes, you should use your standard dynamically linked python
 interpreter.
 
 Contrary to a bunch of Stack Overflow/forum posts, this was far harder than
@@ -13,9 +12,9 @@ initially anticipated and involved extensive fiddling/patching. This repo is the
 result of my madness while procrastinating studying for MIT finals :).
 
 Python ABI (Application Binary Interface) support through `ctypes` is mostly
-there plus or minus epsilon (No deprecated ABI's are included in my hacked
-module). The Makefile injects some monkey-patched code into the Python source
-tree to make all of this work^^.
+there plus or minus epsilon (No deprecated ABI's are included). The Makefile
+injects some monkey-patched code into the Python source tree to make all of this
+work^^.
 
 The resulting build comes with almost the entire standard library supported, so
 pure python packages should just work (It runs a django app perfectly). But any
