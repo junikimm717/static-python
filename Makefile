@@ -93,10 +93,11 @@ deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted: deps-$(TARGET)/mus
 		-e 's/\([jJz]x\)vf/\1f/g'\
 		-e 's|^LINUX_VER =.*|LINUX_VER = $(LINUX_VER)|g'\
 		deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/Makefile
-	sed -i\
-		-e 's/--enable-languages=c,c++/--enable-languages=c/g'\
-		-e 's|--enable-libstdcxx-time=rt||g'\
-		deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/litecross/Makefile
+	# just enable c++ for now, makes it easier for other toolchains.
+	# sed -i\
+	# 	-e 's/--enable-languages=c,c++/--enable-languages=c/g'\
+	# 	-e 's|--enable-libstdcxx-time=rt||g'\
+	# 	deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/litecross/Makefile
 	cd deps-$(TARGET)/musl-cross-make-$(CROSSMAKE) && make -j$(JOBS)
 	cd deps-$(TARGET)/musl-cross-make-$(CROSSMAKE) && make install
 	touch $@
