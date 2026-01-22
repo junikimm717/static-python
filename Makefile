@@ -1,5 +1,4 @@
 ROOT_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
-
 CROSSMAKE := master
 OPENSSL := 3.5.0
 LIBFFI := 3.4.8
@@ -10,7 +9,7 @@ NCURSES := 6.5
 SQLITE := 3490200
 BZIP2 := 1.0.8
 UTILLINUX := 2.41
-PYTHON := 3.13.7
+PYTHON := 3.13.11
 LINUX_VER := 5.15.184
 
 SPLIT := $(subst ., ,$(PYTHON))
