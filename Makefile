@@ -3,13 +3,13 @@ CROSSMAKE := master
 OPENSSL := 3.5.0
 LIBFFI := 3.4.8
 LIBLZMA := 5.8.1
-ZLIB := 1.3.1
+ZLIB := 1.3.2
 READLINE := 8.2
 NCURSES := 6.5
 SQLITE := 3490200
 BZIP2 := 1.0.8
 UTILLINUX := 2.41
-PYTHON := 3.13.3
+PYTHON := 3.13.13
 LINUX_VER := 5.15.184
 
 SPLIT := $(subst ., ,$(PYTHON))
@@ -363,11 +363,15 @@ deps-$(TARGET)/Python-$(PYTHON)/Modules/Setup.local: tarballs/Python-$(PYTHON).t
 	tar -xzf $< -C deps-$(TARGET)
 	# monkey patched code for static symbols in ctypes
 	cp -r ./python/staticapi deps-$(TARGET)/Python-$(PYTHON)/Modules/staticapi
-	# This seems EXTRMEMELY fragile, should patch later probably.
+	# Patch ctypes/__init__.py using content anchors (resilient to upstream
+	# refactors of CDLL._load_library / line-number drift across patch releases).
+	# 1. Inject StaticCDLL definitions before the CDLL class.
+	# 2. Override `pythonapi = PyDLL(None)` with the StaticCDLL-backed proxy.
+	# 3. Neuter the dlopen import (returns 0) so CDLL/PyDLL never call libdl.
 	sed -i \
-		-e "319r ./python/ctypes_patch_1.py"\
-		-e "486r ./python/ctypes_patch_2.py"\
-		-e "390s/.*/            pass/"\
+		-e "/^################################################################$$/r ./python/ctypes_patch_1.py"\
+		-e "/^    pythonapi = PyDLL(None)$$/r ./python/ctypes_patch_2.py"\
+		-e "s|^    from _ctypes import dlopen as _dlopen$$|    _dlopen = lambda *a, **kw: 0|"\
 		./deps-$(TARGET)/Python-$(PYTHON)/Lib/ctypes/__init__.py
 	cp -r ./python/Setup deps-$(TARGET)/Python-$(PYTHON)/Modules/Setup.local
 
