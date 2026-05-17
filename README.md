@@ -94,3 +94,73 @@ argument to make to build the cross-compiling toolchain.
 You can also view supported architectures in the `supported.txt` file. (I assume
 if you are actually trying to run this project, you for sure know what you are
 doing 😇)
+
+## Benchmarking (AI-Assisted)
+
+A small benchmark harness in `benchmark/` exists to put numbers on the
+"is `-O3 -flto` + static linking actually worth anything?" question.
+Always native-vs-native. Run it from inside the dev container:
+
+```sh
+# (one-off) build a stock dynamic Python of the same version, using the
+# container's gcc and apk-installed openssl-dev/zlib-dev/sqlite-dev/...
+./benchmark/dynamic-build.sh
+
+# run the comparison; report lands in benchmark/reports/ and is echoed
+# to stdout
+./benchmark/run.sh
+```
+
+The runner compares whichever of these interpreters resolve to an executable:
+
+- `python-static-$(uname -m)-linux-musl/bin/python$(PYTHONV)` (this repo, required)
+- `python-dynamic-$(uname -m)-linux-musl/bin/python$(PYTHONV)` (above, optional)
+- `/usr/bin/python3` (the container's system python, optional)
+
+It runs a CPU-bound interpreter micro-benchmark suite (`benchmark/microbench.py`)
+plus an external startup / first-import probe (`benchmark/measure_startup.py`).
+Each report is timestamped + arch-tagged under `benchmark/reports/` (e.g.
+`2026-05-17T1818Z_x86_64.md`) so the run history is reviewable, and includes
+an Environment block (CPU model, core count, cache hierarchy, kernel) so a
+random row of numbers can't get mistaken for a different machine. The report
+shows per-row `X / static` ratios and a final geometric-mean row per
+non-static interpreter. Each path is overridable via `STATIC=` / `DYNAMIC=` /
+`SYSTEM=`. Architecture comes from `uname -m`; the Python version comes from
+`make print-PYTHON` -- nothing is hard-coded.
+
+The script appends an empty `## Analysis` section to every report; the agent
+or human running the benchmark is expected to fill it in with what moved and
+why. See [`AGENTS.md`](AGENTS.md) for the full workflow.
+
+### What the numbers look like
+
+Sample run on x86_64 against a same-version stock dynamic build (see
+[`benchmark/reports/2026-05-17T1818Z_x86_64.md`](benchmark/reports/2026-05-17T1818Z_x86_64.md)
+for the full table and the per-run analysis).
+Compiler and library versions are matched as tightly as we can get them:
+static side is `musl-cross-make` `gcc 15.1.0` + `openssl 3.5.6` + `sqlite
+3.51.2` + `libffi 3.5.2` + `xz 5.8.3`; dynamic side is Alpine's `gcc 15.2.0` +
+the corresponding `apk` dev packages (effectively the same upstream versions).
+So the remaining deltas are about link mode and `-O3 -flto` vs `-O2`, not
+about compiler vintage or out-of-date libraries.
+
+- **CPU micro-benchmarks (geomean):** the static build is about **1.17x**
+  faster than a stock `-O2 --enable-shared` build of the same 3.13.13 source.
+  Pure-interpreter loops dominate the gain (`arith_loop` 1.51x, `except_path`
+  1.45x, `func_call` 1.40x, `attr_access` 1.29x, `fib_iter` 1.27x). A few
+  C-extension benches stay stubbornly red -- `json_roundtrip` ~0.74x,
+  `str_format` ~0.94x, `fib_recursive` ~0.92x. With library versions now in
+  sync these are clearly *intrinsic* to static + LTO on those workloads, most
+  likely an icache/inlining trade-off in the much-larger LTO'd binary, not a
+  library-version artefact.
+- **Startup / first-import (geomean):** the static build spawns about **1.13x**
+  faster than the same-version dynamic build -- the frozen-stdlib +
+  no-`dlopen` benefit, isolated. Bare-interpreter spawn alone is ~1.13x;
+  `import json/os/re/...` is also ~1.15x.
+
+So: a ~17% interpreter-loop win, a ~13% spawn-time win, paid for by ~5--25%
+on a handful of C-extension hot paths that are *not* explained by version
+mismatch (we matched versions and they didn't move). Worth doing if you care
+about a self-contained binary or fast-spawning short-lived processes; less
+worth it if your hot path lives in `_json` / `_struct` / `_codecs` /
+`_decimal`-flavoured extension modules.

@@ -1,6 +1,7 @@
 build
 build-*
 python-static-*
+python-dynamic-*
 deps
 deps-*
 tarballs

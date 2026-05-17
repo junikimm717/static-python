@@ -1,12 +1,13 @@
 ROOT_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
 CROSSMAKE := master
-OPENSSL := 3.5.0
-LIBFFI := 3.4.8
-LIBLZMA := 5.8.1
+OPENSSL := 3.5.6
+LIBFFI := 3.5.2
+LIBLZMA := 5.8.3
 ZLIB := 1.3.2
 READLINE := 8.2
 NCURSES := 6.5
-SQLITE := 3490200
+SQLITE := 3510200
+SQLITE_YEAR := 2026
 BZIP2 := 1.0.8
 UTILLINUX := 2.41
 PYTHON := 3.13.13
@@ -14,6 +15,10 @@ LINUX_VER := 5.15.184
 
 SPLIT := $(subst ., ,$(PYTHON))
 PYTHONV := $(word 1, $(SPLIT)).$(word 2, $(SPLIT))
+
+print-%:
+	@echo $($*)
+.PHONY: print-%
 
 # External (third-party) source tarballs. Each is sha256-verified at download
 # time against hashes/<basename>.sha256. Toolchain prebuilts from
@@ -175,7 +180,16 @@ tarballs/openssl-$(OPENSSL).tar.gz:
 deps-$(TARGET)/openssl-$(OPENSSL)/.extracted: tarballs/openssl-$(OPENSSL).tar.gz
 	mkdir -p deps-$(TARGET)
 	tar -xzf $< -C deps-$(TARGET)
-	cd deps-$(TARGET)/openssl-$(OPENSSL) && sed -i '1513d' ./Configure
+	# OpenSSL's Configure auto-disables `static`, `pic`, and `threads`
+	# when it sees `-static` in LDFLAGS. We pass `-static` deliberately
+	# for the static build, so we strip the entire perl block (anchored
+	# by content rather than line number so it survives upstream
+	# version bumps). The block looks like:
+	#   if (grep { $_ =~ /(?:^|\s)-static(?:\s|$$)/ } @{$$config{LDFLAGS}}) {
+	#       disable('static', 'pic', 'threads');
+	#   }
+	cd deps-$(TARGET)/openssl-$(OPENSSL) && \
+		sed -i '/if (grep.*-static.*\$$config{LDFLAGS}/,/^}$$/d' ./Configure
 	touch $@
 
 build-$(TARGET)/include/openssl/ssl.h: deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted deps-$(TARGET)/openssl-$(OPENSSL)/.extracted
@@ -336,7 +350,7 @@ readline: build-$(TARGET)/lib/libreadline.a
 
 tarballs/sqlite-src-$(SQLITE).zip:
 	mkdir -p tarballs
-	curl -Lf https://www.sqlite.org/2025/sqlite-src-$(SQLITE).zip -o $@
+	curl -Lf https://www.sqlite.org/$(SQLITE_YEAR)/sqlite-src-$(SQLITE).zip -o $@
 	@$(VERIFY_SHA256)
 
 deps-$(TARGET)/sqlite-src-$(SQLITE)/.extracted: tarballs/sqlite-src-$(SQLITE).zip
