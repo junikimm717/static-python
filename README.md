@@ -54,7 +54,7 @@ Alternatively, make sure you have all of the following packages on your system
 # Build python while downloading gcc binaries from musl.cc
 make
 # Or build python while manually compiling your own gcc toolchain
-make CROSSMAKE=1
+make USE_CROSSMAKE=1
 # run your statically linked python3!
 ./python-static-$(uname -m)/bin/python3
 ```
