@@ -1,7 +1,8 @@
 # Python with Static + Cross + LTO
 
 Building a (mostly) functional cross-compiled python interpreter with zero
-shared libraries and full link-time optimization (-O3 -flto).
+shared libraries and full link-time optimization (-O3 -flto). We gain up to
+**20% geomean speedup** on benchmarks from dynamically linked python (!!)
 
 **Warning:** this project is exclusively as a hobby. For basically all intents
 and purposes, you should use your standard dynamically linked python
@@ -10,6 +11,10 @@ interpreter.
 Contrary to a bunch of Stack Overflow/forum posts, this was far harder than
 initially anticipated and involved extensive fiddling/patching. This repo is the
 result of my madness while procrastinating studying for MIT finals :).
+
+**Update in 2026**: I have come back to this project to procrastinate from
+*studying for finals again. The LLM's are way better now, so I developed some
+*additional profiling infrastructure and let opus iron out some latent bugs.
 
 Python ABI (Application Binary Interface) support through `ctypes` is mostly
 there plus or minus epsilon (No deprecated ABI's are included). The Makefile
