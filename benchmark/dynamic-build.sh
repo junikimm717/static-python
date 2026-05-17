@@ -82,7 +82,14 @@ LDFLAGS_NODIST="-Wl,-rpath,${PREFIX}/lib" \
 
 echo ">>> building"
 # `-x test_re` skips two locale tests that fail on musl and abort PGO.
-make -j"$(nproc)" PROFILE_TASK='-m test --pgo -x test_re'
+# `-i test_fma_zero_result` skips a musl-1.2.5 software-fma sign-of-zero bug
+# that the upstream CPython `linked_to_musl()` skip already covers for shared
+# musl builds, but we mirror it here so static and dynamic stay in sync. See
+# MUSL_REPORT.md.
+# JOBS defaults to `nproc` but can be overridden (e.g. `JOBS=8 ./dynamic-build.sh`)
+# to keep this build from saturating the host when another build runs alongside.
+JOBS="${JOBS:-$(nproc)}"
+make -j"$JOBS" PROFILE_TASK='-m test --pgo -x test_re -i test_fma_zero_result'
 
 echo ">>> installing to $PREFIX"
 make install

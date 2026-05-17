@@ -88,7 +88,15 @@ $(info USE_PGO=$(USE_PGO))
 
 # `-x test_re` skips two locale tests that fail on musl (no non-C byte-level
 # case folding) and would abort the PGO build. Same workaround as Alpine apk.
-PROFILE_TASK ?= -m test --pgo -x test_re
+#
+# `-i test_fma_zero_result` skips the IEEE-754 fma negative-zero test that
+# fails because of an unfixed bug in musl 1.2.5's software `fma` fast path
+# (`return x*y + z;` when z==0 double-rounds and loses sign on underflow).
+# CPython 3.13.13 already wraps the test in `@skipIf(linked_to_musl())`, but
+# `linked_to_musl()` shells out to `ldd` and a fully-static `-no-pie` binary
+# makes `ldd` exit non-zero, so the skip silently doesn't trigger. See
+# MUSL_REPORT.md for the full three-layer story.
+PROFILE_TASK ?= -m test --pgo -x test_re -i test_fma_zero_result
 
 
 export TCTYPE
