@@ -111,14 +111,84 @@ cache_size_at() {
     if [ -r "$f" ]; then cat "$f"; else echo "?"; fi
 }
 
-# Best-effort CPU model name. x86 exposes it as `model name`, aarch64 / arm
-# typically expose `Model name` or fall back to `Hardware`. RISC-V varies.
+# Best-effort CPU model name. x86 exposes it as `model name`; some ARM SBCs
+# expose `Model name` or `Hardware`. Server-class aarch64 (Azure / AWS /
+# bare-metal Ampere etc.) exposes only `CPU implementer` and `CPU part`
+# (the raw MIDR fields), so we decode those into vendor + core when the
+# easy paths fail. RISC-V varies and is left to the fallback.
 cpu_model() {
-    awk -F': ' '
+    model="$(awk -F': ' '
         /^model name/ {print $2; exit}
         /^Model name/ {print $2; exit}
         /^Hardware/   {print $2; exit}
-    ' /proc/cpuinfo 2>/dev/null
+    ' /proc/cpuinfo 2>/dev/null)"
+    if [ -n "$model" ]; then
+        echo "$model"
+        return
+    fi
+
+    impl="$(awk -F': *' '/^CPU implementer/ {print $2; exit}' /proc/cpuinfo 2>/dev/null)"
+    part="$(awk -F': *' '/^CPU part/        {print $2; exit}' /proc/cpuinfo 2>/dev/null)"
+    [ -n "$impl" ] && [ -n "$part" ] || return 0
+
+    case "$impl" in
+        0x41) vendor="ARM" ;;
+        0x42) vendor="Broadcom" ;;
+        0x43) vendor="Cavium" ;;
+        0x44) vendor="DEC" ;;
+        0x46) vendor="Fujitsu" ;;
+        0x48) vendor="HiSilicon" ;;
+        0x49) vendor="Infineon" ;;
+        0x4e) vendor="NVIDIA" ;;
+        0x50) vendor="APM" ;;
+        0x51) vendor="Qualcomm" ;;
+        0x53) vendor="Samsung" ;;
+        0x56) vendor="Marvell" ;;
+        0x61) vendor="Apple" ;;
+        0x66) vendor="Faraday" ;;
+        0x69) vendor="Intel" ;;
+        0xc0) vendor="Ampere" ;;
+        *)    vendor="vendor-$impl" ;;
+    esac
+
+    case "$impl/$part" in
+        # ARM Limited (0x41) -- the bulk of the field.
+        0x41/0xd03) core="Cortex-A53" ;;
+        0x41/0xd04) core="Cortex-A35" ;;
+        0x41/0xd05) core="Cortex-A55" ;;
+        0x41/0xd07) core="Cortex-A57" ;;
+        0x41/0xd08) core="Cortex-A72" ;;
+        0x41/0xd09) core="Cortex-A73" ;;
+        0x41/0xd0a) core="Cortex-A75" ;;
+        0x41/0xd0b) core="Cortex-A76" ;;
+        0x41/0xd0c) core="Neoverse-N1" ;;
+        0x41/0xd0d) core="Cortex-A77" ;;
+        0x41/0xd40) core="Neoverse-V1" ;;
+        0x41/0xd41) core="Cortex-A78" ;;
+        0x41/0xd44) core="Cortex-X1" ;;
+        0x41/0xd46) core="Cortex-A510" ;;
+        0x41/0xd47) core="Cortex-A710" ;;
+        0x41/0xd48) core="Cortex-X2" ;;
+        0x41/0xd49) core="Neoverse-N2" ;;
+        0x41/0xd4a) core="Neoverse-E1" ;;
+        0x41/0xd4f) core="Neoverse-V2" ;;
+        # Apple silicon under Asahi / similar.
+        0x61/0x022) core="M1" ;;
+        0x61/0x028) core="M1 Pro" ;;
+        0x61/0x029) core="M1 Max" ;;
+        0x61/0x032) core="M2" ;;
+        # Ampere (post-rebrand from APM).
+        0xc0/0xac3) core="Ampere-1" ;;
+        0xc0/0xac4) core="Ampere-1a" ;;
+        # Cavium / Marvell ThunderX line.
+        0x43/0x0a1) core="ThunderX" ;;
+        0x43/0x0af) core="ThunderX2" ;;
+        0x43/0x0b8) core="ThunderX3" ;;
+        # Falls back to the raw part code so a new core still produces
+        # something diff-able rather than silently "unknown".
+        *)          core="part-$part" ;;
+    esac
+    echo "$vendor $core"
 }
 
 # ---------------------------------------------------------------------------
