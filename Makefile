@@ -15,6 +15,38 @@ LINUX_VER := 5.15.184
 SPLIT := $(subst ., ,$(PYTHON))
 PYTHONV := $(word 1, $(SPLIT)).$(word 2, $(SPLIT))
 
+# External (third-party) source tarballs. Each is sha256-verified at download
+# time against hashes/<basename>.sha256. Toolchain prebuilts from
+# dev.mit.junic.kim are intentionally excluded (those are produced by us).
+EXTERNAL_TARBALLS := \
+	tarballs/musl-cross-make-$(CROSSMAKE).tar.gz \
+	tarballs/openssl-$(OPENSSL).tar.gz \
+	tarballs/libffi-$(LIBFFI).tar.gz \
+	tarballs/xz-$(LIBLZMA).tar.gz \
+	tarballs/zlib-$(ZLIB).tar.gz \
+	tarballs/ncurses-$(NCURSES).tar.gz \
+	tarballs/readline-$(READLINE).tar.gz \
+	tarballs/sqlite-src-$(SQLITE).zip \
+	tarballs/bzip2-$(BZIP2).tar.gz \
+	tarballs/util-linux-$(UTILLINUX).tar.gz \
+	tarballs/Python-$(PYTHON).tgz
+
+# Set SKIP_VERIFY=1 to bypass the integrity check (the `update-hashes`
+# target does this via target-specific assignment while refreshing hashes).
+SKIP_VERIFY ?=
+
+# Recipe snippet: verify $@ against hashes/<basename>.sha256. On mismatch
+# (or a missing hash file) the downloaded tarball is deleted so the next
+# attempt re-downloads rather than reusing a poisoned file.
+VERIFY_SHA256 = if test -z "$(SKIP_VERIFY)"; then \
+		if ! test -f hashes/$(@F).sha256; then \
+			echo "ERROR: missing hashes/$(@F).sha256 (run 'make update-hashes')" >&2; \
+			rm -f $@; exit 1; \
+		fi; \
+		(cd tarballs && sha256sum -c ../hashes/$(@F).sha256) \
+			|| { rm -f $@; exit 1; }; \
+	fi
+
 ARCH := $(shell uname -m)
 MUSLABI := musl
 JOBS := $(shell nproc)
@@ -48,7 +80,7 @@ export MUSLABI
 
 # first target should be python3
 
-.PHONY: python3 clean distclean
+.PHONY: python3 clean distclean update-hashes
 
 python3: python-static-$(TARGET)/bin/python$(PYTHONV)
 
@@ -58,11 +90,24 @@ clean:
 distclean: clean
 	rm -rf tarballs
 
+# Refresh hashes/<basename>.sha256 for every external tarball. Skips the
+# normal sha256 check so freshly-downloaded tarballs aren't rejected; after
+# running, the resulting hash files should be committed to record the
+# now-trusted versions.
+update-hashes: SKIP_VERIFY := 1
+update-hashes: $(EXTERNAL_TARBALLS)
+	@mkdir -p hashes
+	@for t in $(notdir $(EXTERNAL_TARBALLS)); do \
+		(cd tarballs && sha256sum "$$t") > "hashes/$$t.sha256"; \
+		echo "updated hashes/$$t.sha256"; \
+	done
+
 # build steps for musl toolchain.
 
 tarballs/musl-cross-make-master.tar.gz:
 	mkdir -p tarballs
 	curl -Lf https://github.com/richfelker/musl-cross-make/archive/$(CROSSMAKE).tar.gz -o $@
+	@$(VERIFY_SHA256)
 
 deps-$(TARGET)/musl-cross-make-master/.extracted: tarballs/musl-cross-make-$(CROSSMAKE).tar.gz
 	mkdir -p deps-$(TARGET)
@@ -118,6 +163,7 @@ patcher:
 tarballs/openssl-$(OPENSSL).tar.gz:
 	mkdir -p tarballs
 	curl -Lf https://github.com/openssl/openssl/releases/download/openssl-$(OPENSSL)/openssl-$(OPENSSL).tar.gz -o $@
+	@$(VERIFY_SHA256)
 
 deps-$(TARGET)/openssl-$(OPENSSL)/.extracted: tarballs/openssl-$(OPENSSL).tar.gz
 	mkdir -p deps-$(TARGET)
@@ -144,6 +190,7 @@ openssl: build-$(TARGET)/include/openssl/ssl.h
 tarballs/libffi-$(LIBFFI).tar.gz:
 	mkdir -p tarballs
 	curl -Lf https://github.com/libffi/libffi/releases/download/v$(LIBFFI)/libffi-$(LIBFFI).tar.gz -o $@
+	@$(VERIFY_SHA256)
 
 deps-$(TARGET)/libffi-$(LIBFFI)/.extracted: tarballs/libffi-$(LIBFFI).tar.gz
 	mkdir -p deps-$(TARGET)
@@ -169,6 +216,7 @@ libffi: build-$(TARGET)/lib/libffi.a
 tarballs/xz-$(LIBLZMA).tar.gz:
 	mkdir -p tarballs
 	curl -Lf https://github.com/tukaani-project/xz/releases/download/v$(LIBLZMA)/xz-$(LIBLZMA).tar.gz -o $@
+	@$(VERIFY_SHA256)
 
 deps-$(TARGET)/xz-$(LIBLZMA)/.extracted: tarballs/xz-$(LIBLZMA).tar.gz
 	mkdir -p deps-$(TARGET)
@@ -196,6 +244,7 @@ liblzma: build-$(TARGET)/lib/liblzma.a
 tarballs/zlib-$(ZLIB).tar.gz:
 	mkdir -p tarballs
 	curl -Lf http://zlib.net/zlib-$(ZLIB).tar.gz -o $@
+	@$(VERIFY_SHA256)
 
 deps-$(TARGET)/zlib-$(ZLIB)/.extracted: tarballs/zlib-$(ZLIB).tar.gz
 	mkdir -p deps-$(TARGET)
@@ -217,6 +266,7 @@ zlib: build-$(TARGET)/lib/libz.a
 tarballs/ncurses-$(NCURSES).tar.gz:
 	mkdir -p tarballs
 	curl -Lf https://ftp.gnu.org/gnu/ncurses/ncurses-$(NCURSES).tar.gz -o $@
+	@$(VERIFY_SHA256)
 
 deps-$(TARGET)/ncurses-$(NCURSES)/.extracted: tarballs/ncurses-$(NCURSES).tar.gz
 	mkdir -p deps-$(TARGET)
@@ -247,6 +297,7 @@ ncurses: build-$(TARGET)/lib/libncursesw.a
 tarballs/readline-$(READLINE).tar.gz:
 	mkdir -p tarballs
 	curl -Lf https://ftp.gnu.org/gnu/readline/readline-$(READLINE).tar.gz -o $@
+	@$(VERIFY_SHA256)
 
 deps-$(TARGET)/readline-$(READLINE)/.extracted: tarballs/readline-$(READLINE).tar.gz 
 	mkdir -p deps-$(TARGET)
@@ -275,6 +326,7 @@ readline: build-$(TARGET)/lib/libreadline.a
 tarballs/sqlite-src-$(SQLITE).zip:
 	mkdir -p tarballs
 	curl -Lf https://www.sqlite.org/2025/sqlite-src-$(SQLITE).zip -o $@
+	@$(VERIFY_SHA256)
 
 deps-$(TARGET)/sqlite-src-$(SQLITE)/.extracted: tarballs/sqlite-src-$(SQLITE).zip
 	mkdir -p deps-$(TARGET)
@@ -299,6 +351,7 @@ libsqlite: build-$(TARGET)/lib/libsqlite3.a
 tarballs/bzip2-$(BZIP2).tar.gz:
 	mkdir -p tarballs
 	curl -Lf https://sourceware.org/pub/bzip2/bzip2-$(BZIP2).tar.gz -o $@
+	@$(VERIFY_SHA256)
 
 deps-$(TARGET)/bzip2-$(BZIP2)/.extracted: tarballs/bzip2-$(BZIP2).tar.gz
 	mkdir -p deps-$(TARGET)
@@ -326,6 +379,7 @@ libbz2: build-$(TARGET)/lib/libbz2.a
 tarballs/util-linux-$(UTILLINUX).tar.gz:
 	mkdir -p tarballs
 	curl -Lf https://github.com/util-linux/util-linux/archive/refs/tags/v$(UTILLINUX).tar.gz -o $@
+	@$(VERIFY_SHA256)
 
 deps-$(TARGET)/util-linux-$(UTILLINUX)/.extracted: tarballs/util-linux-$(UTILLINUX).tar.gz
 	mkdir -p deps-$(TARGET)
@@ -357,6 +411,7 @@ libuuid: build-$(TARGET)/lib/libuuid.a
 tarballs/Python-$(PYTHON).tgz:
 	mkdir -p tarballs
 	curl -Lf https://www.python.org/ftp/python/$(PYTHON)/Python-$(PYTHON).tgz -o $@
+	@$(VERIFY_SHA256)
 
 deps-$(TARGET)/Python-$(PYTHON)/Modules/Setup.local: tarballs/Python-$(PYTHON).tgz
 	mkdir -p deps-$(TARGET)
