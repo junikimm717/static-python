@@ -260,8 +260,12 @@ deps-$(TARGET)/zlib-$(ZLIB)/.extracted: tarballs/zlib-$(ZLIB).tar.gz
 
 build-$(TARGET)/lib/libz.a: deps-$(TARGET)/zlib-$(ZLIB)/.extracted deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted
 	mkdir -p build-$(TARGET)
+	# --disable-crcvx: zlib 1.3.2 detects s390x VX but its Makefile.in -> Makefile
+	# sed substitution has no rule for VGFMAFLAG, so crc32_vx.c is compiled
+	# without -mzarch/-march=z13 and the VX builtins fail. Skipping the VX
+	# CRC32 contrib avoids the upstream bug on s390x and is a no-op elsewhere.
 	cd deps-$(TARGET)/zlib-$(ZLIB) &&\
-		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(TARGET) --eprefix=$(ROOT_DIR)build-$(TARGET) --static
+		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(TARGET) --eprefix=$(ROOT_DIR)build-$(TARGET) --static --disable-crcvx
 	cd deps-$(TARGET)/zlib-$(ZLIB) && ../../configure-wrapper.sh make -j$(JOBS)
 	cd deps-$(TARGET)/zlib-$(ZLIB) && ../../configure-wrapper.sh make install
 
