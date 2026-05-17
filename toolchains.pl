@@ -38,7 +38,7 @@ sub build {
   my ($platform) = @_;
   my ($arch, $kernel, $abi) = split /-/, $platform;
   $kernel eq "linux" || die "Did not get a linux platform";
-  $abi =~ /^musl(eabihf)?$/ || die "did not get an appropriate musl abi $abi";
+  $abi =~ /^musl(eabi(hf)?)?$/ || die "did not get an appropriate musl abi $abi";
   $platform = "$arch-$kernel-$abi";
   print "compiling toolchain for platform $platform...\n";
 

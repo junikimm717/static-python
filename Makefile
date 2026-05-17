@@ -142,8 +142,15 @@ deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted: deps-$(TARGET)/mus
 	# 	-e 's/--enable-languages=c,c++/--enable-languages=c/g'\
 	# 	-e 's|--enable-libstdcxx-time=rt||g'\
 	# 	deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/litecross/Makefile
-	cd deps-$(TARGET)/musl-cross-make-$(CROSSMAKE) && make -j$(JOBS)
-	cd deps-$(TARGET)/musl-cross-make-$(CROSSMAKE) && make install
+	# Unset MAKEFLAGS/MAKEOVERRIDES so our `ARCH=...` command-line override
+	# does not leak through MAKEFLAGS into musl's Makefile (which sets ARCH
+	# itself in config.mak). Without this, targets like `powerpc64le` break
+	# because musl uses arch/powerpc64/ while ARCH=powerpc64le is forced.
+	# Use `env -u` (truly unset) rather than `VAR=` (empty string); the
+	# empty-string form breaks downstream propagation of MAKEOVERRIDES, so
+	# nested invocations like the kernel headers install lose INSTALL_HDR_PATH.
+	cd deps-$(TARGET)/musl-cross-make-$(CROSSMAKE) && env -u MAKEFLAGS -u MAKEOVERRIDES make -j$(JOBS)
+	cd deps-$(TARGET)/musl-cross-make-$(CROSSMAKE) && env -u MAKEFLAGS -u MAKEOVERRIDES make install
 	touch $@
 else
 deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted: tarballs/$(TARGET)-$(TCTYPE).tgz
