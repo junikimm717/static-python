@@ -57,8 +57,16 @@ rm -rf "$BUILD" "$PREFIX"
 mkdir -p "$(dirname "$BUILD")"
 tar -xzf "$SRC" -C "$(dirname "$BUILD")"
 
-echo ">>> configuring (stock, --enable-shared, no --enable-optimizations)"
+echo ">>> configuring (--enable-shared --enable-optimizations --with-lto)"
+# Matches python.org's release-build flags so the dynamic baseline reflects
+# stock optimized CPython. DYNAMIC_NO_PGO=1 reverts to plain `-O3 -Wall`.
 cd "$BUILD"
+if [ "${DYNAMIC_NO_PGO:-0}" = "1" ]; then
+    OPT_FLAGS=""
+    echo ">>> DYNAMIC_NO_PGO=1: skipping --enable-optimizations / --with-lto"
+else
+    OPT_FLAGS="--enable-optimizations --with-lto"
+fi
 # LDFLAGS_NODIST bakes the install-time libpython directory into the binary
 # as an rpath, so the dynamic interpreter is self-contained -- no
 # LD_LIBRARY_PATH dance for the benchmark harness or subprocess spawns.
@@ -66,13 +74,15 @@ LDFLAGS_NODIST="-Wl,-rpath,${PREFIX}/lib" \
     ./configure \
         --prefix="$PREFIX" \
         --enable-shared \
+        $OPT_FLAGS \
         --without-ensurepip \
         --with-system-ffi --with-system-expat \
         --enable-loadable-sqlite-extensions \
         --with-computed-gotos
 
 echo ">>> building"
-make -j"$(nproc)"
+# `-x test_re` skips two locale tests that fail on musl and abort PGO.
+make -j"$(nproc)" PROFILE_TASK='-m test --pgo -x test_re'
 
 echo ">>> installing to $PREFIX"
 make install

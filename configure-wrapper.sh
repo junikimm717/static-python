@@ -22,7 +22,11 @@ echo "====================="
 echo "configure-wrapper.sh: Using target $TARGET in configuration $TCTYPE..."
 echo "====================="
 
-export LDFLAGS="-Wl,--export-dynamic -static -no-pie -flto \
+# `-flto-partition=none`: whole-program inlining (default `=balanced` chops
+# into parallel chunks). No `-fuse-linker-plugin` -- our gcc is built
+# `--disable-shared`, so `liblto_plugin.so` doesn't exist; gcc-collect
+# handles LTO via the AR=gcc-ar archives instead.
+export LDFLAGS="-Wl,--export-dynamic -static -no-pie -flto -flto-partition=none \
   -s --static -L$ROOT/build-$TARGET/lib \
   -L$ROOT/build-$TARGET/lib64\
   -L$DEPS_DIR/$TARGET-$TCTYPE/$TARGET/lib\
@@ -37,7 +41,7 @@ export LINKFORSHARED=" "
 export CFLAGS="-I$ROOT/build-$TARGET/include \
   -I$ROOT/build-$TARGET/include/ncursesw \
   -I$ROOT/build-$TARGET/include/uuid \
-  -O3 -flto -Wno-error -no-pie -w -pipe -ffunction-sections -fdata-sections"
+  -O3 -flto -flto-partition=none -Wno-error -no-pie -w -pipe -ffunction-sections -fdata-sections"
 
 # Sandbox pkg-config so it only sees the .pc files we produced inside this
 # repo. Without this, Python's configure happily reaches into Alpine's
