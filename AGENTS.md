@@ -150,6 +150,27 @@ that directory is the natural diff target. A good analysis:
 
 See `benchmark/reports/2026-05-17T1818Z_x86_64.md` for a worked example.
 
+### Also update `benchmark/reports/README.md`
+
+`benchmark/reports/README.md` is the short-attention-span cliffs-notes
+across **all** reports -- TL;DR + "what wins / what's mixed" ranges +
+reports index + open experiments. **It goes stale the moment a new
+report lands.** After writing your per-report `## Analysis`, do this:
+
+- Bump the "Last updated" date and the run-count line at the top.
+- If your new run pushes either bound of a range column under
+  "What wins" or "What is mixed or wrong", widen the range.
+- Add a row to the "Reports index" table (host + 1-line distinguishing
+  fact).
+- If a TL;DR bullet became more or less true, edit it. If an item in
+  "What is missing" got answered, strike it and turn the answer into a
+  TL;DR bullet.
+- If you found a new cross-cutting pattern (a row that's consistently
+  weird, a knob that consistently moves the geomean), add it.
+
+The cliffs-notes README has its own checklist at the bottom mirroring
+this; both should agree.
+
 ### When to re-run
 
 - After bumping any version in the Makefile or `cross-make/config.mak`.
@@ -190,7 +211,7 @@ Don't commit unless the user explicitly asks. Even then:
 
 | task | done when |
 |---|---|
-| version bump | Makefile edited, `make update-hashes` run, `hashes/` refreshed, x86_64 static build green, sanity imports clean (`ssl, zlib, sqlite3, ctypes, _lzma, _hashlib`), benchmark re-run with analysis written |
+| version bump | Makefile edited, `make update-hashes` run, `hashes/` refreshed, x86_64 static build green, sanity imports clean (`ssl, zlib, sqlite3, ctypes, _lzma, _hashlib`), benchmark re-run with analysis written, `benchmark/reports/README.md` updated |
 | toolchain change | as above, plus banner from the new binary mentions the right gcc version (`python3 -c 'import sys; print(sys.version)'`) |
-| benchmark code change | report renders, analysis explains what the new metric is measuring and why the baseline numbers stayed put (or didn't) |
+| benchmark code change | report renders, analysis explains what the new metric is measuring and why the baseline numbers stayed put (or didn't), `benchmark/reports/README.md` updated |
 | cross-arch fan-out | each arch in `supported.txt` produces a static interpreter; at least one non-x86_64 arch gets benchmarked |
