@@ -77,6 +77,27 @@ override TCTYPE=native
 $(info Native Compiling in $(NATIVE_ARCH)...)
 endif
 
+# PGO trains against the freshly built interpreter, so it needs a runnable
+# native binary. Default on for native, off for cross.
+ifeq ($(TCTYPE),native)
+USE_PGO ?= 1
+else
+USE_PGO ?= 0
+endif
+$(info USE_PGO=$(USE_PGO))
+
+# `-x test_re` skips two locale tests that fail on musl (no non-C byte-level
+# case folding) and would abort the PGO build. Same workaround as Alpine apk.
+#
+# `-i test_fma_zero_result` skips the IEEE-754 fma negative-zero test that
+# fails because of an unfixed bug in musl 1.2.5's software `fma` fast path
+# (`return x*y + z;` when z==0 double-rounds and loses sign on underflow).
+# CPython 3.13.13 already wraps the test in `@skipIf(linked_to_musl())`, but
+# `linked_to_musl()` shells out to `ldd` and a fully-static `-no-pie` binary
+# makes `ldd` exit non-zero, so the skip silently doesn't trigger. See
+# MUSL_REPORT.md for the full three-layer story.
+PROFILE_TASK ?= -m test --pgo -x test_re -i test_fma_zero_result
+
 
 export TCTYPE
 export ARCH
@@ -95,10 +116,7 @@ clean:
 distclean: clean
 	rm -rf tarballs
 
-# Refresh hashes/<basename>.sha256 for every external tarball. Skips the
-# normal sha256 check so freshly-downloaded tarballs aren't rejected; after
-# running, the resulting hash files should be committed to record the
-# now-trusted versions.
+# Refresh hashes/<basename>.sha256 for every external tarball.
 update-hashes: SKIP_VERIFY := 1
 update-hashes: $(EXTERNAL_TARBALLS)
 	@mkdir -p hashes
@@ -564,8 +582,9 @@ python-static-$(TARGET)/bin/python$(PYTHONV): $(PYTHON_DEPS)
 			--with-openssl=$(ROOT_DIR)build-$(TARGET)\
 			--build=$(ARCH)-linux-$(MUSLABI)\
 			--disable-test-modules\
+			$(if $(filter 1,$(USE_PGO)),--enable-optimizations,)\
 			--with-ensurepip=no
-	cd deps-$(TARGET)/Python-$(PYTHON) && PYTHON_BUILD=1 ../../configure-wrapper.sh make -j$(JOBS)
+	cd deps-$(TARGET)/Python-$(PYTHON) && PYTHON_BUILD=1 ../../configure-wrapper.sh make -j$(JOBS) PROFILE_TASK='$(PROFILE_TASK)'
 	mkdir -p python-static-$(TARGET)
 	cd deps-$(TARGET)/Python-$(PYTHON) && PYTHON_BUILD=1 ../../configure-wrapper.sh make bininstall
 	rm -rf python-static-$(TARGET)/lib/libpython$(PYTHONV).a
