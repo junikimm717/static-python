@@ -5,10 +5,11 @@ individual reports (`*.md`) have the full tables + analysis; this README
 keeps the **recurring pattern across all runs to date** in one place so a
 fresh reader doesn't have to read multiple reports to know what's known.
 
-Last updated: **2026-05-17** -- covers 5 reports across 4 hosts
-(2 x86_64, 2 aarch64); the latest is the post-`-flto-partition=none`
-canonical baseline on M4 Pro. Update this file whenever you add a new
-report; see [`AGENTS.md`](../../AGENTS.md) for the rule.
+Last updated: **2026-05-18** -- covers 7 reports across 4 hosts
+(3 x86_64, 4 aarch64); we now have **three** PGO+LTO data points
+across three µarchs (M4 Pro Firestorm, Neoverse-N1, Zen 5), spanning
+both ISAs. Update this file whenever you add a new report; see
+[`AGENTS.md`](../../AGENTS.md) for the rule.
 
 ## TL;DR
 
@@ -24,25 +25,49 @@ report; see [`AGENTS.md`](../../AGENTS.md) for the rule.
  are pre-PGO and substantially overstate or understate the static
  win** -- they each carry a banner saying so.
 - **Static + whole-program LTO + PGO beats dynamic + libpython-only-LTO
- + PGO by ~11% CPU geomean, ~12% startup geomean.** Up from the
- prior post-PGO 6% / 11%, after we matched (and extended) the LTO
- recipe on the static side. The improvement is concentrated in
- libpython-internal rows (`listcomp` jumped from parity to 1.27x,
- `except_path` from parity to 1.19x).
+ + PGO by 7-18% CPU geomean across three µarchs.** Per-host: 1.07x on
+ Azure Neoverse-N1 aarch64 (2359Z), 1.11x on Apple M4 Pro aarch64
+ (2146Z), 1.18x on AMD Zen 5 x86_64 (0000Z). The Zen 5 number is the
+ widest and is driven by big wins on `arith_loop` (1.52x), `func_call`
+ (1.23x), and `fib_iter` (1.22x) -- bytecode-int rows where Zen 5's
+ wider integer issue width compounds with the static build's `-no-pie
+ -ffunction-sections --gc-sections`.
+- **Startup geomean is 1-12% across the three PGO+LTO hosts and the
+ spread is large.** 2359Z N1 1.09x, 2146Z M4 1.12x, 0000Z Zen 5
+ **1.01x**. The Zen 5 number is bottom-of-spread because of one
+ scenario (`stdlib` flipped from 1.13x to 0.89x -- dynamic spawns
+ faster). The "static wins every startup scenario" claim from the
+ pre-PGO era no longer holds on x86_64; both aarch64 hosts still
+ hold all three scenarios. Mechanism is open; one-data-point.
 - **Static now wins on every CPU row except one.** Margins range from
- 1.02x (`dictops`) to 1.27x (`listcomp`). The C-extension-boundary
- rows are still the widest single category (`str_format` 1.25x,
- `json_roundtrip` 1.22x, `attr_access` 1.17x), but the
- libpython-internal rows closed in this latest run and now match or
- exceed them.
-- **The one row static still loses on, badly: `fib_recursive` on M4
- Pro at 0.78x.** Three rounds of optimisation knobs (PGO, then
- `-flto-partition=none`) have now had a shot at fixing it via
- `-fprofile-use` / more-aggressive inlining and have not moved the
- ratio. This is now the "live" hypothesis: structural call-site bloat
- on the recursive `_PyEval_EvalFrameDefault` path mispredicts on M4
- Pro's branch target buffer at varying recursion depths. `perf stat`
- on real aarch64 hardware (not OrbStack) is the next move.
+ 1.02x (`dictops` on M4 Pro) to 1.52x (`arith_loop` on Zen 5). The
+ C-extension-boundary rows are the widest cross-host category
+ (`str_format` 1.11-1.25x, `json_roundtrip` 1.17-1.22x, `attr_access`
+ 1.07-1.22x). Libpython-internal rows are narrower and more
+ µarch-sensitive (`listcomp` 1.07-1.27x, `except_path` 1.09-1.20x,
+ `func_call` 1.06-1.23x).
+- **The one row static loses on, on all three hosts: `fib_recursive`.**
+ 0.78x on M4 Pro, 0.89x on Zen 5, 0.92x on N1. Three rounds of
+ optimisation knobs (PGO, then `-flto-partition=none`) have had a shot
+ at fixing this via `-fprofile-use` / more-aggressive inlining and
+ have not moved the ratio on any of the three. **Cross-isa,
+ cross-vendor, cross-µarch** evidence for the "structural call-site
+ bloat on the recursive `_PyEval_EvalFrameDefault` path under
+ `-flto-partition=none`" hypothesis. `perf stat` runs cleanly on both
+ N1 and Zen 5 (real PMUs); waiting on neither.
+- **The `listcomp` win is sharply µarch-dependent and the L1i story
+ is at best partial.** M4 Pro (192K L1i) 1.27x, Zen 5 (32K L1i)
+ 1.18x, N1 (64K L1i) 1.07x. The 2359Z L1i-thrashing hypothesis
+ predicts a monotonic relationship between L1i size and `listcomp`
+ ratio; the Zen 5 number sits between M4 Pro and N1 despite having
+ the smallest L1i, which is consistent with Zen 5's op cache
+ effectively acting as a second-level icache for hot loops. Needs a
+ `perf -e L1-icache-load-misses` triangulation on all three hosts.
+- **The pre-PGO `json_roundtrip` x86_64 regression is resolved.** The
+ 1924Z 0.75x became 1.19x once PGO landed on the static side. The
+ 1924Z analysis's "static + `-O3 -flto` on the JSON decoder is
+ 25-30% slower than the dynamic build's per-TU compilation" was
+ falsified by simply turning on `--enable-optimizations`.
 - **The dynamic baseline links against Alpine apk's `libssl.so.3` /
  `libsqlite3.so.0` / `libcrypto.so.3` / etc., which are *not* LTO'd.**
  So three asymmetries are baked into every static-vs-dynamic row: (1)
@@ -64,48 +89,67 @@ report; see [`AGENTS.md`](../../AGENTS.md) for the rule.
 CPU rows where static is ahead on **every** report we've taken
 (post-PGO+LTO only -- pre-PGO numbers in parens are wider and noisier):
 
-| bench         | post-PGO+LTO range | (pre-PGO range) | what it stresses              |
-|---            |---:                |---:             |---                            |
-| `listcomp`    | **1.27x**          | (1.14x - 1.26x) | list build hot path           |
-| `str_format`  | **1.25x**          | (0.97x - 1.71x) | `_string.formatter_parser`    |
-| `json_roundtrip` | **1.22x**       | (0.75x - 1.30x) | `_json` C decoder             |
-| `except_path` | **1.19x**          | (1.24x - 1.69x) | C-level exception restore     |
-| `attr_access` | **1.17x**          | (1.13x - 1.23x) | LOAD_ATTR specialisation      |
-| `func_call`   | **1.16x**          | (1.10x - 1.42x) | shallow Python call dispatch  |
-| `arith_loop`  | **1.14x**          | (1.16x - 1.45x) | bytecode int arithmetic       |
-| `fib_iter`    | **1.09x**          | (1.08x - 1.28x) | pure loop + tuple pack/unpack |
-| `regex_match` | **1.03x**          | (1.14x - 1.21x) | `_sre` C extension            |
-| `dictops`     | **1.02x**          | (1.13x - 1.28x) | dict insert + lookup          |
+| bench            | post-PGO+LTO range  | M4 / N1 / Zen5  | (pre-PGO range) | what it stresses              |
+|---               |---:                 |---:             |---:             |---                            |
+| `arith_loop`     | **1.10x - 1.52x**   | 1.14 / 1.10 / 1.52 | (1.16x - 1.45x) | bytecode int arithmetic       |
+| `str_format`     | **1.11x - 1.25x**   | 1.25 / 1.11 / 1.25 | (0.97x - 1.71x) | `_string.formatter_parser`    |
+| `func_call`      | **1.06x - 1.23x**   | 1.16 / 1.06 / 1.23 | (1.10x - 1.42x) | shallow Python call dispatch  |
+| `fib_iter`       | **1.08x - 1.22x**   | 1.09 / 1.08 / 1.22 | (1.08x - 1.28x) | pure loop + tuple pack/unpack |
+| `attr_access`    | **1.07x - 1.22x**   | 1.17 / 1.07 / 1.22 | (1.13x - 1.23x) | LOAD_ATTR specialisation      |
+| `except_path`    | **1.09x - 1.20x**   | 1.19 / 1.09 / 1.20 | (1.24x - 1.69x) | C-level exception restore     |
+| `json_roundtrip` | **1.17x - 1.22x**   | 1.22 / 1.17 / 1.19 | (0.75x - 1.30x) | `_json` C decoder             |
+| `listcomp`       | **1.07x - 1.27x**   | 1.27 / 1.07 / 1.18 | (1.14x - 1.26x) | list build hot path           |
+| `dictops`        | **1.02x - 1.14x**   | 1.02 / 1.08 / 1.14 | (1.13x - 1.28x) | dict insert + lookup          |
+| `regex_match`    | **1.03x - 1.08x**   | 1.03 / 1.07 / 1.08 | (1.14x - 1.21x) | `_sre` C extension            |
 
-The post-PGO+LTO column has only one data point per row right now (the
-2146Z aarch64 run); ranges will fill in as we re-run on x86_64. The
-shape of the column changed materially after we added
+Three data points now: M4 Pro aarch64 (2146Z) via OrbStack, Azure
+Neoverse-N1 aarch64 (2359Z) on bare-metal, and AMD Zen 5 x86_64
+(0000Z) on bare-metal. All three rebench the same canonical PGO +
+`-flto-partition=none` static recipe against an `--enable-optimizations
+--with-lto` dynamic. The shape changed materially after we added
 `-flto-partition=none` to the static build: the libpython-internal
 rows (`listcomp`, `except_path`, `func_call`, `arith_loop`) jumped
-into the same 13-27% band that the C-extension-boundary rows occupy.
-**The takeaway from this is that the static win is now driven by two
-different effects of similar magnitude**: (a) whole-program LTO
-across `libpython + libssl + libsqlite + ...` extending the inlining
+into the same 7-52% band that the C-extension-boundary rows occupy.
+**The takeaway is that the static win is now driven by two different
+effects of similar magnitude**: (a) whole-program LTO across
+`libpython + libssl + libsqlite + ...` extending the inlining
 visibility further than any dynamic build can do, and (b) the
 intra-libpython inlining quality jump from `-flto-partition=none`,
-which is also what upstream's `--with-lto` gives the dynamic
-baseline's libpython but which we now also have on static. The
-remaining tight rows (`regex_match`, `dictops`) are ones where the
-hot path is already in a single highly-tuned C function the compiler
-can't improve further.
+which is also what upstream's `--with-lto` gives the dynamic baseline's
+libpython but which we now also have on static.
+
+**Per-row µarch sensitivity is real.** `arith_loop`, `fib_iter`, and
+`func_call` all swing 12-42 ratio-points across the three hosts and
+they all peak on Zen 5 -- consistent with Zen 5's wider integer
+issue width amplifying the static `-no-pie -ffunction-sections
+--gc-sections` advantage on tight bytecode-int loops. `listcomp`
+non-monotonically tracks L1i size (M4 192K > Zen 5 32K > N1 64K with
+ratios 1.27 > 1.18 > 1.07), which is the "what is mixed" item below.
+The tight rows (`regex_match`, `dictops`) are ones where the hot
+path is already in a single highly-tuned C function the compiler
+can't improve further; they sit in 1.02-1.14x across all three hosts.
 
 ## What is mixed or wrong
 
-| bench            | x86_64 (pre-PGO)  | aarch64 post-PGO+LTO | notes                                                                |
-|---               |---:               |---:                  |---                                                                   |
-| `json_roundtrip` | **0.75x - 0.77x** | 1.22x                | x86_64 regression pre-PGO+LTO; needs re-bench with new static recipe |
-| `fib_recursive`  | 0.96x - 0.99x     | **0.78x**            | M4 Pro outlier persists after PGO and `-flto-partition=none`; perf stat job |
-| `str_format`     | 0.97x - 0.99x     | 1.25x                | x86_64 pre-PGO was parity; needs re-bench with new static recipe     |
+| bench / scenario  | M4 Pro | N1    | Zen 5    | notes                                                                                |
+|---                |---:    |---:   |---:      |---                                                                                   |
+| `fib_recursive`   | 0.78x  | 0.92x | 0.89x    | **Cross-µarch, cross-ISA static loss** after PGO + `-flto-partition=none`; perf stat |
+| `listcomp`        | 1.27x  | 1.07x | 1.18x    | µarch-dependent; 2359Z L1i-thrashing hypothesis only partial (Zen 5 sits in middle on smaller L1i) |
+| `stdlib` startup  | 1.13x  | 1.13x | **0.89x**| Zen-5-only: dynamic spawns faster on stdlib import. One data point, x86_64-specific |
 
-The x86_64 rows in this table are still pre-PGO and pre-`-flto-partition=none`
-numbers. **Both x86_64 runs in `reports/` need a re-bench with the
-current static recipe** before we know how much of the
-`json_roundtrip` x86_64 regression survived.
+Down from three pre-PGO+LTO rows. Resolved since the last edit:
+`json_roundtrip` x86_64 regression (1924Z 0.75x -> 0000Z 1.19x),
+`str_format` x86_64 parity (1924Z 0.97x -> 0000Z 1.25x). Both now
+sit in the "what wins" table above.
+
+`fib_recursive` is the **only consistent CPU loss across all three
+PGO+LTO hosts** and the canonical perf-stat target. Both N1 and Zen 5
+have real PMUs.
+
+`listcomp` and `stdlib` startup are µarch-conditional: `listcomp`
+wins on all three but with a 20-ratio-point spread, `stdlib` wins on
+both aarch64 hosts but loses on the one x86_64 host. Both need a
+follow-up `perf` invocation before they leave this table.
 
 ## What the static build has that the dynamic doesn't
 
@@ -157,41 +201,56 @@ Highest-leverage open experiments, in priority order:
    1.17-1.25x toward 1.00-1.05x against the new "intree-dyn"
    binary, the structural static win is asymmetry 1 only and is
    small. If they stay 1.10x+, asymmetry 1 alone is real.
-2. **Re-bench both x86_64 hosts with the current static recipe.** The
-   published x86_64 reports predate both PGO *and*
-   `-flto-partition=none`. Specifically: does the `json_roundtrip`
-   x86_64 regression (~0.75x) survive on the current static build?
-   Does `str_format`'s x86_64 parity (~0.99x) flip to 1.25x like on
-   aarch64? Different answers per arch would be a meaningful
-   arch-specific finding.
-3. **`perf stat` on `fib_recursive` on real aarch64 hardware** (not
-   OrbStack -- guest has no PMU). Three rounds of optimisation knobs
-   (PGO, `-flto-partition=none`) have had the chance to fix the 0.78x
-   gap and have not moved it. The "structural call-site bloat under
-   LTO" hypothesis is now the live one. Events to capture:
-   `instructions, cycles, branch-misses, iTLB-load-misses,
-   L1-icache-load-misses` on a tight `fib(20)`-in-a-loop body for
-   both binaries.
-4. **`STATIC_NO_LTO=1` static build.** Mirror experiment to (1):
+2. ~~**Re-bench both x86_64 hosts with the current static recipe.**~~
+   **Half-done.** The Ryzen AI HX 370 host got its PGO+LTO re-bench in
+   `2026-05-18T0000Z_x86_64.md` -- `json_roundtrip` regression resolved
+   (0.75x -> 1.19x), `str_format` parity flipped to win (0.99x ->
+   1.25x), new findings folded into the tables above. **Azure Xeon
+   Platinum 8370C (1818Z host) still owes a PGO+LTO re-bench** to
+   confirm the cross-host story on Cascade Lake -- second x86_64
+   µarch matters because Zen 5 amplifies the bytecode-int rows by an
+   amount we don't yet know is Zen-specific.
+3. **`perf stat -e cycles,instructions,branch-misses,iTLB-load-misses,
+   L1-icache-load-misses` on `fib_recursive`, on both N1 and Zen 5,
+   both binaries.** No longer waiting on PMU access -- we now have two
+   real-PMU hosts (N1 2359Z, Zen 5 0000Z) showing the same regression
+   at different magnitudes (0.92x and 0.89x). Cross-host agreement on
+   the offending counter narrows the mechanism better than any single
+   host can. Promoted ahead of (1) by 2359Z and confirmed by 0000Z.
+4. **`perf stat -e L1-icache-load-misses,L1-icache-loads` on
+   `listcomp` on N1, M4 Pro, and Zen 5.** Tests the 2359Z L1i-thrashing
+   hypothesis against the 0000Z counter-evidence (Zen 5 holds 1.18x on
+   a 32K L1i, smaller than N1's 64K, which the L1i hypothesis doesn't
+   predict). One `perf` invocation per host settles whether L1i miss
+   rate or Zen 5's op cache is doing the work.
+5. **`stdlib` startup regression triage on Zen 5.** New 0000Z finding:
+   dynamic spawns faster on the `stdlib` startup scenario (0.89x)
+   despite both aarch64 hosts holding 1.13x. Either Ryzen-host
+   scheduling artefact, or the dynamic-side PGO captured something
+   about the import path on musl-x86_64 that it didn't capture on
+   musl-aarch64. `strace -e trace=openat,read,mmap,close -c` on the
+   `python -c 'import sys, ...stdlib...'` body for both binaries is a
+   one-hour answer.
+6. **`STATIC_NO_LTO=1` static build.** Mirror experiment to (1):
    strip `-flto -flto-partition=none` from `configure-wrapper.sh` and
    measure. If the geomean drops to ~1.00-1.02x, static linkage
    *alone* (no LTO advantage) is parity with the dynamic baseline,
    and the project is really "whole-program LTO Python that happens
    to be static". Expected drop of ~10% based on the size of the
    2112Z -> 2146Z move.
-5. **musl libc LTO via musl-cross-make patches.** Now even more
+7. **musl libc LTO via musl-cross-make patches.** Now even more
    incremental on top of (1); the remaining unrecovered cross-LTO
    win is inlining through `malloc` / `memchr` / `strlen` / etc.
    into our static binary. ~20 lines of musl-cross-make patches;
    expected gain ~3% but a more novel demo (no other static-python
    project does this). Risk: have to maintain a musl-cross-make
    fork.
-6. **Cross-arch PGO via qemu-user.** `build-all.sh` currently
+8. **Cross-arch PGO via qemu-user.** `build-all.sh` currently
    produces non-PGO binaries for everything except the host arch
    (Makefile auto-gates `USE_PGO=0` on cross). Add qemu-user-static
    to the container and accept the ~3x training-step slowdown, or
-   stand up a CI matrix with one runner per arch. The 2 published
-   x86_64 reports are the natural first re-bench targets for this.
+   stand up a CI matrix with one runner per arch.    The pre-PGO reports (1818Z Cascade Lake, 1907Z Neoverse-N1, 1955Z
+   M4 Pro) are the natural first re-bench targets.
 
 ## Reports index
 
@@ -202,6 +261,8 @@ Highest-leverage open experiments, in priority order:
 | [`2026-05-17T1924Z_x86_64.md`](./2026-05-17T1924Z_x86_64.md)                          | Local Ryzen AI 9 HX 370 (Zen 5)             | pre-PGO           | Second x86_64 host; `json_roundtrip` x86_64 regression confirmed reproducible                         |
 | [`2026-05-17T1955Z_aarch64.md`](./2026-05-17T1955Z_aarch64.md)                        | Local Apple M4 Pro via OrbStack             | pre-PGO           | `fib_recursive` 0.69x outlier; OrbStack hides PMU + cpuid + cache sizes                               |
 | [`2026-05-17T2146Z_aarch64.md`](./2026-05-17T2146Z_aarch64.md)                        | Local Apple M4 Pro via OrbStack             | **PGO+LTO**       | Canonical post-PGO + `-flto-partition=none` baseline; geomean 1.11x; `fib_recursive` 0.78x persists. Supersedes the deleted 2112Z report (which had PGO but no `-flto-partition=none` on static). |
+| [`2026-05-17T2359Z_aarch64.md`](./2026-05-17T2359Z_aarch64.md)                        | Azure Neoverse-N1                           | **PGO+LTO**       | First PGO+LTO on real-PMU hardware. Cross-validates the M4 Pro PGO+LTO recipe. Geomean 1.07x (narrower than M4 Pro 1.11x). `fib_recursive` 0.92x replicates the M4 Pro loss on a totally different aarch64 µarch. `listcomp` did NOT replicate (1.07x vs 1.27x on M4 Pro); 2359Z proposes L1i-thrashing hypothesis. |
+| [`2026-05-18T0000Z_x86_64.md`](./2026-05-18T0000Z_x86_64.md)                          | Local Ryzen AI 9 HX 370 (Zen 5)             | **PGO+LTO**       | First x86_64 PGO+LTO report. Same host as 1924Z; PGO unlocked via `BUGREPORT.md` musl-fma workaround. Resolves the 1924Z `json_roundtrip` regression (0.75x -> 1.19x). Confirms `fib_recursive` as a three-host loss. `listcomp` 1.18x on a 32K L1i partially falsifies 2359Z's L1i-thrashing hypothesis. New: `stdlib` startup 0.89x (dynamic spawns faster). |
 
 ## Checklist when adding a new report
 
