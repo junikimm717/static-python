@@ -5,7 +5,7 @@ report's own `## Analysis` carries the mechanism story and the per-run
 hypothesis updates; this file just tracks **what holds across all runs**
 so a fresh reader can skip to the right report.
 
-Last updated: **2026-05-18** -- 8 benchmark reports + 1 perf follow-up,
+Last updated: **2026-05-19** -- 9 benchmark reports + 1 perf follow-up,
 across 4 hosts (3 x86_64, 4 aarch64). Four PGO+LTO data points span
 four µarchs (M4 Pro, Neoverse-N1, Zen 5, Cascade Lake) and both ISAs.
 Update on every new report; rule lives in [`AGENTS.md`](../../AGENTS.md).
@@ -15,7 +15,7 @@ Update on every new report; rule lives in [`AGENTS.md`](../../AGENTS.md).
 - **Recipe is now PGO + whole-program `-flto-partition=none` on both
   sides.** Reports older than `2026-05-17T2146Z_aarch64.md` are pre-PGO
   and carry a banner. The most recent x86_64 run
-  ([2322Z](./2026-05-18T2322Z_x86_64.md)) adds `-fuse-linker-plugin
+  ([0223Z](./2026-05-19T0223Z_x86_64.md)) adds `-fuse-linker-plugin
   -fno-fat-lto-objects` on the static side via a `liblto_plugin.so`-
   enabled musl-cross gcc 15.1.0 host toolchain; see that report for
   the (largely null) per-row delta.
@@ -24,14 +24,15 @@ Update on every new report; rule lives in [`AGENTS.md`](../../AGENTS.md).
   Startup geomean 1-13% (Zen 5 1.01x is the bottom of spread because
   of one regressed scenario; the other three cluster 1.09-1.12x).
 - **`-fuse-linker-plugin` on the static side did not move CPU geomean
-  meaningfully.** First plugin-enabled run lands at 1.20x on Cascade
+  meaningfully.** First plugin-enabled run ([2322Z, now deleted]; confirmed
+  by [0223Z](./2026-05-19T0223Z_x86_64.md)) lands at 1.20x on Cascade
   Lake vs 1.18x on Zen 5 sans-plugin -- well inside the 1.07-1.18x
   cross-host band already established. Static binary grew 0.9 MB
   same-host, consistent with the plugin pulling in more reachable
   code from `.a`s without opening new inlining frontiers. Same-host
   plugin-on/off A/B (open experiment) is now the cleanest test.
 - **Static wins every CPU row except `fib_recursive`.** That row is
-  0.78x / 0.89x / 0.89x / 0.92x and is the only consistent loss
+  0.78x / 0.85x / 0.89x / 0.92x and is the only consistent loss
   across all four PGO+LTO hosts. N1 `perf stat` attributes it to
   branch-mispredict + back-end stalls in the computed-goto dispatch
   inside `_PyEval_EvalFrameDefault`; **frontend is not the
@@ -57,24 +58,24 @@ context; they're noisier and biased.
 
 | bench            | post-PGO+LTO range  | M4 / N1 / Zen5 / Cas      | (pre-PGO range) | stresses                       |
 |---               |---:                 |---:                       |---:             |---                             |
-| `arith_loop`     | **1.10x - 1.52x**   | 1.14 / 1.10 / 1.52 / 1.47 | (1.16 - 1.45)   | bytecode int arithmetic        |
-| `str_format`     | **1.11x - 1.25x**   | 1.25 / 1.11 / 1.25 / 1.16 | (0.97 - 1.71)   | `_string.formatter_parser`     |
-| `func_call`      | **1.06x - 1.25x**   | 1.16 / 1.06 / 1.23 / 1.25 | (1.10 - 1.42)   | shallow Python call dispatch   |
-| `fib_iter`       | **1.08x - 1.27x**   | 1.09 / 1.08 / 1.22 / 1.27 | (1.08 - 1.28)   | pure loop + tuple pack/unpack  |
-| `attr_access`    | **1.07x - 1.24x**   | 1.17 / 1.07 / 1.22 / 1.24 | (1.13 - 1.23)   | LOAD_ATTR specialisation       |
-| `except_path`    | **1.09x - 1.24x**   | 1.19 / 1.09 / 1.20 / 1.24 | (1.24 - 1.69)   | C-level exception restore      |
-| `json_roundtrip` | **1.17x - 1.22x**   | 1.22 / 1.17 / 1.19 / 1.20 | (0.75 - 1.30)   | `_json` C decoder              |
+| `arith_loop`     | **1.10x - 1.52x**   | 1.14 / 1.10 / 1.52 / 1.38 | (1.16 - 1.45)   | bytecode int arithmetic        |
+| `str_format`     | **1.11x - 1.25x**   | 1.25 / 1.11 / 1.25 / 1.20 | (0.97 - 1.71)   | `_string.formatter_parser`     |
+| `func_call`      | **1.06x - 1.32x**   | 1.16 / 1.06 / 1.23 / 1.32 | (1.10 - 1.42)   | shallow Python call dispatch   |
+| `fib_iter`       | **1.08x - 1.27x**   | 1.09 / 1.08 / 1.22 / 1.22 | (1.08 - 1.28)   | pure loop + tuple pack/unpack  |
+| `attr_access`    | **1.07x - 1.24x**   | 1.17 / 1.07 / 1.22 / 1.21 | (1.13 - 1.23)   | LOAD_ATTR specialisation       |
+| `except_path`    | **1.09x - 1.24x**   | 1.19 / 1.09 / 1.20 / 1.23 | (1.24 - 1.69)   | C-level exception restore      |
+| `json_roundtrip` | **1.17x - 1.24x**   | 1.22 / 1.17 / 1.19 / 1.24 | (0.75 - 1.30)   | `_json` C decoder              |
 | `listcomp`       | **1.07x - 1.27x**   | 1.27 / 1.07 / 1.18 / 1.23 | (1.14 - 1.26)   | list build hot path            |
 | `dictops`        | **1.02x - 1.20x**   | 1.02 / 1.08 / 1.14 / 1.20 | (1.13 - 1.28)   | dict insert + lookup           |
-| `regex_match`    | **1.03x - 1.12x**   | 1.03 / 1.07 / 1.08 / 1.12 | (1.14 - 1.21)   | `_sre` C extension             |
+| `regex_match`    | **1.03x - 1.22x**   | 1.03 / 1.07 / 1.08 / 1.22 | (1.14 - 1.21)   | `_sre` C extension             |
 
 ## What is mixed or wrong
 
 | bench / scenario | M4    | N1    | Zen 5    | Cas      | summary (see linked report for mechanism)                                              |
 |---               |---:   |---:   |---:      |---:      |---                                                                                     |
-| `fib_recursive`  | 0.78x | 0.92x | 0.89x    | **0.89x**| Four-host, cross-ISA static loss. N1 perf stat: branch-mispredict + backend stalls in `_PyEval_EvalFrameDefault`; NOT L1i. See [0024Z perf](./2026-05-18T0024Z_aarch64_perf.md). `-fuse-linker-plugin` did not move it. Zen 5 or Cas perf run still owed. |
+| `fib_recursive`  | 0.78x | 0.92x | 0.89x    | **0.85x**| Four-host, cross-ISA static loss. N1 perf stat: branch-mispredict + backend stalls in `_PyEval_EvalFrameDefault`; NOT L1i. See [0024Z perf](./2026-05-18T0024Z_aarch64_perf.md). `-fuse-linker-plugin` did not move it. Zen 5 or Cas perf run still owed. |
 | `listcomp`       | 1.27x | 1.07x | 1.18x    | 1.23x    | µarch-dependent. L1i hypothesis falsified by N1 perf stat. Spread is issue-width, not icache. See [0024Z perf](./2026-05-18T0024Z_aarch64_perf.md). |
-| `stdlib` startup | 1.13x | 1.13x | **0.89x**| 1.14x    | Zen-5-only -- dynamic spawns faster. Cas + M4 + N1 all 1.13-1.14x, so the 0.89x is an outlier, not a recipe-wide regression. Mechanism still open. |
+| `stdlib` startup | 1.13x | 1.13x | **0.89x**| 1.14x    | Zen-5-only -- dynamic spawns faster. Cas confirmed 1.14x across two PGO+LTO runs; M4 + N1 + Cas all 1.13-1.14x, so the 0.89x is almost certainly a one-time scheduling artefact on a busy local Ryzen machine. Low priority. |
 
 ## What the static build has that the dynamic doesn't
 
@@ -85,8 +86,8 @@ From `sysconfig.get_config_var(...)` on each binary.
 | `-flto`                                     | yes                          | yes                                | no              |
 | `-flto` *scope*                             | **whole program** (openssl, sqlite, zlib, libffi, lzma, bz2, ncursesw, libuuid all .a-LTO'd) | libpython + bundled extensions only | no |
 | `-flto-partition=none`                      | yes                          | yes (via `--with-lto`)             | no              |
-| `-fuse-linker-plugin`                       | **yes** (since [2322Z](./2026-05-18T2322Z_x86_64.md); musl-cross gcc no longer `--disable-shared`, host gcc dynamically linked + wrapped) | yes (via `--with-lto`) | no |
-| `-fno-fat-lto-objects`                      | **yes** (since [2322Z](./2026-05-18T2322Z_x86_64.md))                       | no (`-ffat-lto-objects` instead) | no              |
+| `-fuse-linker-plugin`                       | **yes** (since [0223Z](./2026-05-19T0223Z_x86_64.md); musl-cross gcc no longer `--disable-shared`, host gcc dynamically linked + wrapped) | yes (via `--with-lto`) | no |
+| `-fno-fat-lto-objects`                      | **yes** (since [0223Z](./2026-05-19T0223Z_x86_64.md))                       | no (`-ffat-lto-objects` instead) | no              |
 | `-O3`                                       | yes                          | yes                                | `-Os`           |
 | PGO (`--enable-optimizations`)              | yes                          | yes                                | no              |
 | `-no-pie` / non-PIC                         | yes                          | no                                 | no              |
@@ -106,12 +107,12 @@ linked into the same ELF.
    that, rebench. Isolates "cross-`.so` cost" from "Alpine libs aren't
    LTO'd".
 2. ~~**PGO+LTO re-bench Azure Cascade Lake (1818Z host).**~~ Done in
-   [2322Z](./2026-05-18T2322Z_x86_64.md); geomean 1.20x lands at the
+   [0223Z](./2026-05-19T0223Z_x86_64.md); geomean 1.20x lands at the
    top of the four-host PGO+LTO band, lifted to the TL;DR range.
 3. **`STATIC_NO_LINKER_PLUGIN=1` same-host A/B on Cascade Lake.** Drop
    `-fuse-linker-plugin -fno-fat-lto-objects` from `configure-wrapper.sh`
    `CFLAGS`/`LDFLAGS`, rebuild, re-bench. Without this, the
-   [2322Z](./2026-05-18T2322Z_x86_64.md) 1.17x->1.20x same-host geomean
+   [0223Z](./2026-05-19T0223Z_x86_64.md) 1.17x->1.20x same-host geomean
    move can't be attributed -- almost all of it is the PGO addition
    that bundled in. Same run should compare `size -A` + `nm --size-
    sort` to attribute the +0.9 MB binary growth to `.text`-from-archives
@@ -149,7 +150,7 @@ linked into the same ELF.
 | [`2026-05-17T2359Z_aarch64.md`](./2026-05-17T2359Z_aarch64.md)                       | Azure Neoverse-N1                        | **PGO+LTO**     | First PGO+LTO on real PMU; cross-validates M4 Pro recipe; geomean 1.07x |
 | [`2026-05-18T0000Z_x86_64.md`](./2026-05-18T0000Z_x86_64.md)                         | Local Ryzen AI 9 HX 370 (Zen 5)          | **PGO+LTO**     | First x86_64 PGO+LTO; resolves 1924Z `json_roundtrip`; new `stdlib` regression |
 | [`2026-05-18T0024Z_aarch64_perf.md`](./2026-05-18T0024Z_aarch64_perf.md)             | Azure Neoverse-N1                        | perf follow-up  | `perf stat` on `fib_recursive` + `listcomp`; falsifies L1i hypothesis on both |
-| [`2026-05-18T2322Z_x86_64.md`](./2026-05-18T2322Z_x86_64.md)                         | Azure Xeon Platinum 8370C (Cascade Lake) | **PGO+LTO**     | First `-fuse-linker-plugin -fno-fat-lto-objects` build (`juni/patch-for-ldplugin`); geomean 1.20x; no clear plugin signal vs Zen 5 0000Z |
+| [`2026-05-19T0223Z_x86_64.md`](./2026-05-19T0223Z_x86_64.md)                         | Azure Xeon Platinum 8370C (Cascade Lake) | **PGO+LTO**     | Re-run on same host as deleted 2322Z; CPU geomean 1.20x reproduced; `fib_recursive` deepened to 0.85x; `stdlib` startup 1.14x confirmed |
 
 ## Checklist when adding a new report
 
