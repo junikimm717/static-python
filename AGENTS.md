@@ -241,19 +241,28 @@ this; both should agree.
 The host has tmux; the container does not. Use the host wrapper pattern:
 spawn a detached tmux session that runs the command via `docker compose
 exec`, tees stdout+stderr to a log file, and writes a final
-`EXIT_CODE=...` line. Example:
+`EXIT_CODE=...` line that reflects the **inner** command, not `tee`.
+
+Bash's `${PIPESTATUS[0]}` (or `set -o pipefail` + `$?`) is the right way
+to capture the upstream exit; plain `$?` after a pipeline reads the
+exit of the rightmost stage (`tee`), which is always 0 -- a build can
+fail loudly and the log will still claim `EXIT_CODE=0`.
 
 ```sh
 LOG=$PWD/build.log
-tmux new-session -d -s build "\
+tmux new-session -d -s build "bash -c '\
+  set -o pipefail; \
   docker compose exec -T spython \
-    sh -lc 'cd /workspace && make USE_CROSSMAKE=1 python3 -j\$(nproc)' \
-  2>&1 | tee $LOG; echo EXIT_CODE=\$? | tee -a $LOG"
+    sh -lc \"cd /workspace && make USE_CROSSMAKE=1 python3 -j\\\$(nproc)\" \
+  2>&1 | tee $LOG; \
+  echo EXIT_CODE=\${PIPESTATUS[0]} | tee -a $LOG'"
 ```
 
 Then poll the log file rather than re-attaching, so you don't fight the
-user for the terminal. When you think the job is done, check the tail
-and grep for `EXIT_CODE`.
+user for the terminal. When you think the job is done, look at the
+tail; check for `EXIT_CODE=0` **and** grep `'Error [0-9]\|FAILED'` to
+catch failure messages, since past `EXIT_CODE=0` lines on broken builds
+have been observed when the launcher pattern wasn't pipestatus-aware.
 
 For all-arch toolchain builds use `parallel-toolchains.pl` rather than
 hand-rolling parallel `make crossmake` calls; it owns the worker pool
