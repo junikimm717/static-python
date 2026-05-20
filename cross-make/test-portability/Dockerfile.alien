@@ -1,0 +1,22 @@
+# Glibc-based "alien" rootfs for proving the static-musl toolchain
+# tarball is genuinely relocatable. No compilers; only inspection and
+# build orchestration tools. See ai/PORTABILITY_PROOF.md.
+FROM debian:stable-slim
+
+RUN apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        make \
+        file \
+        binutils \
+        ca-certificates \
+ && rm -rf /var/lib/apt/lists/* \
+ && for p in cc gcc g++ cpp; do rm -f /usr/bin/$p; done
+
+RUN ! command -v cc \
+ && ! command -v gcc \
+ && ! command -v g++ \
+ && command -v ld \
+ && command -v readelf \
+ && command -v file
+
+WORKDIR /work

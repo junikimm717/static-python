@@ -1,5 +1,10 @@
 build
 build-*
+# Keep the build-logs/ directory tracked (empty) without tracking any of the
+# rolling per-arch log files (also caught by *.log below) that land in it.
+!build-logs/
+build-logs/*
+!build-logs/.gitkeep
 python-static-*
 python-dynamic-*
 deps

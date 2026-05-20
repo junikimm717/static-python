@@ -22,36 +22,32 @@ echo "====================="
 echo "configure-wrapper.sh: Using target $TARGET in configuration $TCTYPE..."
 echo "====================="
 
-# `-flto-partition=none`: whole-program inlining (default `=balanced` chops
-# into parallel chunks). No `-fuse-linker-plugin` -- our gcc is built
-# `--disable-shared`, so `liblto_plugin.so` doesn't exist; gcc-collect
-# handles LTO via the AR=gcc-ar archives instead.
-export LDFLAGS="-Wl,--export-dynamic -static -no-pie -flto -flto-partition=none \
+# Hand-roll what CPython's `--with-lto` would inject on gcc with
+# --disable-shared: -flto=auto -flto-partition=none -fuse-linker-plugin.
+# We don't actually pass --with-lto because it also wraps the PGO-instrument
+# bootstrap link in -fno-lto, which then can't read slim LTO bitcode out of
+# our static sub-dep archives (libsqlite3.a et al.). Driving LTO from the
+# wrapper keeps the plugin loaded for every link, so slim archives work and
+# we avoid building fat sub-deps we'd otherwise never need.
+export LDFLAGS="-Wl,--export-dynamic -static -no-pie \
+  -flto=auto -flto-partition=none -fuse-linker-plugin \
   -s --static -L$ROOT/build-$TARGET/lib \
   -L$ROOT/build-$TARGET/lib64\
   -L$DEPS_DIR/$TARGET-$TCTYPE/$TARGET/lib\
   -Wl,--gc-sections -Wl,-O1 -Wl,--as-needed"
 
 export LINKFORSHARED=" "
-# `-I.../include/uuid` mirrors the existing ncursesw entry: util-linux installs
-# libuuid's header to $prefix/include/uuid/uuid.h, but Python's _uuidmodule.c
-# does `#include <uuid.h>` when HAVE_UUID_H is defined. Without an explicit -I
-# for the subdir, the compile fails. We still also have the bare include path
-# so headers in our prefix root (zlib.h, ffi.h, bzlib.h, etc.) keep resolving.
+# include/uuid: util-linux installs uuid.h under a subdir but Python does
+# `#include <uuid.h>`. include/ncursesw: same idea for ncurses wide headers.
 export CFLAGS="-I$ROOT/build-$TARGET/include \
   -I$ROOT/build-$TARGET/include/ncursesw \
   -I$ROOT/build-$TARGET/include/uuid \
-  -O3 -flto -flto-partition=none -Wno-error -no-pie -w -pipe -ffunction-sections -fdata-sections"
+  -O3 -flto=auto -flto-partition=none -fuse-linker-plugin \
+  -Wno-error -no-pie -w -pipe -ffunction-sections -fdata-sections"
 
-# Sandbox pkg-config so it only sees the .pc files we produced inside this
-# repo. Without this, Python's configure happily reaches into Alpine's
-# /usr/lib/pkgconfig and pulls in things like
-#   pkg_cv_LIBFFI_LIBS='-L/usr/lib/../lib -lffi'
-#   pkg_cv_LIBUUID_CFLAGS='-I/usr/include/uuid'
-# which silently mix the host's libffi/libuuid with our static prefix. For
-# packages we don't ship a .pc for (bzip2, ncurses, openssl) pkg-config simply
-# fails and Python falls back to its built-in header tests, which work because
-# CFLAGS/LDFLAGS already point at our prefix.
+# Pin pkg-config to our prefix so configure scripts can't leak into
+# /usr/lib/pkgconfig and silently mix host libs (libffi, libuuid) with our
+# static build.
 export PKG_CONFIG_LIBDIR="$ROOT/build-$TARGET/lib/pkgconfig"
 export PKG_CONFIG_PATH="$ROOT/build-$TARGET/lib/pkgconfig"
 

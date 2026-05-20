@@ -9,7 +9,16 @@ my $nativearch = `uname -m`;
 chomp $nativearch;
 
 my $cores = int(`nproc`);
-my $jobs = $cores > 8 ? 8 : $cores;
+# JOBS env var lets the caller (e.g. parallel-toolchains.sh) cap per-build
+# parallelism so the product stays under nproc.
+my $jobs;
+if (exists $ENV{JOBS} && $ENV{JOBS} ne '') {
+  $jobs = int($ENV{JOBS});
+  $jobs > 0 || die "JOBS must be a positive integer (got '$ENV{JOBS}')";
+} else {
+  $jobs = $cores > 8 ? 8 : $cores;
+}
+print "toolchains.pl: jobs=$jobs (cores=$cores)\n";
 
 chdir $RealDir || die "failed cding??";
 

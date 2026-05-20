@@ -12,6 +12,7 @@ BZIP2 := 1.0.8
 UTILLINUX := 2.41
 PYTHON := 3.13.13
 LINUX_VER := 5.15.184
+GCC_VER := 15.1.0
 
 SPLIT := $(subst ., ,$(PYTHON))
 PYTHONV := $(word 1, $(SPLIT)).$(word 2, $(SPLIT))
@@ -66,12 +67,9 @@ ifeq ($(shell grep '$(TARGET)' ./supported.txt),)
 $(error Platform '$(TARGET)' is not supported)
 endif
 
-# do a bunch of architecture fiddling.
-
 ifneq ($(ARCH),$(NATIVE_ARCH))
 override TCTYPE=cross
 $(info Cross-Compiling to $(ARCH) from $(NATIVE_ARCH)...)
-# TODO: conditions where you have to force musl cross make
 else
 override TCTYPE=native
 $(info Native Compiling in $(NATIVE_ARCH)...)
@@ -86,35 +84,74 @@ USE_PGO ?= 0
 endif
 $(info USE_PGO=$(USE_PGO))
 
-# `-x test_re` skips two locale tests that fail on musl (no non-C byte-level
-# case folding) and would abort the PGO build. Same workaround as Alpine apk.
-#
-# `-i test_fma_zero_result` skips the IEEE-754 fma negative-zero test that
-# fails because of an unfixed bug in musl 1.2.5's software `fma` fast path
-# (`return x*y + z;` when z==0 double-rounds and loses sign on underflow).
-# CPython 3.13.13 already wraps the test in `@skipIf(linked_to_musl())`, but
-# `linked_to_musl()` shells out to `ldd` and a fully-static `-no-pie` binary
-# makes `ldd` exit non-zero, so the skip silently doesn't trigger. See
-# MUSL_REPORT.md for the full three-layer story.
+# `-x test_re`: skips locale tests that fail on musl (no non-C byte-level
+# case folding); same workaround Alpine apk uses.
+# `-i test_fma_zero_result`: skips an IEEE-754 fma negative-zero test
+# tickled by a musl `fma` fast-path bug. Upstream CPython gates this with
+# `@skipIf(linked_to_musl())`, but that probe shells out to ldd which
+# exits non-zero on a fully-static `-no-pie` binary, so the skip never
+# fires. See ai/MUSL_REPORT.md.
 PROFILE_TASK ?= -m test --pgo -x test_re -i test_fma_zero_result
-
 
 export TCTYPE
 export ARCH
 export NATIVE_ARCH
 export MUSLABI
 
-# first target should be python3
-
-.PHONY: python3 clean distclean update-hashes
+.PHONY: python3 clean distclean update-hashes upload-tarballs download
 
 python3: python-static-$(TARGET)/bin/python$(PYTHONV)
 
+# `clean` deliberately preserves deps-download-prime/: it is the sentinel
+# tree for `make download`, not a build artefact. `distclean` nukes it
+# along with the tarballs cache.
 clean:
-	rm -rf deps-* build-* python-static-*
+	rm -rf $(filter-out deps-download-prime,$(wildcard deps-*)) build-* python-static-*
 
 distclean: clean
-	rm -rf tarballs
+	rm -rf tarballs deps-download-prime
+
+# Single-producer preflight: fetch every tarball any toolchain or python
+# build will need into tarballs/, before parallel workers start. Without
+# this, multiple `make crossmake` runs race on musl-cross-make's
+# sources/% downloads (sources/ is symlinked into the shared tarballs/
+# from each per-target tree).
+#
+# The musl-cross-make sources are populated by bootstrapping a one-shot
+# tree under deps-download-prime/, dropping our config.mak in (so the
+# right GCC_VER expands), and driving `make extract_all` once. That
+# resolves SRC_DIRS against our pinned versions and downloads exactly
+# the tarballs we need (gcc, binutils, musl, gmp, mpc, mpfr, linux,
+# config.{sub,guess}). The extracted source dirs left behind under
+# deps-download-prime/ are a benign disk cache; the next `make download`
+# is a no-op thanks to the .done stamp.
+download: $(EXTERNAL_TARBALLS) deps-download-prime/.done
+
+deps-download-prime/.done: tarballs/musl-cross-make-$(CROSSMAKE).tar.gz
+	mkdir -p deps-download-prime
+	tar -xzf $< -C deps-download-prime --strip-components=1
+	cp -a ./cross-make/hashes/.  deps-download-prime/hashes/
+	cp -a ./cross-make/patches/. deps-download-prime/patches/
+	cp ./cross-make/config.mak   deps-download-prime/config.mak
+	ln -sfn $(ROOT_DIR)tarballs  deps-download-prime/sources
+	cd deps-download-prime && env -u MAKEFLAGS -u MAKEOVERRIDES \
+		make TARGET=$(NATIVE_TARGET) extract_all
+	touch $@
+
+# Mirror locally-built toolchain tarballs to dev.mit.junic.kim. The
+# USE_CROSSMAKE=0 branch curls them back from
+# https://dev.mit.junic.kim/cross/<host-arch>/<target>-<tctype>.tgz, so
+# the layout has to match: one dir per host arch, one tarball per
+# (target, tctype) pair built on that host.
+upload-tarballs:
+	@uploaded=0; \
+	for t in tarballs/*-cross.tgz tarballs/*-native.tgz; do \
+		[ -f "$$t" ] || continue; \
+		echo "scp $$t -> mit.junic.kim:/srv/dev/cross/$(NATIVE_ARCH)/"; \
+		scp "$$t" mit.junic.kim:/srv/dev/cross/$(NATIVE_ARCH)/ || exit $$?; \
+		uploaded=$$((uploaded + 1)); \
+	done; \
+	echo "upload-tarballs: $$uploaded tarball(s) pushed to mit.junic.kim:/srv/dev/cross/$(NATIVE_ARCH)/"
 
 # Refresh hashes/<basename>.sha256 for every external tarball.
 update-hashes: SKIP_VERIFY := 1
@@ -149,7 +186,7 @@ tarballs/$(TARGET)-$(TCTYPE).tgz:
 crossmake: deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted
 
 ifeq ($(USE_CROSSMAKE),1)
-# manually compile the toolchain.
+# Build the toolchain from source via musl-cross-make.
 deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted: deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/.extracted
 	sed\
 		-e 's|^TARGET=.*|TARGET=$(ARCH)-linux-$(MUSLABI)|g'\
@@ -160,20 +197,17 @@ deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted: deps-$(TARGET)/mus
 		-e 's/\([jJz]x\)vf/\1f/g'\
 		-e 's|^LINUX_VER =.*|LINUX_VER = $(LINUX_VER)|g'\
 		deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/Makefile
-	# just enable c++ for now, makes it easier for other toolchains.
-	# sed -i\
-	# 	-e 's/--enable-languages=c,c++/--enable-languages=c/g'\
-	# 	-e 's|--enable-libstdcxx-time=rt||g'\
-	# 	deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/litecross/Makefile
-	# Unset MAKEFLAGS/MAKEOVERRIDES so our `ARCH=...` command-line override
-	# does not leak through MAKEFLAGS into musl's Makefile (which sets ARCH
-	# itself in config.mak). Without this, targets like `powerpc64le` break
-	# because musl uses arch/powerpc64/ while ARCH=powerpc64le is forced.
-	# Use `env -u` (truly unset) rather than `VAR=` (empty string); the
-	# empty-string form breaks downstream propagation of MAKEOVERRIDES, so
-	# nested invocations like the kernel headers install lose INSTALL_HDR_PATH.
+	# `env -u` (not VAR=) is required: empty MAKEFLAGS/MAKEOVERRIDES lets
+	# our `ARCH=...` leak into musl's Makefile and break archs like
+	# powerpc64le (musl uses arch/powerpc64/), and also clobbers
+	# INSTALL_HDR_PATH in the nested kernel-headers install.
 	cd deps-$(TARGET)/musl-cross-make-$(CROSSMAKE) && env -u MAKEFLAGS -u MAKEOVERRIDES make -j$(JOBS)
 	cd deps-$(TARGET)/musl-cross-make-$(CROSSMAKE) && env -u MAKEFLAGS -u MAKEOVERRIDES make install
+	# Make the install tree relocatable; see cross-make/post-install.sh.
+	./cross-make/post-install.sh \
+		"$(ROOT_DIR)deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)" \
+		"$(ARCH)-linux-$(MUSLABI)" \
+		"$(GCC_VER)"
 	touch $@
 else
 deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted: tarballs/$(TARGET)-$(TCTYPE).tgz
@@ -182,7 +216,7 @@ deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted: tarballs/$(TARGET)-$(TCTYPE).tgz
 	touch $@
 endif
 
-# stupid patcher script that takes a cross-compiled toolchain and gives us info.
+# Probe binary used to introspect the cross-compiled toolchain.
 .PHONY: patcher
 patcher:
 	mkdir -p build-$(TARGET)
@@ -198,14 +232,9 @@ tarballs/openssl-$(OPENSSL).tar.gz:
 deps-$(TARGET)/openssl-$(OPENSSL)/.extracted: tarballs/openssl-$(OPENSSL).tar.gz
 	mkdir -p deps-$(TARGET)
 	tar -xzf $< -C deps-$(TARGET)
-	# OpenSSL's Configure auto-disables `static`, `pic`, and `threads`
-	# when it sees `-static` in LDFLAGS. We pass `-static` deliberately
-	# for the static build, so we strip the entire perl block (anchored
-	# by content rather than line number so it survives upstream
-	# version bumps). The block looks like:
-	#   if (grep { $_ =~ /(?:^|\s)-static(?:\s|$$)/ } @{$$config{LDFLAGS}}) {
-	#       disable('static', 'pic', 'threads');
-	#   }
+	# OpenSSL's Configure disables static/pic/threads when it sees -static
+	# in LDFLAGS, which is exactly what we pass for a static build. Strip
+	# that block (matched by content so it survives version bumps).
 	cd deps-$(TARGET)/openssl-$(OPENSSL) && \
 		sed -i '/if (grep.*-static.*\$$config{LDFLAGS}/,/^}$$/d' ./Configure
 	touch $@
@@ -292,10 +321,9 @@ deps-$(TARGET)/zlib-$(ZLIB)/.extracted: tarballs/zlib-$(ZLIB).tar.gz
 
 build-$(TARGET)/lib/libz.a: deps-$(TARGET)/zlib-$(ZLIB)/.extracted deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted
 	mkdir -p build-$(TARGET)
-	# --disable-crcvx: zlib 1.3.2 detects s390x VX but its Makefile.in -> Makefile
-	# sed substitution has no rule for VGFMAFLAG, so crc32_vx.c is compiled
-	# without -mzarch/-march=z13 and the VX builtins fail. Skipping the VX
-	# CRC32 contrib avoids the upstream bug on s390x and is a no-op elsewhere.
+	# --disable-crcvx: works around an s390x VX detection bug in zlib
+	# 1.3.2 where crc32_vx.c gets compiled without -mzarch/-march=z13.
+	# No-op on every other arch.
 	cd deps-$(TARGET)/zlib-$(ZLIB) &&\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(TARGET) --eprefix=$(ROOT_DIR)build-$(TARGET) --static --disable-crcvx
 	cd deps-$(TARGET)/zlib-$(ZLIB) && ../../configure-wrapper.sh make -j$(JOBS)
@@ -459,13 +487,12 @@ tarballs/Python-$(PYTHON).tgz:
 deps-$(TARGET)/Python-$(PYTHON)/Modules/Setup.local: tarballs/Python-$(PYTHON).tgz
 	mkdir -p deps-$(TARGET)
 	tar -xzf $< -C deps-$(TARGET)
-	# monkey patched code for static symbols in ctypes
 	cp -r ./python/staticapi deps-$(TARGET)/Python-$(PYTHON)/Modules/staticapi
-	# Patch ctypes/__init__.py using content anchors (resilient to upstream
-	# refactors of CDLL._load_library / line-number drift across patch releases).
-	# 1. Inject StaticCDLL definitions before the CDLL class.
-	# 2. Override `pythonapi = PyDLL(None)` with the StaticCDLL-backed proxy.
-	# 3. Neuter the dlopen import (returns 0) so CDLL/PyDLL never call libdl.
+	# Patch ctypes/__init__.py via content anchors (line-number-stable
+	# across CPython patch releases):
+	#   1. inject StaticCDLL before CDLL
+	#   2. replace `pythonapi = PyDLL(None)` with the StaticCDLL proxy
+	#   3. stub `_dlopen` to a no-op so CDLL/PyDLL never call libdl
 	sed -i \
 		-e "/^################################################################$$/r ./python/ctypes_patch_1.py"\
 		-e "/^    pythonapi = PyDLL(None)$$/r ./python/ctypes_patch_2.py"\
@@ -473,15 +500,13 @@ deps-$(TARGET)/Python-$(PYTHON)/Modules/Setup.local: tarballs/Python-$(PYTHON).t
 		./deps-$(TARGET)/Python-$(PYTHON)/Lib/ctypes/__init__.py
 	cp -r ./python/Setup deps-$(TARGET)/Python-$(PYTHON)/Modules/Setup.local
 
-# you must distinguish between cross and native compilation.
-# apparently you need the native interpreter for cross compilation sob
-
+# Cross builds reuse the native interpreter (CPython's build needs a
+# runnable python at $(NATIVE_PATH)).
 PYTHON_DEPS = deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted\
 		openssl libffi libuuid libsqlite liblzma readline zlib libbz2 ncurses \
 		deps-$(TARGET)/Python-$(PYTHON)/Modules/Setup.local
 
 ifeq ($(TCTYPE),cross)
-# cross-compiling case; use python-specific flags.
 override NATIVE_PATH := python-static-$(NATIVE_TARGET)/bin/python$(PYTHONV)
 .PHONY: check_native
 check_native:
@@ -517,7 +542,7 @@ python-static-$(TARGET)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
 		deps-$(NATIVE_TARGET)/Python-$(PYTHON)/Makefile.pre\
 		> deps-$(TARGET)/Python-$(PYTHON)/Makefile.pre
 
-	# absolutely cursed patch to force atomics LMAO.
+	# Force -latomic on archs that need a libatomic for 64-bit atomics.
 	if echo "$(ARCH)" | grep -E "i[3-6]86|arm[^6]?|mips[^6]?|microblaze|sh|m68k|or1k|riscv(32|64)"; then\
 		sed -i\
 			-e '/^SYSLIBS=.*/ s/$$/ -latomic/g'\
@@ -533,7 +558,7 @@ python-static-$(TARGET)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
 	test -f ./python/pyconfig/$(TARGET)-patches.h
 	cat ./python/pyconfig/$(TARGET)-patches.h >> deps-$(TARGET)/Python-$(PYTHON)/pyconfig.h;
 
-	# monkey patch gcc128
+	# Drop -DHAVE_UINT128_T=1 if the per-arch pyconfig patches undefine it.
 	if grep '#undef HAVE_GCC_UINT128_T' ./python/pyconfig/$(TARGET)-patches.h; then\
 		sed -i\
 			-e 's|-DHAVE_UINT128_T=1||g'\
@@ -542,7 +567,7 @@ python-static-$(TARGET)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
 			-e 's|-DHAVE_UINT128_T=1||g'\
 			deps-$(TARGET)/Python-$(PYTHON)/Makefile ;\
 	fi
-	# monkey patch 32-bit
+	# Same idea, but for the 32-bit CONFIG_64/CONFIG_32 toggle.
 	if grep '32-bit' ./python/pyconfig/$(TARGET)-patches.h; then\
 		sed -i\
 			-e 's|-DCONFIG_64=1|-DCONFIG_32=1|g'\
@@ -561,19 +586,17 @@ python-static-$(TARGET)/bin/python$(PYTHONV): check_native $(PYTHON_DEPS)
 	rsync -a --exclude='__pycache__/' \
 		python-static-$(NATIVE_TARGET)/lib/python$(PYTHONV) \
 		python-static-$(TARGET)/lib
-	# sysconfig bullshit
+	# Rename _sysconfigdata for the cross target so sysconfig finds it.
 	mv python-static-$(TARGET)/lib/python$(PYTHONV)/_sysconfigdata__linux_$(NATIVE_TARGET).py\
 		python-static-$(TARGET)/lib/python$(PYTHONV)/_sysconfigdata__linux_$(TARGET).py
 	sed -i \
 		"s/$(NATIVE_TARGET)/$(TARGET)/g"\
 		python-static-$(TARGET)/lib/python$(PYTHONV)/_sysconfigdata__linux_$(TARGET).py
 
-	# build the actual binary
 	cd deps-$(TARGET)/Python-$(PYTHON) && PYTHON_BUILD=1 ../../configure-wrapper.sh make -j$(JOBS) build/python
 	cp -r deps-$(TARGET)/Python-$(PYTHON)/build/python python-static-$(TARGET)/bin/python$(PYTHONV)
 	ln -sf python$(PYTHONV) python-static-$(TARGET)/bin/python3
 else
-# native case; basically just stub everyting.
 python-static-$(TARGET)/bin/python$(PYTHONV): $(PYTHON_DEPS)
 	cd deps-$(TARGET)/Python-$(PYTHON) &&\
 		PYTHON="1"\
