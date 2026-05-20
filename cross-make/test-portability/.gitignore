@@ -1,4 +1,3 @@
 # Toolchain tarball under test is too big to track in git; regenerate
-# from a current deps-x86_64-linux-musl/ tree. See proof.sh and
-# ../../ai/PORTABILITY_PROOF.md.
-x86_64-linux-musl-*.tgz
+# from deps-<arch>-linux-musl/. See proof.sh and ../../ai/PORTABILITY_PROOF.md.
+*-linux-musl-native.tgz

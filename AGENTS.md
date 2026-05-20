@@ -120,20 +120,22 @@ has to dlopen `liblto_plugin.so`. The end-to-end proof lives in
 ```
 
 That builds a `debian:stable-slim` "alien" image with no compiler in
-it (only `make`/`file`/`binutils`), extracts the toolchain tarball at
-`cross-make/test-portability/x86_64-linux-musl-native.tgz` into `/opt`,
-then compiles + runs three nontrivial programs (C, C++ with libstdc++,
-and a two-TU LTO build via `-flto -fuse-linker-plugin
+it (only `make`/`file`/`binutils`), extracts the host-native toolchain
+tarball (`<uname -m>-linux-musl-native.tgz`, e.g. x86_64 or aarch64)
+into `/opt`, then compiles + runs three nontrivial programs (C, C++
+with libstdc++, and a two-TU LTO build via `-flto -fuse-linker-plugin
 -fno-fat-lto-objects`), including a negative control that links the
 slim LTO objects *without* the plugin to confirm the link actually
 fails. Re-run after touching `wrapper.c`, `post-install.sh`, or after
-a `GCC_VER` / `BINUTILS` bump. The bundled toolchain tarball is
-regenerated from a current `deps-x86_64-linux-musl/` tree with:
+a `GCC_VER` / `BINUTILS` bump. `proof.sh` packs the tarball from
+`deps-<arch>-linux-musl/<arch>-linux-musl-native/` when missing; or
+regenerate explicitly with:
 
 ```sh
 docker compose exec -T spython sh -lc \
-  'cd /workspace && tar -czf cross-make/test-portability/x86_64-linux-musl-native.tgz \
-     -C deps-x86_64-linux-musl x86_64-linux-musl-native'
+  'cd /workspace && H=$(uname -m) && \
+   tar -czf cross-make/test-portability/${H}-linux-musl-native.tgz \
+     -C deps-${H}-linux-musl ${H}-linux-musl-native'
 ```
 
 Full writeup, including expected output, falsification controls, and
