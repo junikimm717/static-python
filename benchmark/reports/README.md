@@ -5,20 +5,26 @@ report's own `## Analysis` carries the mechanism story and the per-run
 hypothesis updates; this file just tracks **what holds across all runs**
 so a fresh reader can skip to the right report.
 
-Last updated: **2026-05-19** -- 9 benchmark reports + 1 perf follow-up,
-across 4 hosts (3 x86_64, 4 aarch64). Four PGO+LTO data points span
-four µarchs (M4 Pro, Neoverse-N1, Zen 5, Cascade Lake) and both ISAs.
+Last updated: **2026-05-20** -- 10 benchmark reports + 1 perf follow-up,
+across 4 hosts (3 x86_64, 4 aarch64; Neoverse-N1 now has two
+PGO+LTO datapoints separated by a `configure-wrapper.sh` flag tweak).
+Five PGO+LTO data points span four µarchs (M4 Pro, Neoverse-N1, Zen 5,
+Cascade Lake) and both ISAs.
 Update on every new report; rule lives in [`AGENTS.md`](../../AGENTS.md).
 
 ## TL;DR
 
 - **Recipe is now PGO + whole-program `-flto-partition=none` on both
   sides.** Reports older than `2026-05-17T2146Z_aarch64.md` are pre-PGO
-  and carry a banner. The most recent x86_64 run
-  ([0223Z](./2026-05-19T0223Z_x86_64.md)) adds `-fuse-linker-plugin
-  -fno-fat-lto-objects` on the static side via a `liblto_plugin.so`-
-  enabled musl-cross gcc 15.1.0 host toolchain; see that report for
-  the (largely null) per-row delta.
+  and carry a banner. The 2026-05-19 `configure-wrapper.sh` tweak
+  (commit `6a73c5c`) swapped static-side `-flto -fno-fat-lto-objects`
+  for `-flto=auto` (dropping `-fno-fat-lto-objects`). On x86_64
+  ([0223Z](./2026-05-19T0223Z_x86_64.md), with the *old* wrapper) the
+  per-row delta was largely null and binary grew +0.9 MB; on aarch64
+  ([0013Z](./2026-05-20T0013Z_aarch64.md), with the *new* wrapper) the
+  per-row delta is again null but binary grew +1.99 MB / +14.5%
+  same-host vs the 2359Z baseline. Same-host A/B (revert wrapper,
+  rebuild, compare) is now the cleanest test; see 0013Z's analysis.
 - **Static beats dynamic by 7-20% CPU geomean** across the four PGO+LTO
   hosts (N1 1.07x, M4 Pro 1.11x, Zen 5 1.18x, Cascade Lake 1.20x).
   Startup geomean 1-13% (Zen 5 1.01x is the bottom of spread because
@@ -117,6 +123,17 @@ linked into the same ELF.
    that bundled in. Same run should compare `size -A` + `nm --size-
    sort` to attribute the +0.9 MB binary growth to `.text`-from-archives
    vs PGO counters.
+3a. **`STATIC_FAT_LTO_OBJECTS` A/B on Neoverse-N1.** Mirror of #3 but
+   the other direction and on aarch64. Revert
+   `configure-wrapper.sh` `CFLAGS`/`LDFLAGS` to the 2359Z-era
+   `-flto -flto-partition=none -fuse-linker-plugin -fno-fat-lto-objects`,
+   rebuild, re-bench, compare `size -A` and `nm --size-sort` against
+   [0013Z](./2026-05-20T0013Z_aarch64.md). Cleanest test of whether the
+   2026-05-19 `configure-wrapper.sh` tweak caused the +1.99 MB static
+   binary growth (linker-plugin reads fat objects differently) or PGO
+   profile variance did. Per-row CPU drift between 2359Z and 0013Z was
+   ≤1.5%, so if A/B binary size returns to ~13.8 MB the new wrapper is
+   pure dead weight and should be reverted.
 4. **Real-PMU `perf stat` on `fib_recursive` and `json_roundtrip`.**
    Cascade Lake or Zen 5; both now have a banked PGO+LTO baseline.
    AMD doesn't fence `br_indirect_spec`/`br_return_spec`/`l1i_*`;
@@ -151,6 +168,7 @@ linked into the same ELF.
 | [`2026-05-18T0000Z_x86_64.md`](./2026-05-18T0000Z_x86_64.md)                         | Local Ryzen AI 9 HX 370 (Zen 5)          | **PGO+LTO**     | First x86_64 PGO+LTO; resolves 1924Z `json_roundtrip`; new `stdlib` regression |
 | [`2026-05-18T0024Z_aarch64_perf.md`](./2026-05-18T0024Z_aarch64_perf.md)             | Azure Neoverse-N1                        | perf follow-up  | `perf stat` on `fib_recursive` + `listcomp`; falsifies L1i hypothesis on both |
 | [`2026-05-19T0223Z_x86_64.md`](./2026-05-19T0223Z_x86_64.md)                         | Azure Xeon Platinum 8370C (Cascade Lake) | **PGO+LTO**     | Re-run on same host as deleted 2322Z; CPU geomean 1.20x reproduced; `fib_recursive` deepened to 0.85x; `stdlib` startup 1.14x confirmed |
+| [`2026-05-20T0013Z_aarch64.md`](./2026-05-20T0013Z_aarch64.md)                       | Azure Neoverse-N1                        | **PGO+LTO**     | Same host as 2359Z; first run on new `configure-wrapper.sh` flags (`-flto=auto`, no `-fno-fat-lto-objects`); +1.99 MB static binary for zero per-row CPU change; A/B revert proposed |
 
 ## Checklist when adding a new report
 

@@ -59,6 +59,16 @@ between commands.
   pass `-k` for keep-going. Default skips any platform whose
   `tarballs/<platform>-<tctype>.tgz` already exists; pass `--force` to
   rebuild. Plan for a multi-hour wall clock with gcc 15.
+- **Static interpreter, all archs**: `./parallel-pythons.pl` from inside
+  the container, inside a tmux session. Builds the native interpreter serially
+  first (cross targets need it), then supervises N concurrent cross builds
+  (default 4 workers x -j8 each), prefixes `make download`, and writes
+  per-platform logs to `build-logs/python-static-<platform>.log`. Default is
+  fail-fast; pass `-k` for keep-going. Default skips any platform whose
+  `python-static-<platform>/bin/python<PYTHONV>` already exists; pass
+  `--force` to rebuild. Expects prebuilt toolchain tarballs (`USE_CROSSMAKE=0`,
+  the default); pass `--use-crossmake` to build toolchains inline. Plan for a
+  multi-hour wall clock.
 - **Dynamic baseline (x86_64 / aarch64 / whichever host you're on)**:
   ```sh
   docker compose exec -T spython sh -c 'cd /workspace && ./benchmark/dynamic-build.sh'
@@ -84,6 +94,16 @@ Build artefacts you can safely nuke if you need to re-do work:
   intentionally preserves it; `make distclean` removes it.
 - *Never* nuke `hashes/` -- those are the trusted checksums for every
   externally fetched tarball.
+
+## Docker
+
+PLEASE maximally use docker for all your builds above. You might occasionally
+run into permission denied errors if you try to stream logs into
+build-logs and that directory happens to be owned by root.
+
+If you absolutely must use the host system, you need all the dependencies
+specified in the Dockerfile. Furthermore, you must check that the entire
+filesystem is owned by you before proceeding.
 
 ## Portability check
 
@@ -326,4 +346,4 @@ Don't commit unless the user explicitly asks. Even then:
 | toolchain change | as above, plus banner from the new binary mentions the right gcc version (`python3 -c 'import sys; print(sys.version)'`); if `GCC_VER` moved, both the top-level `Makefile` and `cross-make/config.mak` were bumped together |
 | benchmark code change | report renders, analysis explains what the new metric is measuring and why the baseline numbers stayed put (or didn't), `benchmark/reports/README.md` updated |
 | cross-arch toolchain fan-out | `parallel-toolchains.pl` exits clean, every arch in `supported.txt` has a `tarballs/<arch>-<tctype>.tgz`, and `build-logs/toolchain-<arch>.log` ends in `EXIT_CODE=0` |
-| cross-arch interpreter fan-out | toolchain tarballs as above, plus a static interpreter built per arch (currently a separate manual loop -- no supervisor yet) and at least one non-x86_64 arch benchmarked |
+| cross-arch interpreter fan-out | `parallel-pythons.pl` exits clean, every arch in `supported.txt` has `python-static-<platform>/bin/python<PYTHONV>`, and at least one non-x86_64 arch benchmarked |
