@@ -22,6 +22,21 @@ echo "====================="
 echo "configure-wrapper.sh: Using target $TARGET in configuration $TCTYPE..."
 echo "====================="
 
+case "${DEBUG_SYMBOLS:-0}" in
+  0)
+    DEBUG_CFLAGS=""
+    STRIP_LDFLAGS="-s"
+    ;;
+  1)
+    DEBUG_CFLAGS="-g"
+    STRIP_LDFLAGS=""
+    ;;
+  *)
+    echo "DEBUG_SYMBOLS must be either 0 or 1 (set to '${DEBUG_SYMBOLS:-}')! Exiting..."
+    exit 1
+    ;;
+esac
+
 # Hand-roll what CPython's `--with-lto` would inject on gcc with
 # --disable-shared: -flto=auto -flto-partition=none -fuse-linker-plugin.
 # We don't actually pass --with-lto because it also wraps the PGO-instrument
@@ -31,7 +46,7 @@ echo "====================="
 # we avoid building fat sub-deps we'd otherwise never need.
 export LDFLAGS="-Wl,--export-dynamic -static -no-pie \
   -flto=auto -flto-partition=none -fuse-linker-plugin \
-  -s --static -L$ROOT/build-$TARGET/lib \
+  $STRIP_LDFLAGS --static -L$ROOT/build-$TARGET/lib \
   -L$ROOT/build-$TARGET/lib64\
   -L$DEPS_DIR/$TARGET-$TCTYPE/$TARGET/lib\
   -Wl,--gc-sections -Wl,-O1 -Wl,--as-needed"
@@ -42,7 +57,7 @@ export LINKFORSHARED=" "
 export CFLAGS="-I$ROOT/build-$TARGET/include \
   -I$ROOT/build-$TARGET/include/ncursesw \
   -I$ROOT/build-$TARGET/include/uuid \
-  -O3 -flto=auto -flto-partition=none -fuse-linker-plugin \
+  -O3 $DEBUG_CFLAGS -flto=auto -flto-partition=none -fuse-linker-plugin \
   -Wno-error -no-pie -w -pipe -ffunction-sections -fdata-sections"
 
 # Pin pkg-config to our prefix so configure scripts can't leak into

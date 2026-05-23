@@ -62,6 +62,12 @@ override NATIVE_ARCH := $(shell uname -m)
 override NATIVE_TARGET := $(NATIVE_ARCH)-linux-musl
 
 USE_CROSSMAKE := 0
+# Set DEBUG_SYMBOLS=1 for DWARF info in perf annotate/gdb builds. The default
+# keeps release-style builds stripped and omits -g.
+DEBUG_SYMBOLS ?= 0
+ifeq ($(filter 0 1,$(DEBUG_SYMBOLS)),)
+$(error DEBUG_SYMBOLS must be 0 or 1)
+endif
 
 ifeq ($(shell grep '$(TARGET)' ./supported.txt),)
 $(error Platform '$(TARGET)' is not supported)
@@ -83,6 +89,7 @@ else
 USE_PGO ?= 0
 endif
 $(info USE_PGO=$(USE_PGO))
+$(info DEBUG_SYMBOLS=$(DEBUG_SYMBOLS))
 
 # `-x test_re`: skips locale tests that fail on musl (no non-C byte-level
 # case folding); same workaround Alpine apk uses.
@@ -97,6 +104,7 @@ export TCTYPE
 export ARCH
 export NATIVE_ARCH
 export MUSLABI
+export DEBUG_SYMBOLS
 
 .PHONY: python3 clean distclean update-hashes upload-tarballs download
 

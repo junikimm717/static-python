@@ -47,11 +47,6 @@ if [ ! -f "$SRC" ]; then
     exit 1
 fi
 
-echo ">>> installing Alpine -dev headers for python ${PYTHON} on ${HOST_ARCH}"
-apk add --no-cache \
-    openssl-dev zlib-dev sqlite-dev libffi-dev bzip2-dev xz-dev \
-    ncurses-dev readline-dev util-linux-dev expat-dev linux-headers
-
 echo ">>> extracting Python-${PYTHON}.tgz"
 rm -rf "$BUILD" "$PREFIX"
 mkdir -p "$(dirname "$BUILD")"

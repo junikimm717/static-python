@@ -1,5 +1,6 @@
 services:
   spython:
+    image: ghcr.io/junikimm717/static-python/spython:latest
     build:
       context: .
       dockerfile: Dockerfile
