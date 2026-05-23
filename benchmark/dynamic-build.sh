@@ -62,18 +62,26 @@ if [ "${DYNAMIC_NO_PGO:-0}" = "1" ]; then
 else
     OPT_FLAGS="--enable-optimizations --with-lto"
 fi
+if [ -n "${EXTRA_CFLAGS:-}" ]; then
+    export CFLAGS="$EXTRA_CFLAGS"
+    echo ">>> EXTRA_CFLAGS=$EXTRA_CFLAGS"
+fi
+if [ -n "${EXTRA_LDFLAGS:-}" ]; then
+    export LDFLAGS="$EXTRA_LDFLAGS"
+    echo ">>> EXTRA_LDFLAGS=$EXTRA_LDFLAGS"
+fi
 # LDFLAGS_NODIST bakes the install-time libpython directory into the binary
 # as an rpath, so the dynamic interpreter is self-contained -- no
 # LD_LIBRARY_PATH dance for the benchmark harness or subprocess spawns.
-LDFLAGS_NODIST="-Wl,-rpath,${PREFIX}/lib" \
-    ./configure \
-        --prefix="$PREFIX" \
-        --enable-shared \
-        $OPT_FLAGS \
-        --without-ensurepip \
-        --with-system-ffi --with-system-expat \
-        --enable-loadable-sqlite-extensions \
-        --with-computed-gotos
+export LDFLAGS_NODIST="-Wl,-rpath,${PREFIX}/lib"
+./configure \
+    --prefix="$PREFIX" \
+    --enable-shared \
+    $OPT_FLAGS \
+    --without-ensurepip \
+    --with-system-ffi --with-system-expat \
+    --enable-loadable-sqlite-extensions \
+    --with-computed-gotos
 
 echo ">>> building"
 # `-x test_re` skips two locale tests that fail on musl and abort PGO.

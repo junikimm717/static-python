@@ -68,6 +68,8 @@ DEBUG_SYMBOLS ?= 0
 ifeq ($(filter 0 1,$(DEBUG_SYMBOLS)),)
 $(error DEBUG_SYMBOLS must be 0 or 1)
 endif
+EXTRA_CFLAGS ?=
+EXTRA_LDFLAGS ?=
 
 ifeq ($(shell grep '$(TARGET)' ./supported.txt),)
 $(error Platform '$(TARGET)' is not supported)
@@ -105,6 +107,8 @@ export ARCH
 export NATIVE_ARCH
 export MUSLABI
 export DEBUG_SYMBOLS
+export EXTRA_CFLAGS
+export EXTRA_LDFLAGS
 
 .PHONY: python3 clean distclean update-hashes upload-tarballs download
 
