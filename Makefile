@@ -134,6 +134,8 @@ deps-download-prime/.done: tarballs/musl-cross-make-$(CROSSMAKE).tar.gz
 	cp -a ./cross-make/patches/. deps-download-prime/patches/
 	cp ./cross-make/config.mak   deps-download-prime/config.mak
 	ln -sfn $(ROOT_DIR)tarballs  deps-download-prime/sources
+	sed -i -e 's|^LINUX_VER =.*|LINUX_VER = $(LINUX_VER)|g' \
+		deps-download-prime/Makefile
 	cd deps-download-prime && env -u MAKEFLAGS -u MAKEOVERRIDES \
 		make TARGET=$(NATIVE_TARGET) extract_all
 	touch $@
