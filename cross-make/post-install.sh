@@ -99,9 +99,14 @@ resolve_chain_basename() {
 	basename "$cur"
 }
 
+has_program_interpreter() {
+	readelf -l "$1" 2>/dev/null | grep -q 'Requesting program interpreter'
+}
+
 # 3) Shadow dynamic ELF executables in $dir, then re-point any symlinks
-# that resolved to one of them. Pass 1 only matches executables; .so
-# files (e.g. liblto_plugin.so) are left in place and patchelf'd later.
+# that resolved to one of them. A program interpreter is the stable ELF
+# signal for a runnable host binary; shared libraries and plugins must stay
+# loadable at their public paths.
 shadow_dir() {
 	dir=$1
 	[ -d "$dir" ] || return 0
@@ -110,15 +115,12 @@ shadow_dir() {
 	find "$dir" -maxdepth 1 -type f -print | while IFS= read -r f; do
 		[ "$f" = "$dir/.real" ] && continue
 		case "$f" in *"/.real"|*"/.real/"*) continue ;; esac
-		desc=$(file -b "$f" 2>/dev/null || true)
-		case "$desc" in
-			*"ELF"*"executable"*"dynamically linked"*|*"ELF"*"pie executable"*"dynamically linked"*)
-				name=$(basename "$f")
-				mv -f "$f" "$dir/.real/$name"
-				cp "$WRAPPER_BIN" "$f"
-				chmod 0755 "$f"
-				;;
-		esac
+		if has_program_interpreter "$f"; then
+			name=$(basename "$f")
+			mv -f "$f" "$dir/.real/$name"
+			cp "$WRAPPER_BIN" "$f"
+			chmod 0755 "$f"
+		fi
 	done
 
 	# Iterate until quiescent so chains like cc -> gcc -> gcc-15 all get
@@ -132,16 +134,13 @@ shadow_dir() {
 			[ -n "$tname" ] || continue
 			[ -e "$dir/$tname" ] || continue
 			[ -e "$dir/.real/$tname" ] || continue
-			tdesc=$(file -b "$dir/$tname" 2>/dev/null || true)
-			case "$tdesc" in
-				*"ELF"*"statically linked"*|*"ELF"*"static-pie linked"*)
-					rm -f "$s"
-					cp "$WRAPPER_BIN" "$s"
-					chmod 0755 "$s"
-					ln -sf "$tname" "$dir/.real/$name"
-					echo CONVERTED
-					;;
-			esac
+			if has_program_interpreter "$dir/.real/$tname"; then
+				rm -f "$s"
+				cp "$WRAPPER_BIN" "$s"
+				chmod 0755 "$s"
+				ln -sf "$tname" "$dir/.real/$name"
+				echo CONVERTED
+			fi
 		done | grep -q CONVERTED || break
 	done
 }
@@ -178,6 +177,18 @@ set_rpath_dir "$INSTALL/$TARGET/bin"                               '$ORIGIN/../.
 # 5) liblto_plugin.so: RPATH it to runtime/, and add a bfd-plugins
 # symlink so ld.bfd autoloads it without an explicit --plugin.
 PLUGIN=$INSTALL/libexec/gcc/$TARGET/$GCC_VER/liblto_plugin.so
+REAL_PLUGIN=$(dirname "$PLUGIN")/.real/$(basename "$PLUGIN")
+if [ -f "$REAL_PLUGIN" ] && file -b "$REAL_PLUGIN" 2>/dev/null | grep -q 'shared object'; then
+	plugin_desc=$(file -b "$PLUGIN" 2>/dev/null || true)
+	case "$plugin_desc" in
+		*"shared object"*) ;;
+		*)
+			echo "post-install.sh: restoring liblto_plugin.so from .real/ ..."
+			cp -f "$REAL_PLUGIN" "$PLUGIN"
+			chmod 0755 "$PLUGIN"
+			;;
+	esac
+fi
 if [ -f "$PLUGIN" ] && file -b "$PLUGIN" 2>/dev/null | grep -q 'shared object'; then
 	echo "post-install.sh: configuring liblto_plugin.so ..."
 	patchelf --set-rpath '$ORIGIN/../../../../runtime' "$PLUGIN"
