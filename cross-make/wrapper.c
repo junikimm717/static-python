@@ -40,6 +40,58 @@ static int file_exists(const char *p) {
 	return stat(p, &st) == 0;
 }
 
+/*
+ * Follow the symlink chain at `start` to its final target and write that
+ * target's basename into `out`. Mirrors resolve_chain_basename() in
+ * post-install.sh: bounded depth to defend against cycles, and relative
+ * link targets are resolved against the link's own directory.
+ *
+ * If `start` is not a symlink (or does not exist), `out` ends up as
+ * basename(start), so callers can compare against the original name to
+ * detect "no alias to follow".
+ */
+static void resolve_chain_basename(const char *start, char *out,
+		size_t outsz) {
+	char cur[PATH_MAX];
+	strncpy(cur, start, sizeof(cur) - 1);
+	cur[sizeof(cur) - 1] = '\0';
+
+	for (int depth = 16; depth > 0; depth--) {
+		struct stat st;
+		if (lstat(cur, &st) != 0 || !S_ISLNK(st.st_mode))
+			break;
+		char link[PATH_MAX];
+		ssize_t m = readlink(cur, link, sizeof(link) - 1);
+		if (m < 0)
+			break;
+		link[m] = '\0';
+		if (link[0] == '/') {
+			strncpy(cur, link, sizeof(cur) - 1);
+			cur[sizeof(cur) - 1] = '\0';
+		} else {
+			char dir[PATH_MAX];
+			strncpy(dir, cur, sizeof(dir) - 1);
+			dir[sizeof(dir) - 1] = '\0';
+			char *sl = strrchr(dir, '/');
+			if (sl)
+				*sl = '\0';
+			else
+				dir[0] = '\0';
+			char joined[PATH_MAX];
+			if (snprintf(joined, sizeof(joined), "%s/%s", dir, link)
+					>= (int)sizeof(joined))
+				break;
+			strncpy(cur, joined, sizeof(cur) - 1);
+			cur[sizeof(cur) - 1] = '\0';
+		}
+	}
+
+	const char *base = strrchr(cur, '/');
+	base = base ? base + 1 : cur;
+	strncpy(out, base, outsz - 1);
+	out[outsz - 1] = '\0';
+}
+
 int main(int argc, char **argv, char **envp) {
 	char self[PATH_MAX];
 	ssize_t n = readlink("/proc/self/exe", self, sizeof(self) - 1);
@@ -75,6 +127,36 @@ int main(int argc, char **argv, char **envp) {
 			>= (int)sizeof(real_binary)) {
 		fprintf(stderr, "tc-wrapper: real-binary path too long\n");
 		return 127;
+	}
+	if (!file_exists(real_binary)) {
+		/*
+		 * The invoked name may be a consumer-created alias added after
+		 * install (e.g. `strip -> x86_64-linux-musl-strip`), for which
+		 * post-install.sh created no matching `.real/` entry. If a
+		 * sibling alias of the same name exists, follow its symlink
+		 * chain to the final basename and retry `.real/<final>`.
+		 */
+		char alias_path[PATH_MAX];
+		if (snprintf(alias_path, sizeof(alias_path), "%s/%s",
+				self_dir, invoked_base)
+				< (int)sizeof(alias_path)) {
+			char final_base[PATH_MAX];
+			resolve_chain_basename(alias_path, final_base,
+				sizeof(final_base));
+			if (final_base[0]
+				&& strcmp(final_base, invoked_base) != 0) {
+				char alt[PATH_MAX];
+				if (snprintf(alt, sizeof(alt), "%s/.real/%s",
+						self_dir, final_base)
+						< (int)sizeof(alt)
+					&& file_exists(alt)) {
+					strncpy(real_binary, alt,
+						sizeof(real_binary) - 1);
+					real_binary[sizeof(real_binary) - 1] =
+						'\0';
+				}
+			}
+		}
 	}
 	if (!file_exists(real_binary)) {
 		fprintf(stderr, "tc-wrapper: missing real binary: %s\n",
