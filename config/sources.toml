@@ -19,17 +19,9 @@ urls = [
 ]
 sha256 = "deae7c80cba99c4b4f940ecadb3c3338b13cb77418409238e57d7f31f2a3b736"
 
-[[source.openssl.edits]]
-file = "Configure"
-anchor = "disable('static', 'pic', 'threads');"
-action = "replace_line"
-text = "    # staticpy: -static in LDFLAGS is deliberate."
-why = """
-Configure treats -static in LDFLAGS as a signal to turn off static, pic and \
-threads -- the opposite of what we mean by it. Neutering the one call inside \
-the guard is stable across patch releases; deleting the whole if-block (what \
-the Makefile's sed did) depends on brace layout.\
-"""
+# Configure reads -static in LDFLAGS as a signal to turn static, pic and
+# threads *off* -- the opposite of what we mean by it.
+patches = ["0001-keep-static-with-static-ldflags.diff"]
 
 [source.libffi]
 name = "libffi"
@@ -97,48 +89,11 @@ topdir = "bzip2-1.0.8"
 urls = ["https://sourceware.org/pub/bzip2/bzip2-1.0.8.tar.gz"]
 sha256 = "ab5a03176ee106d3f0fa90e381da478ddae405918153cca248e682cd0c4a2269"
 
-# bzip2 has no configure. Its Makefile hardcodes a host toolchain, so every
-# assignment we need to come from the environment has to stop being a makefile
-# assignment first: make lets the environment beat a builtin default but never
-# an explicit `VAR=` in the makefile.
-[[source.bzip2.edits]]
-file = "Makefile"
-anchor = "CC=gcc"
-action = "delete_line"
-why = "Hardcoded host gcc; the cross CC is exported by the environment."
+# bzip2 has no configure, and its Makefile hardcodes a host toolchain. make
+# lets the environment beat a builtin default but never an explicit `VAR=`,
+# so those assignments have to go before the cross toolenv can win.
+patches = ["0001-honour-external-toolchain.diff"]
 
-[[source.bzip2.edits]]
-file = "Makefile"
-anchor = "AR=ar"
-action = "delete_line"
-why = "Must be the toolchain's gcc-ar so LTO archives carry their plugin index."
-
-[[source.bzip2.edits]]
-file = "Makefile"
-anchor = "RANLIB=ranlib"
-action = "delete_line"
-why = "Same as AR: a host ranlib cannot index slim LTO objects."
-
-[[source.bzip2.edits]]
-file = "Makefile"
-anchor = "CFLAGS=-Wall -Winline -O2 -g $(BIGFILES)"
-action = "delete_line"
-why = "Would drop the profile's -O3/-flto and re-add -g on a stripped build."
-
-[[source.bzip2.edits]]
-file = "Makefile"
-anchor = "LDFLAGS="
-action = "delete_line"
-why = "Empties the -static/--gc-sections link flags the profile sets."
-
-[[source.bzip2.edits]]
-file = "Makefile"
-anchor = "PREFIX=/usr/local"
-action = "delete_line"
-why = "install would write outside the artifact; PREFIX comes from the job."
-
-# GitHub's tag archive, not the kernel.org release tarball. They are different
-# files with different checksums; do not "mirror" one with the other.
 [source.util-linux]
 name = "util-linux"
 version = "2.41"

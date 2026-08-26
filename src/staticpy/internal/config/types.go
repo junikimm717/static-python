@@ -26,9 +26,16 @@ type Source struct {
 	Edits []Edit `toml:"edits"`
 }
 
-// Edit is a content-anchored source fixup. Unlike a diff it survives an
-// upstream patch release, and unlike sed it fails loudly when its anchor moves:
-// a build that silently skipped an edit ships a subtly wrong interpreter.
+// Edit is a content-anchored source fixup, and is the exception rather than the
+// tool of choice: patches/ holds real diffs, and `patch` already fails loudly
+// when its context moves.
+//
+// Reach for an Edit only when the edit must survive an upstream version bump
+// unreviewed. Every source here is sha256-pinned, so for a given pin a diff can
+// never spuriously fail — which means a diff that breaks on a bump is a signal
+// worth having, not a cost. The one place that trade goes the other way is the
+// ctypes injection: CPython patch releases are frequent and the injection is
+// mechanical, so an anchor (one line) beats diff context (three) there.
 type Edit struct {
 	File   string `toml:"file"`
 	Anchor string `toml:"anchor"`
