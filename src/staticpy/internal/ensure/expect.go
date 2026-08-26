@@ -20,9 +20,20 @@ func ExpectKey(triple, runner string) string { return triple + ":" + runner }
 // LookupExpect resolves the expectations for (triple, runner), merging the
 // triple-wide entries with the runner-specific ones. A bare triple key applies
 // to both runners; "<triple>:qemu" applies only under qemu.
+// ExpectAll and ExpectStatic are scopes rather than triples. Every interpreter
+// staticpy builds is static, so ExpectStatic always applies; it is a separate
+// key only so the same file can describe a dynamic build that does not have to
+// skip the dlopen-dependent tests.
+const (
+	ExpectAll    = "all"
+	ExpectStatic = "static"
+)
+
+// Keys are resolved widest-first, so a musl divergence is written once rather
+// than repeated for eleven targets.
 func LookupExpect(all map[string]config.TestExpect, triple, runner string) config.TestExpect {
 	var out config.TestExpect
-	for _, key := range []string{triple, ExpectKey(triple, runner)} {
+	for _, key := range []string{ExpectAll, ExpectStatic, triple, ExpectKey(triple, runner)} {
 		e, ok := all[key]
 		if !ok {
 			continue

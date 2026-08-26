@@ -249,6 +249,9 @@ func (c *Config) validateBundles() error {
 			}
 		}
 	}
+	if err := c.validateExpect(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -293,4 +296,26 @@ func sortedKeys[V any](m map[string]V) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// An expect key names a scope or a target, and a typo in one is otherwise
+// invisible: the lookup simply finds nothing and every test it meant to cover
+// is reported as an unexpected failure.
+func (c *Config) validateExpect() error {
+	for _, key := range sortedKeys(c.Expect) {
+		name := key
+		if triple, runner, ok := strings.Cut(key, ":"); ok {
+			if runner != "native" && runner != "qemu" {
+				return fmt.Errorf("config: expect key %q: runner must be \"native\" or \"qemu\"", key)
+			}
+			name = triple
+		}
+		if name == "all" || name == "static" {
+			continue
+		}
+		if _, ok := c.Targets[name]; !ok {
+			return fmt.Errorf("config: expect key %q names no target; use a triple from targets.toml, or the scopes \"all\" or \"static\"", key)
+		}
+	}
+	return nil
 }
