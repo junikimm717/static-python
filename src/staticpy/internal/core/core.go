@@ -117,6 +117,11 @@ type Env struct {
 	// dev box and reproducible nowhere.
 	Hermetic bool
 
+	// Host is the build machine's triple. Recipes need it to reach a compiler
+	// whose output runs here, for packages that build a helper and then execute
+	// it mid-build.
+	Host string
+
 	// Offline serves only what dist/src already holds. It rides on Env rather
 	// than a package global so a test can run two configurations at once.
 	Offline bool

@@ -347,6 +347,14 @@ func (te *toolenv) pkgConfigPath() string {
 			filepath.Join(v, "lib64", "pkgconfig"),
 			filepath.Join(v, "share", "pkgconfig"))
 	}
+	if len(dirs) == 0 {
+		// An *empty* PKG_CONFIG_LIBDIR does not mean "search nothing", it means
+		// "use the compiled-in default", which is the host's /usr/lib/pkgconfig.
+		// That is how pyhost -- a build with no sysroot at all -- came to detect
+		// the host's zlib, define USE_ZLIB_CRC32, and then fail compiling
+		// binascii.c against a toolchain that has no zlib.h.
+		return filepath.Join(te.prefix, ".no-pkg-config")
+	}
 	return strings.Join(dirs, string(os.PathListSeparator))
 }
 

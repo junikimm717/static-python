@@ -145,6 +145,12 @@ func (j *pyHost) Build(ctx context.Context, e *core.Env, r *core.Runner, work, s
 		"--exec-prefix=" + prefix,
 		"--build=" + j.host.Triple,
 		"--disable-shared",
+		// Every stdlib extension is a builtin, never a .so. configure defaults
+		// this to shared and only forces static for wasm -- which needs it for
+		// the same reason we do, no dlopen. Without it CPython links modules
+		// with `-shared` on top of our -static LDFLAGS and the contradiction
+		// surfaces as "undefined reference to main".
+		"MODULE_BUILDTYPE=static",
 		"--with-ensurepip=no",
 		"--disable-test-modules",
 	}
@@ -318,7 +324,7 @@ func (j *pyBuild) pgo() bool {
 // machine-specific, and the dependency keys already cover what lives behind
 // it.
 func (j *pyBuild) decisionFlags() []string {
-	flags := []string{"--disable-shared", "--with-ensurepip=no"}
+	flags := []string{"--disable-shared", "--with-ensurepip=no", "MODULE_BUILDTYPE=static"}
 	if j.cross {
 		flags = append(flags, "--build="+j.host.Triple, "--host="+j.target.Triple, "--with-build-python")
 	} else {

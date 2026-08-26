@@ -552,6 +552,10 @@ func (g *Global) newEnv(cfg *config.Config, runLog bool) (*core.Env, func(), err
 		return nil, nil, fmt.Errorf("open run log under %s: %w", filepath.Join(g.Dist, core.DirLogs), err)
 	}
 
+	// Best-effort: a command that does not resolve a host triple still gets an
+	// Env, it just cannot build a package that needs a build-machine compiler.
+	host, _ := g.HostTriple(cfg)
+
 	hermetic := g.Busybox != ""
 	if g.hermetic {
 		hermetic = true
@@ -573,6 +577,7 @@ func (g *Global) newEnv(cfg *config.Config, runLog bool) (*core.Env, func(), err
 		Busybox:    g.Busybox,
 		Qemu:       g.qemuMap(cfg),
 		Hermetic:   hermetic,
+		Host:       host,
 		Offline:    g.Offline,
 		Jobs:       jobs,
 		MaxWorkers: workers,

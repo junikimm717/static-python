@@ -90,6 +90,10 @@ func (j *sysrootJob) Build(ctx context.Context, e *core.Env, r *core.Runner, wor
 			return err
 		}
 	}
+	if len(c.skipped) > 0 {
+		e.Log.Info("left programs out of the sysroot: they baked in their own prefix and nothing compiles against them",
+			"count", len(c.skipped), "first", c.skipped[0])
+	}
 	return nil
 }
 
@@ -98,9 +102,11 @@ func (j *sysrootJob) Build(ctx context.Context, e *core.Env, r *core.Runner, wor
 // copied and rewritten instead, because writing through a symlink would edit a
 // published artifact that other jobs are reading.
 type composer struct {
-	e     *core.Env
-	stage string
-	final string
+	// programs left out because they baked in a prefix; reported, not silent.
+	skipped []string
+	e       *core.Env
+	stage   string
+	final   string
 	// owner maps a relative path to the package that placed it.
 	owner   map[string]string
 	rewrite map[string]string
@@ -160,6 +166,15 @@ func (c *composer) place(d *depJob, src, dst, rel string, mode os.FileMode) erro
 		return os.Symlink(src, dst)
 	}
 	if !isText(data) {
+		// A sysroot exists to be compiled and linked against, so an executable
+		// that baked in its own prefix is not something any consumer reads --
+		// xz's lzmainfo carries the LOCALEDIR it was configured with. Leave it
+		// out rather than corrupting it or failing the build over it. A library
+		// or a header in the same position is a real problem and still is one.
+		if isProgramDir(rel) {
+			c.skipped = append(c.skipped, rel)
+			return nil
+		}
 		return fmt.Errorf("recipe: sysroot %s: %s (from %s) records a dependency prefix inside a binary file; "+
 			"rewriting it would corrupt it. Configure %s with a prefix it can keep instead",
 			c.final, rel, d.name, d.name)
@@ -171,6 +186,16 @@ func (c *composer) place(d *depJob, src, dst, rel string, mode os.FileMode) erro
 		return err
 	}
 	return c.assertNoStalePrefix(d, rel, out)
+}
+
+// bin and sbin hold programs the dependency built for its own use. Nothing in
+// a compile or a link reads them.
+func isProgramDir(rel string) bool {
+	switch top, _, _ := strings.Cut(filepath.ToSlash(rel), "/"); top {
+	case "bin", "sbin", "libexec":
+		return true
+	}
+	return false
 }
 
 func (c *composer) rewritten(data []byte) ([]byte, bool) {

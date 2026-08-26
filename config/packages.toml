@@ -77,6 +77,11 @@ needs = ["readline"]
 configure = ["--enable-static", "--disable-shared"]
 provides = ["lib/libsqlite3.a"]
 
+# sqlite compiles mkkeywordhash and jimsh and then runs them mid-build, so they
+# have to be built for the machine doing the building. B.cc defaults to $(CC),
+# which here targets musl and produces something a glibc host cannot execute.
+make_vars = ["B.cc=@BUILD_CC@"]
+
 [package.bzip2]
 name = "bzip2"
 # No configure script at all; the Makefile edits in sources.toml make the

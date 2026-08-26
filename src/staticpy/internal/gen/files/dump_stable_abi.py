@@ -37,12 +37,22 @@ def header_words(srctree):
     Include/internal is deliberately absent: a name declared only there is still
     undeclared for us, and so still needs a synthetic extern.
     """
+    root = srctree / "Include"
+    include = re.compile(r'^\s*#\s*include\s+"([^"]+)"', re.M)
+    seen, queue = set(), ["Python.h"]
     words = set()
     ident = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
-    for d in (srctree / "Include", srctree / "Include" / "cpython"):
-        for header in sorted(d.glob("*.h")):
-            text = header.read_text(encoding="utf-8", errors="replace")
-            words.update(ident.findall(text))
+    while queue:
+        name = queue.pop()
+        if name in seen:
+            continue
+        seen.add(name)
+        header = root / name
+        if not header.is_file():
+            continue
+        text = header.read_text(encoding="utf-8", errors="replace")
+        words.update(ident.findall(text))
+        queue.extend(include.findall(text))
     return words
 
 

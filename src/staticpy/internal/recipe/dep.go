@@ -260,6 +260,25 @@ func (j *depJob) Build(ctx context.Context, e *core.Env, r *core.Runner, work, s
 
 func (j *depJob) makeJobs(e *core.Env) string { return "-j" + strconv.Itoa(e.MakeJobs()) }
 
+// A package that builds a helper and then runs it needs that helper to run
+// *here*, not on the target. @BUILD_CC@ is the native toolchain with -static,
+// so the result executes whatever libc the build machine has -- ours is
+// musl-targeting and the host may well be glibc.
+func (j *depJob) makeVars(e *core.Env) []string {
+	if len(j.pkg.MakeVars) == 0 {
+		return nil
+	}
+	cc := "cc"
+	if tc, err := ToolchainNative(e, e.Host); err == nil {
+		cc = tc.CC + " -static"
+	}
+	out := make([]string, 0, len(j.pkg.MakeVars))
+	for _, v := range j.pkg.MakeVars {
+		out = append(out, strings.ReplaceAll(v, "@BUILD_CC@", cc))
+	}
+	return out
+}
+
 func (j *depJob) autotools(ctx context.Context, e *core.Env, r *core.Runner, te *toolenv, src, stage, prefix string) error {
 	args := []string{"./configure",
 		"--prefix=" + prefix,
@@ -273,17 +292,22 @@ func (j *depJob) autotools(ctx context.Context, e *core.Env, r *core.Runner, te 
 		return err
 	}
 	r.Step("building " + j.name)
-	if err := r.Run(ctx, te.cmd(j.name+"-make", src, []string{"make", j.makeJobs(e)}, nil)); err != nil {
+	mk := append([]string{"make", j.makeJobs(e)}, j.makeVars(e)...)
+	if err := r.Run(ctx, te.cmd(j.name+"-make", src, mk, nil)); err != nil {
 		return err
 	}
 	r.Step("installing " + j.name)
-	if err := r.Run(ctx, te.cmd(j.name+"-install", src, []string{"make", "install"}, map[string]string{
-		"DESTDIR": stage,
-		// ncurses' install compiles the terminfo database with tic, which is a
-		// target binary we cannot run when cross-compiling. The database is
-		// not what we ship — libncursesw.a is — so install must not gate on it.
-		"TIC_PATH": "true",
-	})); err != nil {
+	// DESTDIR goes on the command line, never the environment: a makefile
+	// assignment beats an environment variable in make's precedence, and
+	// ncurses ships `DESTDIR=@DESTDIR@`, so an exported one is silently
+	// discarded and the install writes straight to the absolute prefix.
+	if err := r.Run(ctx, te.cmd(j.name+"-install", src,
+		[]string{"make", "install", "DESTDIR=" + stage}, map[string]string{
+			// ncurses' install compiles the terminfo database with tic, which is a
+			// target binary we cannot run when cross-compiling. The database is
+			// not what we ship — libncursesw.a is — so install must not gate on it.
+			"TIC_PATH": "true",
+		})); err != nil {
 		return err
 	}
 	return hoistDestdir(stage, prefix, j.name)
@@ -299,14 +323,15 @@ func (j *depJob) openssl(ctx context.Context, e *core.Env, r *core.Runner, te *t
 		return err
 	}
 	r.Step("building " + j.name)
-	if err := r.Run(ctx, te.cmd(j.name+"-make", src, []string{"make", j.makeJobs(e)}, nil)); err != nil {
+	mk := append([]string{"make", j.makeJobs(e)}, j.makeVars(e)...)
+	if err := r.Run(ctx, te.cmd(j.name+"-make", src, mk, nil)); err != nil {
 		return err
 	}
 	// install_sw, not install: the docs target needs perl's pod2man and
 	// installs nothing a linker or a compiler will ever look at.
 	r.Step("installing " + j.name)
-	if err := r.Run(ctx, te.cmd(j.name+"-install", src, []string{"make", "install_sw"},
-		map[string]string{"DESTDIR": stage})); err != nil {
+	if err := r.Run(ctx, te.cmd(j.name+"-install", src,
+		[]string{"make", "install_sw", "DESTDIR=" + stage}, nil)); err != nil {
 		return err
 	}
 	return hoistDestdir(stage, prefix, j.name)

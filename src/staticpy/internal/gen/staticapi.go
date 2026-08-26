@@ -25,7 +25,7 @@ import (
 
 // generatorVersion invalidates every symbols.c ever generated. Bump it when the
 // emitted C changes shape, not when CPython changes.
-const generatorVersion = "1"
+const generatorVersion = "2"
 
 //go:embed files/dump_stable_abi.py
 var dumpStableABI []byte
@@ -123,10 +123,11 @@ type abiItem struct {
 	Kind    string `json:"kind"`
 	AbiOnly bool   `json:"abi_only"`
 	Ifdef   string `json:"ifdef"`
-	// Declared reports whether the name appears in a header Python.h reaches.
-	// abi_only does not imply undeclared: 23 of the 57 abi_only entries are
-	// declared in public headers, and a synthetic extern for those would
-	// conflict.
+	// Declared reports whether the name appears in a header Python.h actually
+	// reaches, following the include graph rather than globbing Include/. Both
+	// halves matter: abi_only does not imply undeclared (a synthetic extern for
+	// one that is declared conflicts), and being in Include/ does not imply
+	// declared (marshal.h is never included).
 	Declared bool `json:"declared"`
 }
 
@@ -204,7 +205,10 @@ func renderSymbols(items []abiItem, version, manifestSHA string) ([]byte, error)
 func writeExterns(b *bytes.Buffer, funcs, data []abiItem) {
 	var undeclared []abiItem
 	for _, it := range append(append([]abiItem{}, funcs...), data...) {
-		if it.AbiOnly && !it.Declared {
+		// Reachability alone decides this, not abi_only: PyMarshal_* is ordinary
+		// public API declared in marshal.h, which Python.h does not include, so
+		// it needs a declaration here exactly as an abi_only entry does.
+		if !it.Declared {
 			undeclared = append(undeclared, it)
 		}
 	}

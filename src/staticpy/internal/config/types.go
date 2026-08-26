@@ -74,6 +74,11 @@ type Package struct {
 	CFlags   []string `toml:"cflags"`
 	Headers  []string `toml:"headers"`
 	Libname  string   `toml:"libname"`
+	// MakeVars are passed on the make command line, where they beat any
+	// assignment in the makefile. @BUILD_CC@ expands to a compiler whose output
+	// runs on the build machine, for packages that compile helper programs and
+	// then execute them mid-build.
+	MakeVars []string `toml:"make_vars"`
 	Needs    []string `toml:"needs"`
 	Provides []string `toml:"provides"` // artifact paths that must exist afterwards
 }
