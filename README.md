@@ -53,6 +53,14 @@ Alternatively, make sure you have all of the following packages on your system
   perl-core?)
 - cURL, tar, make, rsync
 
+## The build systems
+
+`make` is the build. `src/staticpy` is a Go build system covering the same
+ground with the versions, checksums, configure flags and per-target quirks
+moved into `config/*.toml`, and a content-addressed job graph underneath so a
+changed input rebuilds exactly what depends on it. It has not built an
+interpreter yet.
+
 ## Building Native
 
 ```sh
@@ -103,15 +111,14 @@ doing 😇)
 
 ## Benchmarking
 
-The dynamic baseline still lives at `benchmark/dynamic-build.sh` -- a stock
-`--enable-shared` Python of the same pinned version, which is the only honest
+`benchmark/dynamic-build.sh` builds the dynamic baseline -- a stock
+`--enable-shared` Python of the same pinned version, which is the honest
 comparison target for a static build:
 
 ```sh
 docker compose exec -T spython sh -c 'cd /workspace && ./benchmark/dynamic-build.sh'
 ```
 
-The hand-rolled microbenchmark harness is gone. pyperformance is the canonical
-suite -- it is what speed.python.org publishes against -- and `staticpy bench`
-will drive it once bundles land, since a pip-less, dlopen-less interpreter
-needs its pure-Python dependencies compiled in rather than installed.
+pyperformance is the intended suite, driven by `staticpy bench`. It needs its
+pure-Python dependencies compiled into the interpreter first, since a build
+with no pip and no dlopen cannot install them: that arrives with bundles.

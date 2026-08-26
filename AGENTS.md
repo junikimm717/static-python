@@ -18,6 +18,16 @@ A from-source static Python toolchain. Version pins:
   change here.
 - Supported targets: `supported.txt`.
 
+Two build systems are in the tree. The `Makefile` is the one that works and
+the one to use. `src/staticpy` is a Go build system that owns the same job in
+data rather than recipes -- `config/*.toml` holds the versions, checksums,
+per-package configure args, per-target quirks and flag profiles -- and has not
+yet built an interpreter. It compiles, its config validates, and
+`staticpy doctor` reports what a build would need. Until it has produced a
+working interpreter, treat it as the thing being built rather than the thing
+you build with, and keep `config/*.toml` in step with the `Makefile` when you
+bump a version, because both are live.
+
 Builds run **inside the Alpine dev container**, never on the host. The
 container's `/workspace` is a bind mount of the repo, so anything you create
 on disk shows up on the host immediately. Use `tmux` *on the host* (the
@@ -151,30 +161,34 @@ pass `--no-download` if you know the cache is already warm.
 
 ## Benchmarking
 
-`benchmark/microbench.py`, `measure_startup.py`, `run.sh` and the twelve
-timestamped reports are gone. pyperformance is the canonical suite -- it is
-what speed.python.org publishes against, so its numbers are comparable to the
-wider world in a way a hand-rolled microbench never was. `staticpy bench`
-will drive it.
+`benchmark/dynamic-build.sh` builds the dynamic baseline: a stock
+`--enable-shared` Python of the pinned version, against the container's
+apk-installed `*-dev` packages. It is the honest comparison target for a
+static build, and nothing else produces one.
 
-Two things make that non-trivial for a static interpreter, and both are why
-the command does not exist yet:
+```sh
+docker compose exec -T spython sh -c 'cd /workspace && ./benchmark/dynamic-build.sh'
+```
+
+It reads `make print-PYTHON` for the version, so it depends on the Makefile;
+`staticpy print python-version` is the replacement once that goes.
+
+pyperformance is the intended suite -- it is what speed.python.org publishes
+against, so its numbers are comparable to the wider world. `staticpy bench`
+will drive it, and two things have to land first:
 
 - pyperformance builds a venv per run and pip-installs each benchmark's
   requirements. This interpreter is `--with-ensurepip=no`, so there is no pip.
 - Several benchmark dependencies are C extensions, and no dlopen means no
   compiled wheel will ever import.
 
-The fix is a `bundle.bench` of the pure-Python dependencies compiled in ahead
-of time. That lands with bundles, not before.
+Both are answered by a `bundle.bench` of the pure-Python dependencies compiled
+into the interpreter, which arrives with bundles.
 
-`benchmark/dynamic-build.sh` stays: the dynamic baseline is still the honest
-comparison target, and nothing else builds one. Note it currently reads
-`make print-PYTHON`, so it depends on the Makefile until that goes.
+Benchmark natively only. Under qemu you are measuring qemu, and the overhead
+is not uniform across workloads, so the numbers are comparable to nothing --
+not to native, and not to each other.
 
-Benchmarks are native-only. Under qemu you are measuring qemu, and the
-overhead is not uniform across workloads, so the numbers are not comparable
-to anything -- not to native, and not to each other.
 ## Tmux discipline for long jobs
 
 The host has tmux; the container does not. Use the host wrapper pattern:
