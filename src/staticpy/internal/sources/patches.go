@@ -22,7 +22,7 @@ type Assets = fs.FS
 // PatchDir is where a source's diffs live inside Assets.
 func PatchDir(s config.Source) string { return path.Join("patches", Slug(s)) }
 
-// Patch is one unified diff, applied with `patch -p1` from the source root.
+// Applied with `patch -p1` from the source root.
 type Patch struct {
 	Name string
 	Data []byte
@@ -53,9 +53,8 @@ func LoadPatches(a Assets, s config.Source) ([]Patch, error) {
 	return out, nil
 }
 
-// PatchSetHash is the patch series' contribution to the job key: a sha256 over
-// the ordered contents, so reordering or editing a diff in place rebuilds the
-// tree even though the filenames did not change.
+// A sha256 over the ordered contents, so reordering or editing a diff in place
+// rebuilds the tree even though the filenames did not change.
 func PatchSetHash(a Assets, s config.Source) (string, error) {
 	patches, err := LoadPatches(a, s)
 	if err != nil {
@@ -72,10 +71,9 @@ func PatchSetHash(a Assets, s config.Source) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// ApplyPatches materialises the series into work and applies each diff to tree
-// in order. Shelling out to patch(1) is the one concession in this package:
-// a correct unified-diff applier with fuzz and offset handling is a project of
-// its own, and going through the Runner keeps the invocation in the job log.
+// Shelling out to patch(1) is the one concession in this package: a correct
+// unified-diff applier with fuzz and offset handling is a project of its own,
+// and going through the Runner keeps the invocation in the job log.
 func ApplyPatches(ctx context.Context, r *core.Runner, a Assets, s config.Source, tree, work string) error {
 	patches, err := LoadPatches(a, s)
 	if err != nil {

@@ -63,8 +63,8 @@ func (r *Runner) openScript() error {
 	return nil
 }
 
-// uniqueDir creates base/name, suffixing until it wins the race. Attempt
-// directories are never reused, so no previous attempt's logs are ever lost.
+// Attempt directories are never reused, so no previous attempt's logs are
+// ever lost.
 func uniqueDir(base, name string) (string, error) {
 	if err := os.MkdirAll(base, 0o755); err != nil {
 		return "", err

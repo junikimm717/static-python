@@ -120,8 +120,6 @@ type verifyReport struct {
 	} `json:"checks"`
 }
 
-// printVerifyReports renders every verification report the plan produced, and
-// reports whether any of them failed.
 func printVerifyReports(e *core.Env, nodes []core.PlanNode) bool {
 	anyFail := false
 	for _, n := range nodes {

@@ -14,7 +14,6 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/config"
 )
 
-// Edit actions.
 const (
 	ActionInsertAfter  = "insert_after"
 	ActionInsertBefore = "insert_before"
@@ -44,7 +43,6 @@ func (e *MatchCountError) Error() string {
 	return s + "; upstream moved and the edit must be re-pinned"
 }
 
-// ApplyEdits runs s.Edits against the tree in order.
 func ApplyEdits(a Assets, s config.Source, tree string) error {
 	for i, e := range s.Edits {
 		if err := applyEdit(a, s, e, tree); err != nil {
@@ -180,8 +178,8 @@ func splitLines(s string) ([]string, bool) {
 	return strings.Split(s, "\n"), trailing
 }
 
-// EditSetHash is the edit series' contribution to the job key. Edit.Why is
-// excluded: it documents the edit, and rewording it should not rebuild.
+// Edit.Why is excluded: it documents the edit, and rewording it should not
+// rebuild.
 func EditSetHash(a Assets, s config.Source) (string, error) {
 	if len(s.Edits) == 0 {
 		return "none", nil

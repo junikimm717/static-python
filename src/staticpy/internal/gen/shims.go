@@ -12,8 +12,7 @@ import (
 )
 
 // BuiltinName flattens a dotted module name into the identifier makesetup and
-// config.c use. "lxml.etree" becomes "_lxml_etree"; an undotted name is
-// unchanged.
+// config.c use.
 func BuiltinName(dotted string) string {
 	if !strings.Contains(dotted, ".") {
 		return dotted

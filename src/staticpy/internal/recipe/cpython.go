@@ -171,9 +171,9 @@ func PyCross(cfg *config.Config, srcAssets fs.FS, host, target config.Target, pr
 	return newPyBuild(cfg, srcAssets, host, target, profile, bundle, true)
 }
 
-// pyBuild is both shipped-interpreter shapes. They differ by four configure
-// arguments, so keeping them one job is what stops the cross path from drifting
-// away from the native one that gets all the testing.
+// Native and cross differ by four configure arguments, so keeping them one
+// job is what stops the cross path from drifting away from the native one
+// that gets all the testing.
 type pyBuild struct {
 	cross bool
 
@@ -314,9 +314,9 @@ func (j *pyBuild) pgo() bool {
 	return j.res.PGO == "on" || j.res.PGO == "native-only"
 }
 
-// decisionFlags are the configure arguments that are a choice rather than a
-// path. Only these reach the job key: an absolute prefix would make the cache
-// machine-specific, and the dependency keys already cover what lives behind it.
+// Only these reach the job key: an absolute prefix would make the cache
+// machine-specific, and the dependency keys already cover what lives behind
+// it.
 func (j *pyBuild) decisionFlags() []string {
 	flags := []string{"--disable-shared", "--with-ensurepip=no"}
 	if j.cross {
@@ -412,11 +412,10 @@ func (j *pyBuild) Build(ctx context.Context, e *core.Env, r *core.Runner, work, 
 	return installPrefix(ctx, r, te, src, work, stage, prefix, extra)
 }
 
-// installPrefix runs CPython's install into a DESTDIR and moves the resulting
-// prefix into the job stage. --prefix is the final artifact path rather than
-// the stage, because it is baked into the interpreter: a binary configured
-// against a staging directory would look for its stdlib somewhere that no
-// longer exists once the artifact is published.
+// --prefix is the final artifact path rather than the stage, because it is
+// baked into the interpreter: a binary configured against a staging directory
+// would look for its stdlib somewhere that no longer exists once the artifact
+// is published.
 func installPrefix(ctx context.Context, r *core.Runner, te *toolenv, src, work, stage, prefix string, extra map[string]string) error {
 	destdir := filepath.Join(work, "destdir")
 	r.Step("installing")
@@ -479,9 +478,8 @@ func hostRunner(e *core.Env, t config.Target) string {
 	return qemu
 }
 
-// installStaticAPI puts the generated symbol table next to its module source in
-// the tree. makesetup resolves a relative source against $(srcdir)/Modules, so
-// both files have to be in the source tree and not in a build directory.
+// makesetup resolves a relative source against $(srcdir)/Modules, so both
+// files have to be in the source tree and not in a build directory.
 func installStaticAPI(artifact, src string) error {
 	dst := filepath.Join(src, "Modules", "staticapi")
 	if err := os.MkdirAll(dst, 0o755); err != nil {
@@ -528,9 +526,8 @@ func pyhostInterpreter(dir string) (string, error) {
 	return "", fmt.Errorf("recipe: pyhost artifact %s holds no interpreter", dir)
 }
 
-// bundleModules flattens a bundle into the C extensions its packages declare,
-// for Setup.local. A static interpreter cannot dlopen anything, so a bundled C
-// module either arrives as a builtin or not at all.
+// A static interpreter cannot dlopen anything, so a bundled C module either
+// arrives as a builtin or not at all.
 func bundleModules(cfg *config.Config, bundle string) ([]config.PyModule, error) {
 	if bundle == "" {
 		return nil, nil
@@ -550,7 +547,6 @@ func bundleModules(cfg *config.Config, bundle string) ([]config.PyModule, error)
 	return out, nil
 }
 
-// appendPyconfig applies the per-target header fragment the probe carries.
 // Inline-asm availability and the atomics quirks are decisions rather than
 // measurements, so configure cannot reach them and they arrive as a patch.
 func appendPyconfig(from, header string) error {

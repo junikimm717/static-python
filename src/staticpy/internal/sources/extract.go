@@ -246,9 +246,8 @@ func readZipEntry(f *zip.File) ([]byte, error) {
 	return io.ReadAll(io.LimitReader(rc, 4096))
 }
 
-// strip drops topDir from an archive entry name. An entry outside topDir is
-// reported rather than silently skipped: a pin whose topdir is wrong should
-// fail, not produce a tree missing half its files.
+// An entry outside topDir is reported rather than silently skipped: a pin
+// whose topdir is wrong should fail, not produce a tree missing half its files.
 func strip(name, topDir string) (string, bool, error) {
 	clean := path.Clean(strings.TrimPrefix(path.Clean("/"+strings.ReplaceAll(name, `\`, "/")), "/"))
 	if clean == "." || clean == "" {
@@ -283,10 +282,9 @@ func isPaxMetadata(clean string) bool {
 	return false
 }
 
-// resolve maps a stripped entry name to a path inside dst. An archive that
-// escapes its destination -- via "../" or an absolute name -- is rejected
-// outright rather than sanitised: such an entry is hostile or corrupt, and
-// neither should be allowed to write a single byte.
+// An archive that escapes its destination -- via "../" or an absolute name --
+// is rejected outright rather than sanitised: such an entry is hostile or
+// corrupt, and neither should be allowed to write a single byte.
 func resolve(dst, name string) (string, error) {
 	if path.IsAbs(name) || filepath.IsAbs(name) {
 		return "", fmt.Errorf("entry %q has an absolute path", name)

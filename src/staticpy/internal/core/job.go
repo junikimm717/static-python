@@ -28,8 +28,8 @@ type keyDoc struct {
 var keyCache sync.Map // slug -> key
 
 // Key is the Merkle hash of a job: its own inputs plus the keys of all its
-// dependencies. It is memoized per process by slug, so a slug must uniquely
-// determine a job's content within one process.
+// dependencies. A slug must uniquely determine a job's content within one
+// process.
 func Key(j Job) (string, error) {
 	if v, ok := keyCache.Load(j.Slug()); ok {
 		return v.(string), nil

@@ -103,7 +103,7 @@ const (
 	TestAbsent TestStatus = "absent"
 )
 
-// StatusOf classifies one test. env-changed counts as a failure: a test that
+// Env-changed counts as a failure: a test that
 // leaves the interpreter altered has found a real bug, and letting it pass
 // would hide exactly the kind of state corruption a static build introduces.
 func (o *Outcome) StatusOf(test string) TestStatus {
@@ -119,7 +119,7 @@ func (o *Outcome) StatusOf(test string) TestStatus {
 	return TestAbsent
 }
 
-// RunSuite drives CPython's own runner at the given level. A non-zero exit is
+// A non-zero exit is
 // an expected outcome, so it lands in the Outcome rather than the error; the
 // error is reserved for not being able to run the suite at all.
 func RunSuite(ctx context.Context, r *core.Runner, l *Launcher, level Level, python, work string, opts SuiteOptions) (*Outcome, error) {

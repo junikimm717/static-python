@@ -32,7 +32,6 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-// Target looks up a triple, listing the supported ones when it misses.
 func (c *Config) Target(triple string) (Target, error) {
 	t, ok := c.Targets[triple]
 	if !ok {
@@ -253,8 +252,7 @@ func (c *Config) validateBundles() error {
 	return nil
 }
 
-// hasAbsPath reports whether a compiler flag embeds an absolute path, in any of
-// the shapes flags use: /x, -I/x, -L/x, -Wl,-rpath,/x, --sysroot=/x.
+// In any of the shapes flags use: /x, -I/x, -L/x, -Wl,-rpath,/x, --sysroot=/x.
 func hasAbsPath(flag string) bool {
 	for i := 0; i < len(flag); i++ {
 		if flag[i] != '/' {

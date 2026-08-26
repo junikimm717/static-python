@@ -134,7 +134,6 @@ func runConfigShow(g *Global, args []string) error {
 	return nil
 }
 
-// inheritChain lists the profile's ancestors, nearest first.
 func inheritChain(cfg *config.Config, name string) []string {
 	var out []string
 	seen := map[string]bool{}

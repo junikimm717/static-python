@@ -35,8 +35,7 @@ func slugMutex(slug string) *sync.Mutex {
 	return m
 }
 
-// acquire takes a shared or exclusive flock on dist/locks/<slug>.lock. It
-// polls with LOCK_NB rather than blocking in the kernel so that ctx
+// It polls with LOCK_NB rather than blocking in the kernel so that ctx
 // cancellation works and so that we can report who we are waiting on.
 func acquire(ctx context.Context, e *Env, slug string, excl bool) (*flockLease, error) {
 	path := e.LockPath(slug)
@@ -97,8 +96,7 @@ func (ls leases) release() {
 	}
 }
 
-// TryReadLease takes a shared flock on a job's lock file without waiting. It
-// lets a reader of a published artifact tell "ready" apart from "being
+// It lets a reader of a published artifact tell "ready" apart from "being
 // republished right now" instead of racing the rename. ok=false means someone
 // holds it exclusively; the returned func must be called to release.
 func TryReadLease(e *Env, slug string) (release func(), ok bool, err error) {

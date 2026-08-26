@@ -34,7 +34,6 @@ func Dep(cfg *config.Config, assets fs.FS, t config.Target, profile, name string
 	return b.job(name)
 }
 
-// Deps is every package in the config, for one target and profile.
 func Deps(cfg *config.Config, assets fs.FS, t config.Target, profile string) ([]core.Job, error) {
 	b := &depBuilder{cfg: cfg, assets: assets, target: t, profile: profile,
 		memo: map[string]*depJob{}, onStack: map[string]bool{}}

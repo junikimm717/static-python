@@ -98,8 +98,6 @@ func (j *Job) ArtifactDir(e *core.Env) string {
 	return e.Path(core.DirArtifact, pathSlug(j.Slug()))
 }
 
-// SkipRequested reports whether the operator asked for verification to be
-// skipped.
 func SkipRequested() bool { return os.Getenv(SkipEnv) == "1" }
 
 func (j *Job) Build(ctx context.Context, e *core.Env, r *core.Runner, work, stage string) error {

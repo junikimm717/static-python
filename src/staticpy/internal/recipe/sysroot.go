@@ -173,7 +173,6 @@ func (c *composer) place(d *depJob, src, dst, rel string, mode os.FileMode) erro
 	return c.assertNoStalePrefix(d, rel, out)
 }
 
-// rewritten replaces every dependency prefix with the composed tree's path.
 func (c *composer) rewritten(data []byte) ([]byte, bool) {
 	hit := false
 	for _, from := range sortedKeys(c.rewrite) {

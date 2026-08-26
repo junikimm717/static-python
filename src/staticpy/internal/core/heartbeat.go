@@ -12,8 +12,8 @@ import (
 // HeartbeatInterval is how often a builder refreshes its heartbeat file.
 const HeartbeatInterval = 5 * time.Second
 
-// Heartbeat records who is building a job right now. It is advisory: it drives
-// `staticpy status` and lock-wait messages, never correctness.
+// It is advisory: it drives `staticpy status` and lock-wait messages, never
+// correctness.
 type Heartbeat struct {
 	Slug      string    `json:"slug"`
 	Name      string    `json:"name"`
@@ -42,9 +42,8 @@ func ReadHeartbeat(e *Env, slug string) (*Heartbeat, error) {
 	return &h, nil
 }
 
-// Live reports whether the heartbeat plausibly belongs to a running builder:
-// either its process is still around, or it was refreshed very recently (which
-// covers a builder on another machine sharing dist/).
+// Being refreshed very recently, not just having a live pid, also covers a
+// builder on another machine sharing dist/.
 func (h *Heartbeat) Live() bool {
 	if h == nil {
 		return false

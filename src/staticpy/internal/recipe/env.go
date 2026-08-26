@@ -339,7 +339,6 @@ func (te *toolenv) ldflags() []string {
 	return append(out, "-L"+filepath.Join(te.dir, te.target.Triple, "lib"))
 }
 
-// pkgConfigPath is every pkgconfig directory in the view and nothing else.
 func (te *toolenv) pkgConfigPath() string {
 	var dirs []string
 	for _, v := range te.view {
@@ -385,7 +384,6 @@ func (te *toolenv) vars() map[string]string {
 	return env
 }
 
-// cmd builds a Cmd carrying this environment plus per-command overrides.
 func (te *toolenv) cmd(name, dir string, args []string, extra map[string]string) core.Cmd {
 	env := te.vars()
 	for k, v := range extra {

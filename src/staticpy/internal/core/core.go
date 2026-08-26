@@ -53,13 +53,12 @@ type Job interface {
 	Slug() string
 	// Deps are the jobs whose artifacts this job reads.
 	Deps() []Job
-	// KeyInputs is the recipe-specific contribution to the content key. It must
-	// be deterministic, and must not contain any path that varies per run.
+	// It must be deterministic, and must not contain any path that varies per
+	// run.
 	KeyInputs() map[string]string
 	// ArtifactDir is the absolute path where the published output lives.
 	ArtifactDir(e *Env) string
-	// Build populates stage with the final artifact contents, using work as
-	// scratch. Both are fresh empty directories. All deps are guaranteed valid
+	// work and stage are fresh empty directories. All deps are guaranteed valid
 	// and read-locked for the duration of the call.
 	Build(ctx context.Context, e *Env, r *Runner, work, stage string) error
 }
@@ -95,9 +94,8 @@ type Cmd struct {
 	Name string
 }
 
-// Env is the runtime context shared by every job. Set Dist to an absolute path:
-// EnsureDirs will otherwise rewrite it, which is unsafe once other goroutines
-// are reading the Env.
+// Set Dist to an absolute path: EnsureDirs will otherwise rewrite it, which is
+// unsafe once other goroutines are reading the Env.
 type Env struct {
 	Dist     string
 	RepoRoot string
@@ -147,8 +145,8 @@ func (e *Env) MakeJobs() int {
 	return e.Jobs
 }
 
-// LockPath is the flock file for a job slug. Lock files are never deleted:
-// removing one would break flock identity for anyone holding it open.
+// Lock files are never deleted: removing one would break flock identity for
+// anyone holding it open.
 func (e *Env) LockPath(slug string) string {
 	return e.Path(DirLocks, lockFileName(slug)+".lock")
 }

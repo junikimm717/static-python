@@ -471,8 +471,6 @@ func (g *Global) HostTriple(cfg *config.Config) (string, error) {
 		runtime.GOARCH, arch, strings.Join(all, ", "))
 }
 
-// selectTargets is the target list a command operates on: what --target named,
-// or the build machine itself.
 func (g *Global) selectTargets(cfg *config.Config, host string) ([]string, error) {
 	if len(g.Targets) == 0 {
 		return []string{host}, nil

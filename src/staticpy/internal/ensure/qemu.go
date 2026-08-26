@@ -31,7 +31,7 @@ const (
 // under qemu would otherwise hold a build slot forever.
 const DefaultRunTimeout = 10 * time.Minute
 
-// RunResult is one execution of a target binary. A non-zero ExitCode is a
+// A non-zero ExitCode is a
 // normal outcome here — it becomes a failed Check — so it is reported rather
 // than returned as an error.
 type RunResult struct {
@@ -159,8 +159,7 @@ func (l *Launcher) Argv(prog string, args ...string) []string {
 	return append(append(out, prog), args...)
 }
 
-// Run executes prog for the target and returns its exit status, stdout and
-// stderr. A non-zero exit is reported in the result; the error is reserved for
+// A non-zero exit is reported in the result; the error is reserved for
 // failures to execute at all.
 func (l *Launcher) Run(ctx context.Context, r *core.Runner, name, dir, prog string, args ...string) (RunResult, error) {
 	argv := l.Argv(prog, args...)
@@ -253,8 +252,6 @@ func runHint(out string) string {
 	return ""
 }
 
-// IsNativeTarget reports whether this machine can execute the target's
-// binaries directly.
 func IsNativeTarget(t config.Target) bool {
 	if runtime.GOOS != "linux" {
 		return false

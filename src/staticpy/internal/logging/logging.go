@@ -167,7 +167,6 @@ func (l *Logger) RunDir() string {
 	return l.s.runDir
 }
 
-// Close flushes and closes the JSONL stream.
 func (l *Logger) Close() error {
 	if l == nil || l.s == nil || l.s.file == nil {
 		return nil

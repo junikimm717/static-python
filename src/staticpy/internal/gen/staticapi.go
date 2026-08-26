@@ -197,10 +197,10 @@ func renderSymbols(items []abiItem, version, manifestSHA string) ([]byte, error)
 	return b.Bytes(), nil
 }
 
-// writeExterns declares the stable-ABI entries that no header Python.h reaches
-// declares. Windows does not need this because it emits a linker pragma; we take
-// an address, which needs a declaration. The signature is a fiction and is safe
-// only because the address is all that is ever used.
+// Only for entries no header Python.h reaches declares: Windows emits a linker
+// pragma and needs none of this, while we take an address, which needs a
+// declaration. The signature is a fiction, safe only because the address is all
+// that is ever used.
 func writeExterns(b *bytes.Buffer, funcs, data []abiItem) {
 	var undeclared []abiItem
 	for _, it := range append(append([]abiItem{}, funcs...), data...) {

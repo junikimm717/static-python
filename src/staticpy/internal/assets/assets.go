@@ -42,8 +42,6 @@ func MustGet(name string) []byte {
 	return b
 }
 
-// List returns the asset names under prefix, sorted. A prefix of "" lists
-// everything.
 func List(prefix string) []string {
 	var out []string
 	fs.WalkDir(embedded, "files", func(p string, d fs.DirEntry, err error) error {
@@ -60,7 +58,6 @@ func List(prefix string) []string {
 	return out
 }
 
-// WriteTo writes the asset to dir/name, creating parent directories.
 func WriteTo(dir, name string) error {
 	b, err := Get(name)
 	if err != nil {

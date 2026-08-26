@@ -22,10 +22,9 @@ type Options struct {
 	Assets Assets
 }
 
-// SrcTree is the job that turns one pinned source into an unpacked, patched,
-// edited tree. It is architecture-free and profile-free: one tree is built once
-// and shared by every target and every profile, which is why nothing about a
-// triple or a flag set appears in its key.
+// It is architecture-free and profile-free: one tree is built once and shared
+// by every target and every profile, which is why nothing about a triple or a
+// flag set appears in its key.
 func SrcTree(s config.Source, opts Options) core.Job {
 	j := &srcTree{src: s, assets: opts.Assets}
 	// Hashing is done up front because KeyInputs cannot report an error. A

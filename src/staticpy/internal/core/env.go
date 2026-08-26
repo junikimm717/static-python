@@ -40,8 +40,8 @@ var distSubdirs = []string{
 	filepath.Join(DirState, "heartbeats"),
 }
 
-// EnsureDirs creates the dist/ skeleton and opportunistically collects scratch
-// directories left behind by processes that died.
+// It opportunistically collects scratch directories left behind by processes
+// that died.
 func (e *Env) EnsureDirs() error {
 	if e.Dist == "" {
 		return fmt.Errorf("core: Env.Dist is empty")
@@ -62,10 +62,7 @@ func (e *Env) EnsureDirs() error {
 	return nil
 }
 
-// GCStale removes work/ and .staging/ directories whose owning pid is gone and
-// which have not been touched for at least age, plus heartbeats left behind by
-// dead builders. It is best-effort: losing a race with another collector is
-// harmless.
+// It is best-effort: losing a race with another collector is harmless.
 func (e *Env) GCStale(age time.Duration) {
 	e.gcHeartbeats()
 	for _, root := range []string{e.Path(DirWork), e.Path(DirStaging)} {
@@ -94,8 +91,7 @@ func (e *Env) GCStale(age time.Duration) {
 	}
 }
 
-// gcHeartbeats drops heartbeat files whose builder is gone, so `status` never
-// reports a build that a crash ended long ago.
+// This keeps `status` from reporting a build that a crash ended long ago.
 func (e *Env) gcHeartbeats() {
 	dir := e.Path(DirState, "heartbeats")
 	ents, err := os.ReadDir(dir)
@@ -115,9 +111,9 @@ func (e *Env) gcHeartbeats() {
 	}
 }
 
-// ToolchainDir resolves the toolchain tree for a triple. staticpy never builds
-// or fetches one: the shim provisions it and we fail loudly rather than falling
-// back to whatever compiler the host happens to have.
+// staticpy never builds or fetches one: the shim provisions it and we fail
+// loudly rather than falling back to whatever compiler the host happens to
+// have.
 func (e *Env) ToolchainDir(triple, kind string) (string, error) {
 	if kind != KindCross && kind != KindNative {
 		return "", fmt.Errorf("core: toolchain kind %q for %s: want %q or %q", kind, triple, KindCross, KindNative)
@@ -146,10 +142,10 @@ func isDir(path string) bool {
 	return err == nil && fi.IsDir()
 }
 
-// PathFor is the PATH a build sees. Hermetic mode lists exactly the selected
-// toolchain and busybox, so nothing a developer happens to have installed can
-// leak into an artifact and change it. Without it the host's PATH follows, which
-// is friendlier on a dev box and reproducible nowhere.
+// Hermetic mode lists exactly the selected toolchain and busybox, so nothing a
+// developer happens to have installed can leak into an artifact and change it.
+// Without it the host's PATH follows, which is friendlier on a dev box and
+// reproducible nowhere.
 //
 // A named target that will not resolve is an error, never a silent omission:
 // dropping it would hand the build the host compiler under a target triple, or
@@ -179,7 +175,6 @@ func (e *Env) PathFor(target string) ([]string, error) {
 	return out, nil
 }
 
-// resolvePath expands a PathSentinel value; anything else passes through.
 func (e *Env) resolvePath(v string) (string, error) {
 	if !strings.HasPrefix(v, PathSentinel) {
 		return v, nil
@@ -191,8 +186,8 @@ func (e *Env) resolvePath(v string) (string, error) {
 	return strings.Join(dirs, string(os.PathListSeparator)), nil
 }
 
-// scratchName builds "<slug>.<pid>.<rand>", the naming convention that makes
-// abandoned directories attributable to a dead process.
+// The naming convention makes abandoned directories attributable to a dead
+// process.
 func scratchName(slug string) string {
 	return fmt.Sprintf("%s.%d.%s", lockFileName(slug), os.Getpid(), randHex(4))
 }
@@ -209,9 +204,8 @@ func pidFromScratchName(name string) (int, bool) {
 	return pid, true
 }
 
-// pidAlive reports whether pid names a live process on this machine. A dist/
-// shared across machines would defeat this; the mtime guard keeps that case
-// merely wasteful rather than dangerous.
+// A dist/ shared across machines would defeat this check; the mtime guard
+// keeps that case merely wasteful rather than dangerous.
 func pidAlive(pid int) bool {
 	err := syscall.Kill(pid, 0)
 	return err == nil || err == syscall.EPERM

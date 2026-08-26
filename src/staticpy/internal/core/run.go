@@ -28,8 +28,7 @@ type Provenancer interface {
 	Provenance() map[string]string
 }
 
-// Plan resolves the DAG rooted at jobs and reports each node's state in
-// dependency-first order.
+// It reports each node's state in dependency-first order.
 func Plan(e *Env, jobs []Job) ([]PlanNode, error) {
 	nodes, err := resolve(jobs)
 	if err != nil {
@@ -48,10 +47,10 @@ func Plan(e *Env, jobs []Job) ([]PlanNode, error) {
 	return out, nil
 }
 
-// Run builds every job in the DAG rooted at jobs. Nodes are deduped by slug,
-// built in dependency order with up to e.MaxWorkers concurrency, and skipped
-// entirely when their artifact already matches their key. The first failure
-// cancels the rest and is returned wrapped with the failing job's slug.
+// Nodes are deduped by slug, built in dependency order with up to
+// e.MaxWorkers concurrency, and skipped entirely when their artifact already
+// matches their key. The first failure cancels the rest and is returned
+// wrapped with the failing job's slug.
 func Run(ctx context.Context, e *Env, jobs []Job) error {
 	if err := e.EnsureDirs(); err != nil {
 		return err
@@ -121,8 +120,8 @@ func Run(ctx context.Context, e *Env, jobs []Job) error {
 	return nil
 }
 
-// buildNode builds one node, retrying if a dependency is republished out from
-// under us between our validity check and taking its read lock.
+// It retries if a dependency is republished out from under us between our
+// validity check and taking its read lock.
 func buildNode(ctx context.Context, e *Env, n *node) error {
 	const attempts = 3
 	for i := 1; ; i++ {
@@ -223,8 +222,8 @@ func tryBuild(ctx context.Context, e *Env, n *node) error {
 	return nil
 }
 
-// stampManifest writes .staticpy.json into the staging dir. It is the last
-// thing written, so a directory carrying a manifest is by construction complete.
+// It is the last thing written, so a directory carrying a manifest is by
+// construction complete.
 func stampManifest(e *Env, n *node, stage string, dur time.Duration) error {
 	host, _ := os.Hostname()
 	deps := map[string]string{}

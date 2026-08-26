@@ -59,9 +59,9 @@ var sha256Re = regexp.MustCompile(`^[0-9a-f]{64}$`)
 // Slug names the patch directory, the artifact directory and the job log dir.
 func Slug(s config.Source) string { return s.Name + "-" + s.Version }
 
-// ValidateSource rejects a pin that cannot be fetched safely. An unpinned or
-// short sha256 is the one failure mode that would let unverified bytes through
-// the whole pipeline, so it is checked before anything touches the network.
+// An unpinned or short sha256 is the one failure mode that would let
+// unverified bytes through the whole pipeline, so it is checked before
+// anything touches the network.
 func ValidateSource(s config.Source) error {
 	switch {
 	case s.Name == "":
@@ -84,8 +84,7 @@ func ValidateSource(s config.Source) error {
 // CacheDir is where every fetched archive lands.
 func CacheDir(e *core.Env) string { return e.Path(core.DirSrc) }
 
-// Path embeds the checksum prefix so re-pinning a version never collides with
-// the file the old pin left behind.
+// Re-pinning a version never collides with the file the old pin left behind.
 func Path(e *core.Env, s config.Source) string {
 	return filepath.Join(CacheDir(e), shortSum(s)+"-"+s.File)
 }
@@ -103,8 +102,7 @@ func lockPath(e *core.Env, s config.Source) string {
 	return filepath.Join(CacheDir(e), "."+shortSum(s)+".lock")
 }
 
-// Fetched reports whether a verified copy is already on disk, without taking
-// the lock or hashing anything.
+// Without taking the lock or hashing anything.
 func Fetched(e *core.Env, s config.Source) bool { return verified(e, s) }
 
 // Fetch downloads s into dist/src and returns the archive path, trying URLs in

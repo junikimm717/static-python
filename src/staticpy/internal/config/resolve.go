@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// Scope names. deps.<pkg> layers on top of deps.
+// deps.<pkg> layers on top of deps.
 const (
 	ScopeDeps   = "deps"
 	ScopePython = "python"
@@ -166,9 +166,8 @@ func remove(list, drop []string, where, field string) ([]string, error) {
 	return list, nil
 }
 
-// keyInputs is the contribution a resolved profile makes to a job key. Neither
-// the profile name nor the scope is included: two configurations that resolve
-// to the same flags describe the same artifact and must share it.
+// Neither the profile name nor the scope is included: two configurations that
+// resolve to the same flags describe the same artifact and must share it.
 func (r Resolved) keyInputs() map[string]string {
 	return map[string]string{
 		"cflags":       strings.Join(r.CFlags, " "),

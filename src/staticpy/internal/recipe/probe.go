@@ -209,9 +209,8 @@ var probedBooleans = []string{
 	"DOUBLE_IS_BIG_ENDIAN_IEEE754", "DOUBLE_IS_LITTLE_ENDIAN_IEEE754",
 }
 
-// boolCache maps a yes/no macro to its cache variable. Inverted means the
-// variable answers the opposite question, as with the little-endian half of the
-// float-endianness pair.
+// Inverted means the variable answers the opposite question, as with the
+// little-endian half of the float-endianness pair.
 var boolCache = map[string]struct {
 	Var      string
 	Inverted bool
@@ -249,9 +248,8 @@ func requireProbed(t config.Target, probed map[string]define, out string) error 
 	return nil
 }
 
-// autoconfCache maps a probe macro to the configure cache variable that
-// answers the same question. AS_TR_SH keeps the case of the type name, so
-// _Bool is the one that does not simply lowercase.
+// AS_TR_SH keeps the case of the type name, so _Bool is the one that does
+// not simply lowercase.
 func autoconfCache(macro string) (string, bool) {
 	var kind, name string
 	switch {

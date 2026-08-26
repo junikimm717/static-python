@@ -9,7 +9,7 @@
 // This file is the contract the rest of the tree compiles against.
 package config
 
-// Source is one pinned upstream input. Mirrors are tried in order.
+// Mirrors are tried in order.
 type Source struct {
 	Name    string   `toml:"name"`
 	Version string   `toml:"version"`
@@ -52,7 +52,8 @@ type Edit struct {
 	Why       string `toml:"why"`
 }
 
-// Package is a native library dependency built into its own prefix.
+// A native library, built into its own prefix so a stale artifact cannot
+// survive a version bump in a shared one.
 type Package struct {
 	Name   string `toml:"name"`
 	Source string `toml:"source"` // key into Sources; defaults to Name
@@ -72,7 +73,6 @@ type Package struct {
 	Provides []string `toml:"provides"` // artifact paths that must exist afterwards
 }
 
-// Target is one supported triple and everything that is true only of it.
 // Adding an architecture is a row here plus a pyconfig asset.
 type Target struct {
 	Triple string `toml:"triple"`
@@ -89,8 +89,8 @@ type Target struct {
 	Maps map[string]string `toml:"maps"`
 }
 
-// Profile is a named flag set. Scopes layer on top of the profile-wide values,
-// so a change confined to one scope rebuilds only what that scope reaches.
+// Scopes layer on top of the profile-wide values, so a change confined to one
+// scope rebuilds only what that scope reaches.
 type Profile struct {
 	Inherit string `toml:"inherit"`
 
@@ -120,8 +120,8 @@ type Profile struct {
 	Scopes map[string]Profile `toml:"-"`
 }
 
-// Resolved is one profile flattened for one scope. Jobs hash this, never the
-// file it came from, so adding an unrelated profile invalidates nothing.
+// Jobs hash this, never the file it came from, so adding an unrelated profile
+// invalidates nothing.
 type Resolved struct {
 	Profile string
 	Scope   string
@@ -139,11 +139,9 @@ type Resolved struct {
 	Bundle      string
 }
 
-// KeyInputs is the contribution this resolved set makes to a job key. It must
-// contain no absolute path and no value that varies between runs.
+// It must contain no absolute path and no value that varies between runs.
 func (r Resolved) KeyInputs() map[string]string { return r.keyInputs() }
 
-// Bundle is a set of Python packages compiled into the interpreter.
 type Bundle struct {
 	Packages []string `toml:"packages"`
 }

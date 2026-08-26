@@ -148,9 +148,8 @@ func writeTarGz(ctx context.Context, root, topDir, dst string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// tarEntries lists the prefix in the order the archive uses. The manifest is
-// left out: it records a hostname, a pid and a wall-clock time, which is
-// exactly what a reproducible archive must not contain.
+// The manifest is left out: it records a hostname, a pid and a wall-clock
+// time, which is exactly what a reproducible archive must not contain.
 func tarEntries(root string) ([]string, error) {
 	var out []string
 	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {

@@ -11,7 +11,6 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/config"
 )
 
-// ExpectKey names the expectation set for one target and one runner.
 // Expectations are keyed per runner because qemu-user has its own failures
 // around signals, threads and subprocesses that say nothing about whether the
 // build is correct; a skip earned under qemu must not silence the same test
@@ -62,8 +61,6 @@ func (c *Classified) OK() bool {
 	return len(c.UnexpectedFailures) == 0 && len(c.UnexpectedPasses) == 0
 }
 
-// Classify sorts a run against its expectations.
-//
 // An unexpected pass fails the run. If test_re starts passing because musl
 // fixed byte-level case folding, the entry is stale and the operator has to be
 // told; a skip list that only ever grows is how a suite quietly stops meaning
@@ -126,7 +123,7 @@ func Classify(o *Outcome, expect config.TestExpect, target string) *Classified {
 	return c
 }
 
-// Report renders the classification as checks. The two buckets that decide the
+// The two buckets that decide the
 // exit status become failures; the two that do not become one summary line
 // each, so an operator can see the size of the skip list without reading it.
 func (c *Classified) Report(dur time.Duration) *Report {

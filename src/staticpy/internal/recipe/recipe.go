@@ -45,8 +45,8 @@ type PlanOptions struct {
 	Pack   bool
 }
 
-// Plan resolves the requested build into DAG roots. The CLI never constructs a
-// job itself, so the shape of the graph is decided in exactly one place.
+// The CLI never constructs a job itself, so the shape of the graph is decided
+// in exactly one place.
 func Plan(cfg *config.Config, assets fs.FS, o PlanOptions) ([]core.Job, error) {
 	if o.Profile == "" {
 		o.Profile = "default"
@@ -89,8 +89,7 @@ func Plan(cfg *config.Config, assets fs.FS, o PlanOptions) ([]core.Job, error) {
 	return jobs, nil
 }
 
-// Interpreter picks pynative or pycross by whether host and target agree, so no
-// caller has to know which shape it is asking for.
+// No caller has to know which shape it is asking for.
 func Interpreter(cfg *config.Config, assets fs.FS, host, target config.Target, profile, bundle string) (core.Job, error) {
 	if host.Triple == target.Triple {
 		return PyNative(cfg, assets, target, profile, bundle)
