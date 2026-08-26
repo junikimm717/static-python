@@ -133,6 +133,23 @@ cflags = [
   "-DHAVE_GETRANDOM=1",
   "-DHAVE_JRAND48=1",
   "-DHAVE_LIBPTHREAD=1",
+  # musl has all of these; without them c.h emits its own conflicting fallback
+  # for reallocarray and #errors out of xusleep().
+  "-DHAVE_REALLOCARRAY=1",
+  "-DHAVE_NANOSLEEP=1",
+  "-DHAVE_USLEEP=1",
+  "-DHAVE_ERR_H=1",
+  "-DHAVE_SYS_SYSMACROS_H=1",
+  "-DHAVE_TLS=1",
+  "-DHAVE_LOFF_T=1",
+  "-DHAVE_STRUCT_STAT_ST_MTIM_TV_NSEC=1",
+  "-DHAVE_PROGRAM_INVOCATION_SHORT_NAME=1",
+  # musl only declares program_invocation_short_name under _GNU_SOURCE, which
+  # util-linux's own configure sets via AC_USE_SYSTEM_EXTENSIONS.
+  "-D_GNU_SOURCE=1",
+  # uuidP.h concatenates this with "/lib/libuuid/clock.txt", so it is the
+  # localstatedir itself, not the lib directory under it.
+  "-D_PATH_LOCALSTATEDIR=\"/var\"",
 ]
 # CPython does `#include <uuid.h>`, so the header is installed one level down
 # and the profile adds -I<prefix>/include/uuid.

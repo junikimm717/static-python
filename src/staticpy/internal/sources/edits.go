@@ -60,11 +60,11 @@ func applyEdit(a Assets, s config.Source, e config.Edit, tree string) error {
 	if err != nil {
 		return fmt.Errorf("sources: %s: edit file %q: %w", s.Name, e.File, err)
 	}
-	re, err := regexp.Compile(e.Anchor)
+	matches, err := anchorMatcher(e)
 	if err != nil {
 		return fmt.Errorf("sources: %s: edit anchor %q: %w", s.Name, e.Anchor, err)
 	}
-	text, err := editText(a, e)
+	text, err := editText(a, s, e)
 	if err != nil {
 		return fmt.Errorf("sources: %s: %w", s.Name, err)
 	}
@@ -85,7 +85,7 @@ func applyEdit(a Assets, s config.Source, e config.Edit, tree string) error {
 	}
 	got := 0
 	for _, l := range lines {
-		if re.MatchString(l) {
+		if matches(l) {
 			got++
 		}
 	}
@@ -96,7 +96,7 @@ func applyEdit(a Assets, s config.Source, e config.Edit, tree string) error {
 	ins, _ := splitLines(text)
 	out := make([]string, 0, len(lines)+got*len(ins))
 	for _, l := range lines {
-		if !re.MatchString(l) {
+		if !matches(l) {
 			out = append(out, l)
 			continue
 		}
@@ -150,7 +150,26 @@ func validateEdit(s config.Source, e config.Edit) error {
 	return nil
 }
 
-func editText(a Assets, e config.Edit) (string, error) {
+// A bare text_file resolves under the source's patch directory, the same way a
+// patch filename does. Naming the directory in the config instead would embed
+// the version in a second place and quietly stop resolving on the next bump.
+// An anchor is a line lifted out of somebody else's source, so it is compared
+// literally against a whole line. Treating it as a regex by default is what
+// turned `pythonapi = PyDLL(None)` into a pattern for `PyDLLNone`, which
+// matches nothing -- caught only because MustMatch asserts the count.
+func anchorMatcher(e config.Edit) (func(string) bool, error) {
+	if !e.Regex {
+		anchor := e.Anchor
+		return func(l string) bool { return l == anchor }, nil
+	}
+	re, err := regexp.Compile(e.Anchor)
+	if err != nil {
+		return nil, err
+	}
+	return re.MatchString, nil
+}
+
+func editText(a Assets, s config.Source, e config.Edit) (string, error) {
 	if e.TextFile == "" {
 		return e.Text, nil
 	}
@@ -158,6 +177,9 @@ func editText(a Assets, e config.Edit) (string, error) {
 		return "", fmt.Errorf("edit on %s needs text_file %s but no asset tree was provided", e.File, e.TextFile)
 	}
 	name := path.Clean(filepath.ToSlash(e.TextFile))
+	if !strings.Contains(name, "/") {
+		name = path.Join(PatchDir(s), name)
+	}
 	b, err := fs.ReadFile(a, name)
 	if err != nil {
 		return "", fmt.Errorf("reading edit text_file %s: %w", name, err)
@@ -186,12 +208,12 @@ func EditSetHash(a Assets, s config.Source) (string, error) {
 	}
 	h := sha256.New()
 	for _, e := range s.Edits {
-		text, err := editText(a, e)
+		text, err := editText(a, s, e)
 		if err != nil {
 			return "", fmt.Errorf("sources: %s: %w", s.Name, err)
 		}
-		fmt.Fprintf(h, "%s\x00%s\x00%s\x00%d\x00%d\x00%s\x00",
-			e.File, e.Anchor, e.Action, e.MustMatch, len(text), text)
+		fmt.Fprintf(h, "%s\x00%s\x00%s\x00%d\x00%t\x00%d\x00%s\x00",
+			e.File, e.Anchor, e.Action, e.MustMatch, e.Regex, len(text), text)
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
 }

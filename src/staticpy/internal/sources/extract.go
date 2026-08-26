@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/junikimm717/static-python/src/staticpy/internal/config"
 )
@@ -150,6 +151,7 @@ func extractTar(ctx context.Context, archive, dst string, s config.Source, compr
 			if err := writeFile(target, tr, filePerm(mode)); err != nil {
 				return 0, err
 			}
+			restoreMtime(target, hdr.ModTime)
 		case tar.TypeSymlink:
 			if err := writeSymlink(dst, target, hdr.Linkname); err != nil {
 				return 0, fmt.Errorf("sources: %s: %w", archive, err)
@@ -229,6 +231,7 @@ func extractZip(ctx context.Context, archive, dst string, s config.Source) (int,
 			if err != nil {
 				return 0, err
 			}
+			restoreMtime(target, f.Modified)
 		default:
 			continue
 		}
@@ -322,6 +325,22 @@ func writeSymlink(dst, target, link string) error {
 	}
 	os.Remove(target)
 	return os.Symlink(filepath.FromSlash(link), target)
+}
+
+// Archives carry a timestamp per entry and autotools builds depend on them: a
+// release tarball ships configure newer than configure.ac precisely so make
+// does not try to regenerate it. Extracting everything with the current time
+// destroys that ordering, and whether the maintainer rules then fire comes down
+// to which file the walk happened to write first -- which is how xz ended up
+// running aclocal-1.18 that nobody has installed.
+//
+// Best-effort: a tree whose timestamps did not stick still builds, it just
+// builds the way it did before this existed.
+func restoreMtime(target string, t time.Time) {
+	if t.IsZero() {
+		return
+	}
+	_ = os.Chtimes(target, t, t)
 }
 
 func writeFile(target string, r io.Reader, perm os.FileMode) error {

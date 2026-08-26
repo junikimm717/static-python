@@ -13,7 +13,7 @@ import (
 // edit procedure changes in a way that would produce a different tree from the
 // same inputs; without it a fix to this package leaves every cached tree stale
 // and undetectably wrong.
-const srctreeVersion = "1"
+const srctreeVersion = "2"
 
 // Options carries what the recipe layer knows and this package does not.
 type Options struct {

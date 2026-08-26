@@ -48,8 +48,13 @@ type Edit struct {
 	TextFile string `toml:"text_file"`
 	// MustMatch is how many times Anchor is required to match. Zero means
 	// exactly once. Any other count fails the job.
-	MustMatch int    `toml:"must_match"`
-	Why       string `toml:"why"`
+	MustMatch int `toml:"must_match"`
+	// Regex matches Anchor as a regular expression instead of comparing whole
+	// lines literally. Off by default: an anchor is a line of somebody else's
+	// source, and characters like ( and ) are ordinary there while a regex
+	// would read them as syntax and match nothing at all.
+	Regex bool   `toml:"regex"`
+	Why   string `toml:"why"`
 }
 
 // A native library, built into its own prefix so a stale artifact cannot
