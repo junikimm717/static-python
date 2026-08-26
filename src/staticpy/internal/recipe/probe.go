@@ -140,6 +140,7 @@ func (j *probeJob) Build(ctx context.Context, e *core.Env, r *core.Runner, work,
 	// The fragment is allowed to hold nothing but a comment: several targets
 	// need no correction at all.
 	fromAsset, _ := parseDefines(string(j.patches))
+	reportOverrides(e, j.target, probed, fromAsset)
 
 	site, err := configSite(j.target, probed, fromAsset)
 	if err != nil {
@@ -268,6 +269,46 @@ func autoconfCache(macro string) (string, bool) {
 		return "ac_cv_" + kind + "__Bool", true
 	}
 	return "ac_cv_" + kind + "_" + strings.ToLower(name), true
+}
+
+// reportOverrides names every field where the hand-written fragment contradicts
+// what the hardware just reported. The fragment still wins -- forcing a value
+// the probe could measure is occasionally deliberate -- but silence here is
+// what lets a fragment rot into overriding a correct measurement with a stale
+// one, which is how the blanket x87 undef survived into targets that have x87.
+//
+// A quiet run is also the signal that the redundant half of these fragments can
+// be deleted.
+func reportOverrides(e *core.Env, t config.Target, probed, fromAsset map[string]define) {
+	var names []string
+	for macro := range fromAsset {
+		if _, measured := probed[macro]; measured {
+			names = append(names, macro)
+		}
+	}
+	sort.Strings(names)
+	for _, macro := range names {
+		want, got := probed[macro], fromAsset[macro]
+		if want.Undef == got.Undef && want.Value == got.Value {
+			e.Log.Debug("fragment repeats a measured value", "target", t.Triple, "macro", macro,
+				"asset", PyconfigPatchAsset(t))
+			continue
+		}
+		e.Log.Warn("fragment overrides what the probe measured",
+			"target", t.Triple, "macro", macro,
+			"probed", showDefine(want), "fragment", showDefine(got),
+			"asset", PyconfigPatchAsset(t))
+	}
+}
+
+func showDefine(d define) string {
+	if d.Undef {
+		return "undef"
+	}
+	if d.Value == "" {
+		return "defined"
+	}
+	return d.Value
 }
 
 // configSite is what makes CPython's own configure produce a correct
