@@ -1,0 +1,140 @@
+# Native dependencies, one artifact each.
+#
+# Only the arguments that are a decision live here. --prefix, --exec-prefix and
+# --host are injected by the recipe because they are absolute paths or derived
+# from the target, and anything absolute in this file would leak into the job
+# key and make the cache machine-specific.
+
+[package.openssl]
+name = "openssl"
+build = "openssl"
+platform_map = "openssl"
+configure = [
+  "no-shared", "no-dso",
+  # no-asm: the perlasm generators do not cover every triple in supported.txt,
+  # and a mixed asm/C build is the classic source of "works on x86_64 only".
+  "no-asm",
+  # no-dso rules out engines anyway; saying so keeps Configure from probing.
+  "no-engine",
+  "no-tests", "no-apps",
+  "no-ssl3", "no-comp", "no-idea", "no-rc5", "no-ec2m", "no-weak-ssl-ciphers",
+]
+# libssl.a/libcrypto.a land in lib or lib64 depending on the platform config,
+# so only the header is a stable artifact path.
+provides = ["include/openssl/ssl.h"]
+
+[package.libffi]
+name = "libffi"
+configure = ["--enable-static", "--disable-shared"]
+provides = ["lib/libffi.a"]
+
+[package.xz]
+name = "xz"
+configure = ["--enable-static", "--disable-shared"]
+provides = ["lib/liblzma.a"]
+
+[package.zlib]
+name = "zlib"
+# zlib's configure is hand-rolled: it rejects --host outright and picks up the
+# cross prefix from $CHOST instead, which the recipe exports.
+configure = [
+  "--static",
+  # Works around s390x VX detection in zlib 1.3.2, where crc32_vx.c is compiled
+  # without -mzarch/-march=z13. No-op everywhere else.
+  "--disable-crcvx",
+]
+provides = ["lib/libz.a"]
+
+[package.ncurses]
+name = "ncurses"
+configure = [
+  "--enable-static", "--disable-shared", "--without-shared",
+  # No C++ binding: it would drag a static libstdc++ into the interpreter.
+  "--without-cxx", "--without-cxx-binding",
+  "--without-ada", "--without-manpages", "--without-tests",
+  # The tools are host binaries we cannot run when cross-compiling; install
+  # borrows the host's tic via TIC_PATH instead.
+  "--without-progs",
+  # readline links against termcap names.
+  "--enable-termcap",
+]
+provides = ["lib/libncursesw.a"]
+
+[package.readline]
+name = "readline"
+needs = ["ncurses"]
+configure = [
+  "--enable-static", "--disable-shared",
+  "--with-curses",
+  "--disable-install-examples",
+]
+provides = ["lib/libreadline.a", "lib/libhistory.a"]
+
+[package.sqlite]
+name = "sqlite"
+# The sqlite shell links readline; configure probes for it before we get a say.
+needs = ["readline"]
+configure = ["--enable-static", "--disable-shared"]
+provides = ["lib/libsqlite3.a"]
+
+[package.bzip2]
+name = "bzip2"
+# No configure script at all; the Makefile edits in sources.toml make the
+# stock one honour CC/AR/CFLAGS/PREFIX from the environment.
+build = "make"
+provides = ["lib/libbz2.a"]
+
+# libuuid is compiled straight from util-linux's sources rather than through
+# util-linux's build system. Building the real thing needs meson, ninja, flex
+# and bison on the host to produce one small library CPython uses for exactly
+# three symbols; compiling the files directly removes all four host
+# requirements and the cross.ini / -Dfeature=disabled dance with them.
+[package.libuuid]
+name = "libuuid"
+source = "util-linux"
+build = "sources"
+libname = "uuid"
+sources = [
+  "libuuid/src/clear.c",
+  "libuuid/src/compare.c",
+  "libuuid/src/copy.c",
+  "libuuid/src/gen_uuid.c",
+  "libuuid/src/isnull.c",
+  "libuuid/src/pack.c",
+  "libuuid/src/parse.c",
+  "libuuid/src/predefined.c",
+  "libuuid/src/unpack.c",
+  "libuuid/src/unparse.c",
+  "libuuid/src/uuid_time.c",
+  # gen_uuid.c calls ul_random_get_bytes, UL_MD5* and UL_SHA1*, which live in
+  # util-linux's lib/ rather than libuuid/. libuuid/src/test_uuid.c is the one
+  # file in that directory left out: it is a test program with a main().
+  "lib/randutils.c",
+  "lib/md5.c",
+  "lib/sha1.c",
+]
+cflags = [
+  "-Iinclude",
+  "-Ilibuuid/src",
+  # util-linux normally generates config.h; these are the probes that actually
+  # change code on linux/musl. HAVE_NET_IF_DL_H, HAVE_SYS_SOCKIO_H and
+  # HAVE_SA_LEN are BSD-only and stay undefined; HAVE_UUIDD stays undefined
+  # because a static interpreter has no uuidd socket to talk to.
+  "-DHAVE_STDLIB_H=1",
+  "-DHAVE_UNISTD_H=1",
+  "-DHAVE_SYS_FILE_H=1",
+  "-DHAVE_SYS_IOCTL_H=1",
+  "-DHAVE_SYS_SOCKET_H=1",
+  "-DHAVE_SYS_SYSCALL_H=1",
+  "-DHAVE_SYS_TIME_H=1",
+  "-DHAVE_SYS_UN_H=1",
+  "-DHAVE_NET_IF_H=1",
+  "-DHAVE_NETINET_IN_H=1",
+  "-DHAVE_GETRANDOM=1",
+  "-DHAVE_JRAND48=1",
+  "-DHAVE_LIBPTHREAD=1",
+]
+# CPython does `#include <uuid.h>`, so the header is installed one level down
+# and the profile adds -I<prefix>/include/uuid.
+headers = ["libuuid/src/uuid.h"]
+provides = ["lib/libuuid.a", "include/uuid/uuid.h"]

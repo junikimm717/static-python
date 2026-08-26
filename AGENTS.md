@@ -149,100 +149,32 @@ pulls every source tarball into `tarballs/` serially, so two workers can
 never race the same curl. `parallel-pythons.pl` runs it automatically;
 pass `--no-download` if you know the cache is already warm.
 
-## Benchmarking workflow
+## Benchmarking
 
-The benchmark harness in `benchmark/` exists to put numbers on the "is `-O3
--flto` + static linking actually worth anything?" question and to catch
-regressions when libraries or the compiler get bumped. Three pieces:
+`benchmark/microbench.py`, `measure_startup.py`, `run.sh` and the twelve
+timestamped reports are gone. pyperformance is the canonical suite -- it is
+what speed.python.org publishes against, so its numbers are comparable to the
+wider world in a way a hand-rolled microbench never was. `staticpy bench`
+will drive it.
 
-| file | purpose |
-|---|---|
-| `benchmark/microbench.py` | CPU-bound interpreter loops, ns/op timing |
-| `benchmark/measure_startup.py` | external cold-start / first-import probe |
-| `benchmark/run.sh` | orchestrator -- runs both, emits a markdown report |
+Two things make that non-trivial for a static interpreter, and both are why
+the command does not exist yet:
 
-### Required state before you run
+- pyperformance builds a venv per run and pip-installs each benchmark's
+  requirements. This interpreter is `--with-ensurepip=no`, so there is no pip.
+- Several benchmark dependencies are C extensions, and no dlopen means no
+  compiled wheel will ever import.
 
-1. Container is up (`docker compose up -d spython`).
-2. Static build exists at
-   `python-static-${HOST_ARCH}-linux-musl/bin/python3.13`. If not, build it
-   (see above).
-3. (Optional but recommended) dynamic baseline exists at
-   `python-dynamic-${HOST_ARCH}-linux-musl/bin/python3.13`. If not, run
-   `./benchmark/dynamic-build.sh`. Without it, you only get static vs
-   system-python, which is a confounded comparison (different Python
-   versions).
+The fix is a `bundle.bench` of the pure-Python dependencies compiled in ahead
+of time. That lands with bundles, not before.
 
-### Running
+`benchmark/dynamic-build.sh` stays: the dynamic baseline is still the honest
+comparison target, and nothing else builds one. Note it currently reads
+`make print-PYTHON`, so it depends on the Makefile until that goes.
 
-```sh
-docker compose exec -T spython sh -c 'cd /workspace && ./benchmark/run.sh'
-```
-
-What happens:
-
-- Architecture is detected from `uname -m`; Python version from `make
-  print-PYTHONV`. Nothing is hard-coded.
-- The script writes a fresh report to
-  `benchmark/reports/<YYYY-MM-DDThhmmZ>_<arch>.md`, owned by the host UID
-  (the script `chown`s back so you can edit it).
-- The report includes (a) an Environment block (CPU model, core count,
-  cache hierarchy, kernel), (b) interpreter metadata (path, version,
-  linkage, on-disk size), (c) CPU micro-benchmark table with per-row and
-  geomean `X / static` ratios, (d) startup-probe table with the same shape,
-  and (e) an empty `## Analysis` placeholder at the bottom.
-- The full report is also echoed to stdout for ad-hoc inspection.
-
-### Writing the analysis (this is your job)
-
-**Always** open the new file under `benchmark/reports/` and replace the
-italic placeholder under `## Analysis` with prose. The previous report in
-that directory is the natural diff target. A good analysis:
-
-1. **Names the change.** "First run after `OPENSSL` 3.5.0 -> 3.5.6 and
-   `gcc` 9.4 -> 15.1.0". If you didn't change anything and it's a re-run,
-   say so and call out any drift bigger than ~3% as suspicious.
-2. **Calls out what moved meaningfully** -- per-row deltas of more than a
-   few percent vs the previous report. Don't editorialize 1.17x -> 1.18x;
-   *do* editorialize 0.92x -> 0.99x or 1.10x -> 1.13x.
-3. **Tests hypotheses against the numbers.** If the README claims
-   "regressions come from older libraries", and you just matched libraries
-   and the regressions are still there, *say that the hypothesis was
-   falsified* and propose the next one. Don't preserve a comfortable story.
-4. **Leaves a concrete next step.** A one-line `perf stat` invocation or
-   an extra benchmark you'd run beats a vague "should investigate".
-
-See `benchmark/reports/2026-05-17T1818Z_x86_64.md` for a worked example.
-
-### Also update `benchmark/reports/README.md`
-
-`benchmark/reports/README.md` is the short-attention-span cliffs-notes
-across **all** reports -- TL;DR + "what wins / what's mixed" ranges +
-reports index + open experiments. **It goes stale the moment a new
-report lands.** After writing your per-report `## Analysis`, do this:
-
-- Bump the "Last updated" date and the run-count line at the top.
-- If your new run pushes either bound of a range column under
-  "What wins" or "What is mixed or wrong", widen the range.
-- Add a row to the "Reports index" table (host + 1-line distinguishing
-  fact).
-- If a TL;DR bullet became more or less true, edit it. If an item in
-  "What is missing" got answered, strike it and turn the answer into a
-  TL;DR bullet.
-- If you found a new cross-cutting pattern (a row that's consistently
-  weird, a knob that consistently moves the geomean), add it.
-
-The cliffs-notes README has its own checklist at the bottom mirroring
-this; both should agree.
-
-### When to re-run
-
-- After bumping any version in the Makefile, or after a toolchain re-publish.
-- After touching `configure-wrapper.sh`, `python/Setup`, or any other thing
-  in `python/` that the runtime build picks up.
-- After rebuilding the dynamic baseline (`benchmark/dynamic-build.sh`).
-- *Not* in normal source edits that don't reach the binary.
-
+Benchmarks are native-only. Under qemu you are measuring qemu, and the
+overhead is not uniform across workloads, so the numbers are not comparable
+to anything -- not to native, and not to each other.
 ## Tmux discipline for long jobs
 
 The host has tmux; the container does not. Use the host wrapper pattern:
@@ -322,14 +254,13 @@ Don't commit unless the user explicitly asks. Even then:
 - The `hashes/` files matter -- if you bumped a version, the matching
   `hashes/*.sha256` must be in the same commit. The Makefile will refuse to
   build otherwise.
-- New benchmark reports under `benchmark/reports/` are tracked; commit them
-  alongside the source change that motivated re-running.
+- `config/*.toml` is the version pin now. If you bump a version there, the
+  sha256 in the same file must move with it.
 
 ## What "done" looks like for common tasks
 
 | task | done when |
 |---|---|
-| version bump | Makefile edited, `make update-hashes` run, `hashes/` refreshed, x86_64 static build green, sanity imports clean (`ssl, zlib, sqlite3, ctypes, _lzma, _hashlib`), benchmark re-run with analysis written, `benchmark/reports/README.md` updated |
+| version bump | `config/sources.toml` edited with the new version and sha256, x86_64 static build green, `staticpy verify --level core` clean |
 | toolchain change (re-publish from gccfactory) | `make toolchain` fetches it, `./test-portability/proof.sh` is green, x86_64 static build green, sanity imports clean, and the banner from the new binary mentions the expected gcc version (`python3 -c 'import sys; print(sys.version)'`) |
-| benchmark code change | report renders, analysis explains what the new metric is measuring and why the baseline numbers stayed put (or didn't), `benchmark/reports/README.md` updated |
 | cross-arch interpreter fan-out | `parallel-pythons.pl` exits clean, every arch in `supported.txt` has `python-static-<platform>/bin/python<PYTHONV>`, and at least one non-x86_64 arch benchmarked |

@@ -1,0 +1,94 @@
+#!/bin/sh
+# staticpy -- convenience shim.
+#
+# The division of labour: this script provisions the execution environment,
+# the binary consumes paths and builds artifacts. staticpy itself never
+# reaches the network for a toolchain, a busybox or a qemu; it is handed them
+# and fails loudly when one is missing. That is what lets the same binary run
+# against a volume mount, a gccfactory checkout, or a musl.cc unpack.
+#
+# Nothing here is required. `staticpy --toolchains <dir> ...` works alone.
+
+set -eu
+
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+DIST="${STATICPY_DIST:-$ROOT/dist}"
+BIN="$DIST/.bin/staticpy"
+TOOLCHAINS="${STATICPY_TOOLCHAINS:-$DIST/toolchains}"
+
+# Where gccfactory publishes. One directory per build-host arch, one tarball
+# per (target, kind) pair built on that host.
+MIRROR="${STATICPY_MIRROR:-https://dev.mit.junic.kim/cross}"
+
+NATIVE_ARCH="$(uname -m)"
+
+die() { echo "staticpy: $*" >&2; exit 1; }
+
+build_binary() {
+    command -v go >/dev/null 2>&1 || die "go is not installed, and $BIN does not exist.
+  Either install go, or fetch a released staticpy binary and put it at $BIN."
+    mkdir -p "$DIST/.bin"
+    # CGO off so the result is static and runs wherever the tarballs do.
+    ( cd "$ROOT/src/staticpy" && CGO_ENABLED=0 go build -o "$BIN" . )
+}
+
+# Rebuild when any source file is newer than the binary. `find -newer` beats a
+# checksum here: it is one syscall per file and wrong only in the direction of
+# rebuilding too often.
+needs_rebuild() {
+    [ -x "$BIN" ] || return 0
+    [ -n "$(find "$ROOT/src/staticpy" -name '*.go' -newer "$BIN" -print -quit 2>/dev/null)" ]
+}
+
+fetch_toolchain() {
+    triple="$1"; kind="$2"
+    dest="$TOOLCHAINS/$triple-$kind"
+    [ -d "$dest" ] && return 0
+
+    url="$MIRROR/$NATIVE_ARCH/$triple-$kind.tgz"
+    tmp="$TOOLCHAINS/.$triple-$kind.$$.tgz"
+    mkdir -p "$TOOLCHAINS"
+    echo "staticpy: fetching $triple-$kind from $url" >&2
+    curl -Lf --retry 3 "$url" -o "$tmp" || {
+        rm -f "$tmp"
+        die "could not fetch $triple-$kind from $url.
+  These are built by gccfactory (github.com/junikimm717/gccfactory).
+  If you have one locally, point at it instead:
+      staticpy --toolchains <dir>            (expects <dir>/$triple-$kind/)
+      staticpy --toolchain $triple=<path>"
+    }
+
+    staging="$TOOLCHAINS/.stage.$$"
+    rm -rf "$staging"; mkdir -p "$staging"
+    tar -xzf "$tmp" -C "$staging"
+    # The tarball carries its own top-level directory; move whatever it is into
+    # the name staticpy resolves, so the layout is ours rather than gccfactory's.
+    inner="$(find "$staging" -mindepth 1 -maxdepth 1 -type d | head -n1)"
+    [ -n "$inner" ] || { rm -rf "$staging" "$tmp"; die "$triple-$kind.tgz has no top-level directory"; }
+    mv "$inner" "$dest"
+    rm -rf "$staging" "$tmp"
+}
+
+if needs_rebuild; then
+    build_binary
+fi
+
+# busybox is deliberately not downloaded. Fetching an unpinned binary and
+# putting it on a build PATH would undercut the checksum story the rest of the
+# system depends on, so we use one that is already here or say what is missing.
+BUSYBOX="${STATICPY_BUSYBOX:-$(command -v busybox 2>/dev/null || true)}"
+
+# Ask the binary what this invocation needs before running it for real. It can
+# answer without a toolchain, which is what makes lazy provisioning possible.
+PLAN="$("$BIN" doctor --provision-plan --toolchains "$TOOLCHAINS" -- "$@" 2>/dev/null || true)"
+if [ -n "$PLAN" ]; then
+    echo "$PLAN" | while IFS='	' read -r triple kind; do
+        [ -n "${triple:-}" ] || continue
+        fetch_toolchain "$triple" "$kind"
+    done
+fi
+
+set -- --toolchains "$TOOLCHAINS" --dist "$DIST" "$@"
+[ -n "$BUSYBOX" ] && set -- --busybox "$BUSYBOX" "$@"
+
+exec "$BIN" "$@"

@@ -1,0 +1,89 @@
+# Flag sets. `default` is exactly what configure-wrapper.sh exported, minus the
+# -I/-L paths: those are absolute and belong to the job, not the profile.
+#
+# Scopes ([profile.X.python], [profile.X.deps], [profile.X.deps.<pkg>],
+# [profile.X.pyhost]) layer on top of the profile-wide values, so a change
+# confined to one scope only rebuilds what that scope reaches.
+
+[profile.default]
+cflags = [
+  "-O3",
+  # Hand-rolled LTO rather than CPython's --with-lto: --with-lto also wraps the
+  # PGO-instrument bootstrap link in -fno-lto, which then cannot read slim LTO
+  # bitcode out of our static sub-dep archives (libsqlite3.a et al). Driving it
+  # from the flags puts the plugin on every link, so slim archives work and we
+  # never have to build fat sub-deps.
+  "-flto=auto",
+  "-flto-partition=none",
+  "-fuse-linker-plugin",
+  # --gc-sections can only drop what the compiler split up first.
+  "-ffunction-sections",
+  "-fdata-sections",
+  "-no-pie",
+  "-pipe",
+  # Third-party sources at -O3 produce warnings we are not going to fix, and
+  # several of these trees still build with -Werror by default.
+  "-Wno-error",
+  "-w",
+]
+ldflags = [
+  # ctypes' static symbol table resolves against the interpreter's own dynamic
+  # symbols, so they have to survive the link.
+  "-Wl,--export-dynamic",
+  "-static",
+  "--static",
+  "-no-pie",
+  "-flto=auto",
+  "-flto-partition=none",
+  "-fuse-linker-plugin",
+  "-Wl,--gc-sections",
+  "-Wl,-O1",
+  "-Wl,--as-needed",
+]
+# -s is not listed above: it is what strip means, and the recipe adds it.
+strip = true
+debug_symbols = false
+# PGO trains by running the interpreter it just built, so it is only possible
+# when the build host can execute the target.
+pgo = "native-only"
+# -x test_re: musl has no non-C byte-level case folding, so the locale tests in
+#   test_re fail. Alpine's apk build skips the same module.
+# -i test_fma_zero_result: musl's fma fast path gets an IEEE-754 negative-zero
+#   case wrong. CPython gates this test with @skipIf(linked_to_musl()), but that
+#   probe shells out to ldd, which exits non-zero on a fully static -no-pie
+#   binary, so the skip never fires. See ai/MUSL_REPORT.md.
+profile_task = "-m test --pgo -x test_re -i test_fma_zero_result"
+# The _test* modules are builtins in a static interpreter, so shipping them is
+# a cost paid on every startup rather than an unused directory.
+test_modules = false
+modules = "full"
+
+# LTO on the CPython tree is where the build time goes and where the compiler
+# bugs show up. Dropping it there keeps the dependency artifacts intact, so
+# switching to this profile does not rebuild openssl.
+[profile.nolto]
+inherit = "default"
+
+[profile.nolto.python]
+cflags_remove = ["-flto=auto", "-flto-partition=none", "-fuse-linker-plugin"]
+ldflags_remove = ["-flto=auto", "-flto-partition=none", "-fuse-linker-plugin"]
+
+[profile.nopgo]
+inherit = "default"
+pgo = "off"
+
+[profile.debug]
+inherit = "default"
+strip = false
+debug_symbols = true
+cflags_add = ["-g"]
+
+# The host interpreter that cross builds need in order to run CPython's own
+# build steps. It is a means, not an output: nothing about it ships, so it
+# trades every optimisation for the shortest path to a runnable python.
+[profile.bootstrap]
+inherit = "default"
+pgo = "off"
+modules = "minimal"
+cflags_remove = ["-flto=auto", "-flto-partition=none", "-fuse-linker-plugin"]
+ldflags_remove = ["-flto=auto", "-flto-partition=none", "-fuse-linker-plugin"]

@@ -101,48 +101,17 @@ You can also view supported architectures in the `supported.txt` file. (I assume
 if you are actually trying to run this project, you for sure know what you are
 doing 😇)
 
-## Benchmarking (AI-Assisted)
+## Benchmarking
 
-A small benchmark harness in `benchmark/` exists to put numbers on the
-"is `-O3 -flto` + static linking actually worth anything?" question.
-Always native-vs-native. Run it from inside the dev container:
+The dynamic baseline still lives at `benchmark/dynamic-build.sh` -- a stock
+`--enable-shared` Python of the same pinned version, which is the only honest
+comparison target for a static build:
 
 ```sh
-# (one-off) build a stock dynamic Python of the same version, using the
-# container's gcc and apk-installed openssl-dev/zlib-dev/sqlite-dev/...
-./benchmark/dynamic-build.sh
-
-# run the comparison; report lands in benchmark/reports/ and is echoed
-# to stdout
-./benchmark/run.sh
+docker compose exec -T spython sh -c 'cd /workspace && ./benchmark/dynamic-build.sh'
 ```
 
-The runner compares whichever of these interpreters resolve to an executable:
-
-- `python-static-$(uname -m)-linux-musl/bin/python$(PYTHONV)` (this repo, required)
-- `python-dynamic-$(uname -m)-linux-musl/bin/python$(PYTHONV)` (above, optional)
-- `/usr/bin/python3` (the container's system python, optional)
-
-It runs a CPU-bound interpreter micro-benchmark suite (`benchmark/microbench.py`)
-plus an external startup / first-import probe (`benchmark/measure_startup.py`).
-Each report is timestamped + arch-tagged under `benchmark/reports/` (e.g.
-`2026-05-17T1818Z_x86_64.md`) so the run history is reviewable, and includes
-an Environment block (CPU model, core count, cache hierarchy, kernel) so a
-random row of numbers can't get mistaken for a different machine. The report
-shows per-row `X / static` ratios and a final geometric-mean row per
-non-static interpreter. Each path is overridable via `STATIC=` / `DYNAMIC=` /
-`SYSTEM=`. Architecture comes from `uname -m`; the Python version comes from
-`make print-PYTHON` -- nothing is hard-coded.
-
-The script appends an empty `## Analysis` section to every report; the agent
-or human running the benchmark is expected to fill it in with what moved and
-why. See [`AGENTS.md`](AGENTS.md) for the full workflow.
-
-For the short summary across all runs to date (what
-consistently wins, what's regressed, what we still don't know), see
-[`benchmark/reports/README.md`](./benchmark/reports/README.md). The
-individual per-run reports live alongside it in
-[`benchmark/reports/`](./benchmark/reports/).
-
-benchmark/reports is wholly managed by LLM. The only exception is the data at the top of each timestamped report.
-The interpretation the LLM gives is not guaranteed to be correct.
+The hand-rolled microbenchmark harness is gone. pyperformance is the canonical
+suite -- it is what speed.python.org publishes against -- and `staticpy bench`
+will drive it once bundles land, since a pip-less, dlopen-less interpreter
+needs its pure-Python dependencies compiled in rather than installed.

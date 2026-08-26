@@ -1,0 +1,37 @@
+# What CPython's suite is expected to do. An unexpected pass is a failure too:
+# a skip list that only ever grows is how a test suite stops meaning anything.
+#
+# [expect.all] applies everywhere. [expect.static] applies to the static
+# interpreter only, so the same list can cover the dynamic build.
+
+[[expect.all.skip]]
+test = "test_re"
+why = """
+musl implements no byte-level case folding outside the C locale, so the \
+locale-dependent cases in test_re fail. Alpine's apk build excludes the same \
+module.\
+"""
+
+[[expect.all.skip]]
+test = "test_fma_zero_result"
+why = """
+musl's fma fast path returns the wrong sign of zero for an IEEE-754 corner \
+case. CPython already guards this with @skipIf(linked_to_musl()), but that \
+probe shells out to ldd, which exits non-zero on a fully static -no-pie \
+binary, so the guard never fires. See ai/MUSL_REPORT.md.\
+"""
+
+# These load Modules/_ctypes_test at runtime. It is built as a .so, and a
+# static interpreter has no dlopen to load it with -- ctypes here can describe
+# foreign types and reach the interpreter's own symbols, nothing more.
+[[expect.static.skip]]
+test = "test_ctypes.test_loading"
+why = "Loads _ctypes_test.so through CDLL; there is no dlopen."
+
+[[expect.static.skip]]
+test = "test_ctypes.test_find"
+why = "find_library + CDLL against system shared objects."
+
+[[expect.static.skip]]
+test = "test_ctypes.test_dlerror"
+why = "Asserts on dlerror() text from a dlopen that cannot happen."
