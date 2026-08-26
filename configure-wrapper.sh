@@ -42,8 +42,8 @@ esac
 # We don't actually pass --with-lto because it also wraps the PGO-instrument
 # bootstrap link in -fno-lto, which then can't read slim LTO bitcode out of
 # our static sub-dep archives (libsqlite3.a et al.). Driving LTO from the
-# wrapper keeps the plugin loaded for every link, so slim archives work and
-# we avoid building fat sub-deps we'd otherwise never need.
+# wrapper puts the plugin on every link, so slim archives work and we avoid
+# building fat sub-deps we'd otherwise never need.
 export LDFLAGS="-Wl,--export-dynamic -static -no-pie \
   -flto=auto -flto-partition=none -fuse-linker-plugin \
   $STRIP_LDFLAGS --static -L$ROOT/build-$TARGET/lib \

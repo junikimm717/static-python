@@ -8,13 +8,14 @@ reference -- what to run, where to write, what to leave behind.
 
 A from-source static Python toolchain. Version pins:
 
-- Top-level `Makefile` pins `CROSSMAKE`, `OPENSSL`, `LIBFFI`, `LIBLZMA`,
-  `ZLIB`, `READLINE`, `NCURSES`, `SQLITE`, `BZIP2`, `UTILLINUX`, `PYTHON`,
-  `LINUX_VER`, and `GCC_VER`.
-- `cross-make/config.mak` pins `GCC_VER` (must match the top-level
-  Makefile's `GCC_VER`; the post-install hook reads the top-level one).
-- `binutils`, `musl`, `gmp`, `mpc`, `mpfr`, `config.{sub,guess}` come from
-  `musl-cross-make` master's defaults; no local override.
+- Top-level `Makefile` pins `OPENSSL`, `LIBFFI`, `LIBLZMA`, `ZLIB`,
+  `READLINE`, `NCURSES`, `SQLITE`, `BZIP2`, `UTILLINUX`, and `PYTHON`.
+- The toolchain is **not** built here. gcc, binutils, musl, gmp, mpc, mpfr
+  and the kernel headers are pinned in
+  [gccfactory](https://github.com/junikimm717/gccfactory), which publishes
+  one relocatable tarball per (host, target) cell to dev.mit.junic.kim.
+  A compiler version bump is a gccfactory change plus a re-upload, not a
+  change here.
 - Supported targets: `supported.txt`.
 
 Builds run **inside the Alpine dev container**, never on the host. The
@@ -45,20 +46,12 @@ between commands.
 
 - **Static, native arch** (this is `python3` -- the repo's default target):
   ```sh
-  docker compose exec -T spython sh -c 'cd /workspace && make USE_CROSSMAKE=1 python3 -j$(nproc)'
+  docker compose exec -T spython sh -c 'cd /workspace && make python3 -j$(nproc)'
   ```
-  `USE_CROSSMAKE=1` forces a from-source toolchain via `musl-cross-make`
-  rather than the prebuilt `*.tgz` mirror referenced for `USE_CROSSMAKE=0`.
-  Both paths install into the same `deps-$(TARGET)/$(TARGET)-$(TCTYPE)/`
-  prefix, so a downstream Python build is indifferent.
-- **Static, all archs (toolchains)**: `./parallel-toolchains.pl` from inside
-  the container, inside a tmux session. Supervises N concurrent
-  toolchain builds (default 4 workers x -j8 each), prefixes a `make
-  download` to populate `tarballs/` serially, and writes per-platform
-  logs to `build-logs/toolchain-<platform>.log`. Default is fail-fast;
-  pass `-k` for keep-going. Default skips any platform whose
-  `tarballs/<platform>-<tctype>.tgz` already exists; pass `--force` to
-  rebuild. Plan for a multi-hour wall clock with gcc 15.
+  The toolchain is fetched as a tarball and unpacked into
+  `deps-$(TARGET)/$(TARGET)-$(TCTYPE)/`. `make toolchain` does just that
+  step, which is the cheapest way to check a fresh publish before spending
+  an hour on a python build.
 - **Static interpreter, all archs**: `./parallel-pythons.pl` from inside
   the container, inside a tmux session. Builds the native interpreter serially
   first (cross targets need it), then supervises N concurrent cross builds
@@ -66,9 +59,7 @@ between commands.
   per-platform logs to `build-logs/python-static-<platform>.log`. Default is
   fail-fast; pass `-k` for keep-going. Default skips any platform whose
   `python-static-<platform>/bin/python<PYTHONV>` already exists; pass
-  `--force` to rebuild. Expects prebuilt toolchain tarballs (`USE_CROSSMAKE=0`,
-  the default); pass `--use-crossmake` to build toolchains inline. Plan for a
-  multi-hour wall clock.
+  `--force` to rebuild. Plan for a multi-hour wall clock.
 - **Dynamic baseline (x86_64 / aarch64 / whichever host you're on)**:
   ```sh
   docker compose exec -T spython sh -c 'cd /workspace && ./benchmark/dynamic-build.sh'
@@ -81,17 +72,12 @@ Build artefacts you can safely nuke if you need to re-do work:
   Makefile is idempotent so a partial removal triggers a partial rebuild.
 - `python-static-${TARGET}/`, `python-dynamic-${TARGET}/`: the installed
   interpreters.
-- `tarballs/`: mixed source cache. Contains (a) external dep sources
-  pulled by the Makefile (openssl, libffi, ..., Python), (b)
-  `musl-cross-make-master.tar.gz`, (c) musl-cross-make sources populated
-  by `make download` (gcc, binutils, musl, ...), and (d) per-platform
-  toolchain tarballs we built (`<platform>-<tctype>.tgz`). All entries
-  in (a)/(b)/(c) are sha256/sha1-pinned. The (d) tarballs match what
-  the `USE_CROSSMAKE=0` recipe would otherwise download from
-  `dev.mit.junic.kim`.
-- `deps-download-prime/`: sentinel tree for `make download`. Holds the
-  extracted source dirs as a benign side effect (~1.5 GB). `make clean`
-  intentionally preserves it; `make distclean` removes it.
+- `tarballs/`: mixed cache. Contains (a) external dep sources pulled by
+  the Makefile (openssl, libffi, ..., Python), each sha256-pinned in
+  `hashes/`, and (b) per-platform toolchain tarballs
+  (`<platform>-<tctype>.tgz`) downloaded from dev.mit.junic.kim. The (b)
+  entries are deliberately not hashed here -- they are our own build
+  output, verified in gccfactory.
 - *Never* nuke `hashes/` -- those are the trusted checksums for every
   externally fetched tarball.
 
@@ -107,39 +93,43 @@ filesystem is owned by you before proceeding.
 
 ## Portability check
 
-The whole point of the `cross-make/wrapper.c` + `cross-make/post-install.sh`
-trick is that a toolchain tarball built here drops onto **any** Linux
-rootfs (glibc, near-empty, whatever) and just works -- including the
-`-flto -fuse-linker-plugin -fno-fat-lto-objects` path where `ld.bfd`
-has to dlopen `liblto_plugin.so`. The end-to-end proof lives in
-`cross-make/test-portability/`:
+A toolchain tarball has to drop onto **any** Linux rootfs -- glibc,
+near-empty, whatever -- and just work, including the
+`-flto -fuse-linker-plugin -fno-fat-lto-objects` path. Both halves of that
+come from gccfactory: every binary is static-musl (nothing to dlopen, no
+loader to find) and GCC's LTO plugin is compiled into `libbfd`, so `ld`
+resolves a `-plugin liblto_plugin.so` argument to its built-in copy rather
+than opening a file that does not exist. The end-to-end proof lives in
+`test-portability/`:
 
 ```sh
-./cross-make/test-portability/proof.sh
+./test-portability/proof.sh
 # tee's full output to build-logs/portability-alien.log
 ```
 
-That builds a `debian:stable-slim` "alien" image with no compiler in
-it (only `make`/`file`/`binutils`), extracts the host-native toolchain
-tarball (`<uname -m>-linux-musl-native.tgz`, e.g. x86_64 or aarch64)
-into `/opt`, then compiles + runs three nontrivial programs (C, C++
-with libstdc++, and a two-TU LTO build via `-flto -fuse-linker-plugin
--fno-fat-lto-objects`), including a negative control that links the
-slim LTO objects *without* the plugin to confirm the link actually
-fails. Re-run after touching `wrapper.c`, `post-install.sh`, or after
-a `GCC_VER` / `BINUTILS` bump. `proof.sh` packs the tarball from
+That builds a `debian:stable-slim` "alien" image with no compiler in it
+(only `make`/`file`/`binutils`), extracts the host-native toolchain tarball
+(`<uname -m>-linux-musl-native.tgz`) into `/opt`, checks no driver binary
+has a `PT_INTERP` and that the unprefixed tool names (`cc`, `ld`, `make`,
+...) are all present, then compiles + runs three nontrivial programs (C,
+C++ with libstdc++, and a two-TU LTO build through a static archive),
+including a negative control that links the slim LTO objects *without* the
+plugin to confirm the link actually fails. Re-run after a toolchain
+re-publish. `proof.sh` packs the tarball from
 `deps-<arch>-linux-musl/<arch>-linux-musl-native/` when missing; or
 regenerate explicitly with:
 
 ```sh
 docker compose exec -T spython sh -lc \
   'cd /workspace && H=$(uname -m) && \
-   tar -czf cross-make/test-portability/${H}-linux-musl-native.tgz \
+   tar -czf test-portability/${H}-linux-musl-native.tgz \
      -C deps-${H}-linux-musl ${H}-linux-musl-native'
 ```
 
 Full writeup, including expected output, falsification controls, and
-"where this would break", is in `ai/PORTABILITY_PROOF.md`.
+"where this would break", is in `ai/PORTABILITY_PROOF.md` -- written
+against the older wrapper-based toolchain, so read its mechanism sections
+as history.
 
 ## Tarball hashes and preflight downloads
 
@@ -154,15 +144,10 @@ docker compose exec -T spython sh -c 'cd /workspace && make update-hashes'
 
 Then commit the new `hashes/*.sha256` files alongside the Makefile change.
 
-Before any parallel toolchain run, preflight the cache with `make
-download`. It pulls every tarball any toolchain or python3 build will
-need (top-level deps + musl-cross-make sources) into `tarballs/`
-serially. This eliminates the only real concurrency race: multiple
-`make crossmake` workers symlink `sources/` back to the shared
-`tarballs/`, and musl-cross-make's `sources/%` wget rule has no locking,
-so two workers fetching the same gcc tarball corrupt one tmp file.
-`parallel-toolchains.pl` runs `make download` automatically; pass
-`--no-download` if you know the cache is already warm.
+Before any parallel build, preflight the cache with `make download`. It
+pulls every source tarball into `tarballs/` serially, so two workers can
+never race the same curl. `parallel-pythons.pl` runs it automatically;
+pass `--no-download` if you know the cache is already warm.
 
 ## Benchmarking workflow
 
@@ -252,7 +237,7 @@ this; both should agree.
 
 ### When to re-run
 
-- After bumping any version in the Makefile or `cross-make/config.mak`.
+- After bumping any version in the Makefile, or after a toolchain re-publish.
 - After touching `configure-wrapper.sh`, `python/Setup`, or any other thing
   in `python/` that the runtime build picks up.
 - After rebuilding the dynamic baseline (`benchmark/dynamic-build.sh`).
@@ -275,7 +260,7 @@ LOG=$PWD/build.log
 tmux new-session -d -s build "bash -c '\
   set -o pipefail; \
   docker compose exec -T spython \
-    sh -lc \"cd /workspace && make USE_CROSSMAKE=1 python3 -j\\\$(nproc)\" \
+    sh -lc \"cd /workspace && make python3 -j\\\$(nproc)\" \
   2>&1 | tee $LOG; \
   echo EXIT_CODE=\${PIPESTATUS[0]} | tee -a $LOG'"
 ```
@@ -286,10 +271,10 @@ tail; check for `EXIT_CODE=0` **and** grep `'Error [0-9]\|FAILED'` to
 catch failure messages, since past `EXIT_CODE=0` lines on broken builds
 have been observed when the launcher pattern wasn't pipestatus-aware.
 
-For all-arch toolchain builds use `parallel-toolchains.pl` rather than
-hand-rolling parallel `make crossmake` calls; it owns the worker pool
-and per-platform logging itself, and it expects to be invoked from
-inside a single tmux session.
+For all-arch interpreter builds use `parallel-pythons.pl` rather than
+hand-rolling parallel `make` calls; it owns the worker pool and
+per-platform logging itself, and it expects to be invoked from inside a
+single tmux session.
 
 ## Comment style
 
@@ -345,7 +330,6 @@ Don't commit unless the user explicitly asks. Even then:
 | task | done when |
 |---|---|
 | version bump | Makefile edited, `make update-hashes` run, `hashes/` refreshed, x86_64 static build green, sanity imports clean (`ssl, zlib, sqlite3, ctypes, _lzma, _hashlib`), benchmark re-run with analysis written, `benchmark/reports/README.md` updated |
-| toolchain change | as above, plus banner from the new binary mentions the right gcc version (`python3 -c 'import sys; print(sys.version)'`); if `GCC_VER` moved, both the top-level `Makefile` and `cross-make/config.mak` were bumped together |
+| toolchain change (re-publish from gccfactory) | `make toolchain` fetches it, `./test-portability/proof.sh` is green, x86_64 static build green, sanity imports clean, and the banner from the new binary mentions the expected gcc version (`python3 -c 'import sys; print(sys.version)'`) |
 | benchmark code change | report renders, analysis explains what the new metric is measuring and why the baseline numbers stayed put (or didn't), `benchmark/reports/README.md` updated |
-| cross-arch toolchain fan-out | `parallel-toolchains.pl` exits clean, every arch in `supported.txt` has a `tarballs/<arch>-<tctype>.tgz`, and `build-logs/toolchain-<arch>.log` ends in `EXIT_CODE=0` |
 | cross-arch interpreter fan-out | `parallel-pythons.pl` exits clean, every arch in `supported.txt` has `python-static-<platform>/bin/python<PYTHONV>`, and at least one non-x86_64 arch benchmarked |

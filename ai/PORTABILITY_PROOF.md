@@ -1,5 +1,13 @@
 # Portability Proof: musl-cross Toolchain on a Foreign (glibc) Rootfs
 
+> **History.** This was written against the musl-cross-make toolchain, whose
+> drivers were dynamic and reached their real binaries through a `tc-wrapper`
+> + bundled loader. Toolchains now come from gccfactory: every binary is
+> static-musl and the LTO plugin is compiled into `libbfd`, so the wrapper and
+> its `runtime/` + `.real/` machinery are gone. The property proven here still
+> holds and `test-portability/` still checks it; read the mechanism sections
+> below as an account of how it used to be arranged.
+
 ## Summary
 
 The host-native musl toolchain (`<uname -m>-linux-musl-native`, e.g. x86_64 or
@@ -13,28 +21,28 @@ wrapper system exists. Every artefact it produces is `static-pie linked`,
 has no `PT_INTERP`, has no `DT_NEEDED`, and carries no glibc identifying
 strings -- the host glibc never gets touched. The proof runs in roughly
 seven seconds after a `make download`-free, cache-warm Docker build, and is
-re-runnable end-to-end via `cross-make/test-portability/proof.sh`.
+re-runnable end-to-end via `test-portability/proof.sh`.
 
 ## Reproducer
 
 ```sh
 # Host: x86_64 or aarch64 with docker + a recent kernel. No special privileges.
 # proof.sh picks <uname -m>-linux-musl-native.tgz (packs from deps-* if missing).
-./cross-make/test-portability/proof.sh
+./test-portability/proof.sh
 # tee's full output to build-logs/portability-alien.log
 ```
 
 Internals:
 
-- `cross-make/test-portability/Dockerfile.alien` -- `debian:stable-slim`
+- `test-portability/Dockerfile.alien` -- `debian:stable-slim`
   with `make`, `file`, `binutils`, `ca-certificates`, and a Dockerfile
   tripwire that fails the build if any of `cc`, `gcc`, `g++` survive.
-- `cross-make/test-portability/<arch>-linux-musl-native.tgz` -- the toolchain
+- `test-portability/<arch>-linux-musl-native.tgz` -- the toolchain
   tarball under test (`<arch>` = host `uname -m`). Produced by tar'ing the
   wrapper-applied install tree out of `deps-<arch>-linux-musl/<arch>-linux-musl-native/`.
-- `cross-make/test-portability/tests/{hello.c,hello.cc,lib.c,lib.h,main.c}`
+- `test-portability/tests/{hello.c,hello.cc,lib.c,lib.h,main.c}`
   -- the three nontrivial programs (C, C++, two-TU LTO-via-archive).
-- `cross-make/test-portability/run.sh` -- the in-container driver:
+- `test-portability/run.sh` -- the in-container driver:
   identifies the rootfs, confirms no compiler is on `PATH`, extracts the
   tarball under `/opt`, compiles + runs each test, and emits the deep
   linkage diagnostics quoted below.
@@ -301,7 +309,7 @@ runtime deps, and only confirm provenance.
 
 ## What we ended up doing
 
-- Authored `cross-make/test-portability/{Dockerfile.alien, run.sh,
+- Authored `test-portability/{Dockerfile.alien, run.sh,
   proof.sh, tests/}` and committed a freshly-tar'd
   `x86_64-linux-musl-native.tgz` next to them.
 - Refactored `run.sh` after a first pass: the initial draft tried to
@@ -324,13 +332,13 @@ runtime deps, and only confirm provenance.
   `collect2 -plugin ...` line above. If the plugin path or arguments
   change shape, update the `grep` in `run.sh` so we don't silently
   start passing without exercising the right thing.
-- The tarball `cross-make/test-portability/<arch>-linux-musl-native.tgz`
+- The tarball `test-portability/<arch>-linux-musl-native.tgz`
   (`<arch>` = host `uname -m`) is the artefact under test. `proof.sh`
   packs it from `deps-<arch>-linux-musl/` when missing, or regenerate with:
   ```sh
   docker compose exec -T spython sh -lc \
     'cd /workspace && H=$(uname -m) && \
-     tar -czf cross-make/test-portability/${H}-linux-musl-native.tgz \
+     tar -czf test-portability/${H}-linux-musl-native.tgz \
        -C deps-${H}-linux-musl ${H}-linux-musl-native'
   ```
   Refresh it any time `cross-make/post-install.sh` or `wrapper.c`

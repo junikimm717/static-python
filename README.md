@@ -56,10 +56,8 @@ Alternatively, make sure you have all of the following packages on your system
 ## Building Native
 
 ```sh
-# Build python while downloading gcc binaries from musl.cc
+# Build python. The toolchain is downloaded, not built here.
 make
-# Or build python while manually compiling your own gcc toolchain
-make USE_CROSSMAKE=1
 # run your statically linked python3!
 ./python-static-$(uname -m)/bin/python3
 ```
@@ -69,10 +67,10 @@ make USE_CROSSMAKE=1
 ```sh
 # First, compile a native python interpreter (assuming on x86_64 system).
 make
-# Next, cross-compile to aarch64 while downloading gcc binaries.
+# Next, cross-compile to aarch64.
 make ARCH=aarch64
-# Then, compile to riscv64 while bootstrapping the toolchain.
-make ARCH=riscv64 USE_CROSSMAKE=1
+# ...or to riscv64.
+make ARCH=riscv64
 ```
 
 Cross-compiling is now officially supported from x86_64 and aarch64! This
@@ -90,11 +88,14 @@ weird architecture, you might want to additionally specify ABI type through
 `$(MUSLABI)`. You can check out different musl ABI types at
 [musl.cc](https://musl.cc/)
 
-If you don't want to build gcc from scratch, the build system will install
-toolchains from either musl.cc or
-[dev.mit.junic.kim](https://dev.mit.junic.kim/cross), where I have pre-built
-cross-compiling toolchains from aarch64. Otherwise, supply the `USE_CROSSMAKE`
-argument to make to build the cross-compiling toolchain.
+The toolchains themselves are not built here. They come from
+[gccfactory](https://github.com/junikimm717/gccfactory), which builds the whole
+host x target matrix of GCC + musl toolchains and publishes one relocatable
+tarball per cell to
+[dev.mit.junic.kim](https://dev.mit.junic.kim/cross/); `make` fetches the one
+it needs. Every binary in them is static-musl, so a tarball drops onto any
+Linux rootfs -- glibc, near-empty, whatever -- and just works. `test-portability/`
+proves exactly that, in a Debian image with no compiler in it.
 
 You can also view supported architectures in the `supported.txt` file. (I assume
 if you are actually trying to run this project, you for sure know what you are

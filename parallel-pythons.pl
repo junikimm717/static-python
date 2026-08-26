@@ -33,7 +33,6 @@ my %opt = (
 	download      => 1,
 	fail_fast     => 1,
 	force         => 0,
-	use_crossmake => 0,
 	status_int    => 60,
 );
 
@@ -47,7 +46,6 @@ usage: parallel-pythons.pl [options] [platform ...]
   -J, --make-jobs N      JOBS env passed per cross build (default 8)
       --log-dir DIR      per-platform logs               (default build-logs)
       --no-download      skip the `make download` preflight
-      --use-crossmake    pass USE_CROSSMAKE=1 to inner builds (default 0)
   -k, --keep-going       do not abort on first failure   (default: fail-fast)
       --force            rebuild even if interpreter already present
       --status-interval N  seconds between running summaries (default 60)
@@ -70,7 +68,6 @@ GetOptions(\%opt,
 	'keep-going|k' => sub { $opt{fail_fast} = 0 },
 	'fail-fast'    => sub { $opt{fail_fast} = 1 },
 	'force',
-	'use-crossmake',
 	'status-interval=i' => \$opt{status_int},
 	'help|h' => sub { usage(0) },
 ) or usage(2);
@@ -169,7 +166,7 @@ sub run_logged_make {
 		or die "cannot open $logfile: $!\n";
 	print {$logfh} "=== platform: $platform\n";
 	print {$logfh} "=== started:  ", strftime('%FT%TZ', gmtime), "\n";
-	print {$logfh} "=== JOBS=$jobs USE_CROSSMAKE=$opt{use_crossmake}\n";
+	print {$logfh} "=== JOBS=$jobs\n";
 	$logfh->autoflush(1);
 
 	local *STDOUT = $logfh;
@@ -211,7 +208,6 @@ sub build_native_preflight {
 
 	my @make = (
 		'make',
-		"USE_CROSSMAKE=$opt{use_crossmake}",
 		"JOBS=$jobs",
 		'python3',
 	);
@@ -284,13 +280,12 @@ sub spawn_worker {
 		open STDERR, '>&', \*STDOUT      or die "child stderr: $!\n";
 		print "=== platform: $platform\n";
 		print "=== started:  ", strftime('%FT%TZ', gmtime), "\n";
-		print "=== JOBS=$opt{make_jobs} USE_CROSSMAKE=$opt{use_crossmake}\n";
+		print "=== JOBS=$opt{make_jobs}\n";
 		STDOUT->autoflush(1);
 
 		$ENV{JOBS} = $opt{make_jobs};
 		exec(
 			'make',
-			"USE_CROSSMAKE=$opt{use_crossmake}",
 			"JOBS=$opt{make_jobs}",
 			"ARCH=$arch",
 			"MUSLABI=$abi",
@@ -400,10 +395,9 @@ sub handle_signal {
 # ---- main loop ---------------------------------------------------------
 
 stderr_log(sprintf(
-	"jobs=%d make-jobs=%d log-dir=%s fail-fast=%s use-crossmake=%s cross=%d",
+	"jobs=%d make-jobs=%d log-dir=%s fail-fast=%s cross=%d",
 	$opt{jobs}, $opt{make_jobs}, $opt{log_dir},
 	$opt{fail_fast} ? 'yes' : 'no',
-	$opt{use_crossmake} ? 'yes' : 'no',
 	scalar @cross_requested));
 
 my $last_status = time();

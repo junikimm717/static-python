@@ -4,7 +4,7 @@
 # See ai/PORTABILITY_PROOF.md.
 #
 # Runs INSIDE the alien container. Expects:
-#   /toolchain.tgz       toolchain tarball produced by `make USE_CROSSMAKE=1`
+#   /toolchain.tgz       toolchain tarball as published by gccfactory
 #   /tests/              test sources (hello.c, hello.cc, lib.c, main.c)
 #   /opt                 writable dir we extract the toolchain into
 
@@ -37,7 +37,7 @@ banner "extract toolchain"
 mkdir -p /opt
 tar -xzf /toolchain.tgz -C /opt
 TC=$(find /opt -maxdepth 1 -type d -name '*-linux-musl-native' | head -n 1)
-if [ -z "$TC" ] || [ ! -d "$TC/bin" ] || [ ! -d "$TC/runtime" ]; then
+if [ -z "$TC" ] || [ ! -d "$TC/bin" ]; then
 	echo "FAIL: expected exactly one *-linux-musl-native tree under /opt"
 	ls -la /opt
 	exit 1
@@ -53,14 +53,32 @@ CXX=${TRIPLET}-g++
 AR=${TRIPLET}-gcc-ar
 READELF=${TRIPLET}-readelf
 
-banner "inspect wrapper + real binary + bundled loader"
-file -b "$TC/bin/$CC"
-file -b "$TC/bin/.real/$CC"
-file -b "$TC/runtime/libc.so"
-echo "--- readelf -d runtime/libc.so ---"
-readelf -d "$TC/runtime/libc.so" 2>&1 | head -30 || true
-echo "--- bfd-plugins ---"
-ls -la "$TC/lib/bfd-plugins/" 2>&1 || true
+banner "inspect driver binaries"
+# Every binary is static-musl, so there is no loader to bundle and nothing to
+# dlopen: that is what makes the tarball rootfs-agnostic.
+for b in "$CC" "$CXX" ld; do
+	printf '%-32s %s\n' "bin/$b" "$(file -b "$TC/bin/$b")"
+done
+for b in "$CC" "$CXX" ld; do
+	if readelf -l "$TC/bin/$b" 2>/dev/null | grep -q INTERP; then
+		echo "FAIL: bin/$b has a PT_INTERP; it is not a static binary"
+		exit 1
+	fi
+done
+echo "OK: no PT_INTERP on any driver binary"
+
+banner "unprefixed tool names"
+# gccfactory ships bin/cc, bin/gcc, bin/ld, ... alongside the prefixed names,
+# so putting bin/ on PATH is enough. Consumers used to mint these by hand.
+for t in cc gcc g++ ld ar nm ranlib readelf strip make; do
+	if [ ! -e "$TC/bin/$t" ]; then
+		echo "FAIL: bin/$t missing"
+		exit 1
+	fi
+done
+echo "OK: cc gcc g++ ld ar nm ranlib readelf strip make all present"
+cc --version | head -1
+make --version | head -1
 
 banner "compiler self-test (--version)"
 $CC --version
@@ -79,7 +97,7 @@ file /work/out/hello-cxx
 echo "--- run ---"
 /work/out/hello-cxx
 
-banner "test 3: LTO with linker plugin (the wrapper raison d'etre)"
+banner "test 3: LTO with the linker plugin linked into ld"
 LTO_FLAGS="-O2 -flto -fuse-linker-plugin -fno-fat-lto-objects"
 
 echo "--- compile lib.c -> lib.o (slim LTO object) ---"
@@ -100,6 +118,9 @@ file /work/out/lib.a
 echo "--- compile main.c -> main.o ---"
 $CC $LTO_FLAGS -c /tests/main.c -o /work/out/main.o
 
+# ld resolves a -plugin path named liblto_plugin.* to the copy compiled into
+# libbfd, so no .so has to exist or be dlopen'd. See gccfactory's
+# binutils 0005-builtin-lto-plugin.diff.
 echo "--- link with gcc -v: full driver pipeline (shows -plugin path) ---"
 $CC $LTO_FLAGS -static -v \
 	-o /work/out/lto-main \
@@ -144,7 +165,7 @@ for bin in /work/out/hello-c /work/out/hello-cxx /work/out/lto-main; do
 	readelf -d "$bin" 2>&1 | grep -E 'NEEDED|RUNPATH|RPATH' || echo "(no dynamic deps)"
 	readelf -l "$bin" 2>&1 | grep -A1 INTERP || echo "(no PT_INTERP)"
 	echo "--- musl identifying strings (expect 'musl libc') ---"
-	strings "$bin" | grep -iE "^musl libc|musl-cross-make|${TRIPLET}" | head -5 \
+	strings "$bin" | grep -iE "^musl libc|${TRIPLET}" | head -5 \
 		|| echo "(no musl strings)"
 	echo "--- glibc identifying strings (expect NONE; exclude libstdc++'s GLIBCXX_*) ---"
 	strings "$bin" \
