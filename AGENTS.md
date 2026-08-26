@@ -268,8 +268,16 @@ Don't commit unless the user explicitly asks. Even then:
 - The `hashes/` files matter -- if you bumped a version, the matching
   `hashes/*.sha256` must be in the same commit. The Makefile will refuse to
   build otherwise.
-- `config/*.toml` is the version pin now. If you bump a version there, the
-  sha256 in the same file must move with it.
+- `config/*.toml` carries the staticpy-side pins. A version bump moves the
+  sha256 in the same edit, and also the `Makefile` and `hashes/`, since both
+  build systems are live.
+- `config/sources.toml` and `config/patches/` are deliberately excluded from
+  the runtime overlay -- a file lying around must not be able to redefine a
+  pinned checksum -- so a build reads only the copy embedded in the binary.
+  `./staticpy` re-syncs `internal/config/defaults/` from `config/` and
+  rebuilds whenever either is newer, which is what makes an edit there take
+  effect. Building with plain `go build` skips that and will use a stale
+  embedded copy.
 
 ## What "done" looks like for common tasks
 

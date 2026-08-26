@@ -24,20 +24,33 @@ NATIVE_ARCH="$(uname -m)"
 
 die() { echo "staticpy: $*" >&2; exit 1; }
 
+# The embedded defaults are a mirror of config/, not a second source of truth.
+# Syncing here rather than trusting a hand-run `cp` is what stops a version
+# bump in config/sources.toml from being silently ignored: that file is
+# deliberately excluded from the runtime overlay, so the embedded copy is the
+# only one a build ever reads.
+sync_defaults() {
+    d="$ROOT/src/staticpy/internal/config/defaults"
+    rm -rf "$d" && cp -r "$ROOT/config" "$d"
+}
+
 build_binary() {
     command -v go >/dev/null 2>&1 || die "go is not installed, and $BIN does not exist.
   Either install go, or fetch a released staticpy binary and put it at $BIN."
+    sync_defaults
     mkdir -p "$DIST/.bin"
     # CGO off so the result is static and runs wherever the tarballs do.
     ( cd "$ROOT/src/staticpy" && CGO_ENABLED=0 go build -o "$BIN" . )
 }
 
-# Rebuild when any source file is newer than the binary. `find -newer` beats a
-# checksum here: it is one syscall per file and wrong only in the direction of
-# rebuilding too often.
+# Rebuild when any source file is newer than the binary. Every file counts, not
+# just *.go: go:embed compiles config/ and the C and header assets into the
+# binary, so a patcher.c or sources.toml edit changes the output while leaving
+# every .go file untouched. `find -newer` beats a checksum here -- one syscall
+# per file, and wrong only in the direction of rebuilding too often.
 needs_rebuild() {
     [ -x "$BIN" ] || return 0
-    [ -n "$(find "$ROOT/src/staticpy" -name '*.go' -newer "$BIN" -print -quit 2>/dev/null)" ]
+    [ -n "$(find "$ROOT/src/staticpy" "$ROOT/config" -type f -newer "$BIN" -print -quit 2>/dev/null)" ]
 }
 
 fetch_toolchain() {
