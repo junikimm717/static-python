@@ -10,7 +10,7 @@
 # toolchain. Regenerate the tarball from deps-<arch>-linux-musl/ with:
 #   docker compose exec -T spython sh -lc \
 #     'cd /workspace && HOST=$(uname -m) && \
-#      tar -czf cross-make/test-portability/${HOST}-linux-musl-native.tgz \
+#      tar -czf test-portability/${HOST}-linux-musl-native.tgz \
 #        -C deps-${HOST}-linux-musl ${HOST}-linux-musl-native'
 #
 # If the tarball is missing but deps-<arch>-linux-musl/<arch>-linux-musl-native/
@@ -20,7 +20,7 @@ set -eu
 
 cd "$(dirname "$0")"
 HERE=$(pwd)
-REPO=$(cd ../.. && pwd)
+REPO=$(cd .. && pwd)
 LOG=$REPO/build-logs/portability-alien.log
 
 HOST_ARCH=$(uname -m)
@@ -43,7 +43,7 @@ if [ ! -f "$TARBALL" ]; then
 		tar -czf "$TARBALL" -C "$(dirname "$DEPS_TREE")" "$(basename "$DEPS_TREE")"
 	else
 		echo "ERROR: missing toolchain tarball: $TARBALL" >&2
-		echo "       (build with 'make USE_CROSSMAKE=1 crossmake' or see top of $0)" >&2
+		echo "       (fetch one with 'make toolchain' or see top of $0)" >&2
 		exit 1
 	fi
 fi

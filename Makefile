@@ -1,5 +1,4 @@
 ROOT_DIR := $(dir $(realpath $(lastword $(MAKEFILE_LIST))))
-CROSSMAKE := master
 OPENSSL := 3.5.6
 LIBFFI := 3.5.2
 LIBLZMA := 5.8.3
@@ -11,8 +10,6 @@ SQLITE_YEAR := 2026
 BZIP2 := 1.0.8
 UTILLINUX := 2.41
 PYTHON := 3.13.13
-LINUX_VER := 5.15.184
-GCC_VER := 15.1.0
 
 SPLIT := $(subst ., ,$(PYTHON))
 PYTHONV := $(word 1, $(SPLIT)).$(word 2, $(SPLIT))
@@ -23,9 +20,9 @@ print-%:
 
 # External (third-party) source tarballs. Each is sha256-verified at download
 # time against hashes/<basename>.sha256. Toolchain prebuilts from
-# dev.mit.junic.kim are intentionally excluded (those are produced by us).
+# dev.mit.junic.kim are intentionally excluded (those are produced by us,
+# by gccfactory, and are verified there rather than here).
 EXTERNAL_TARBALLS := \
-	tarballs/musl-cross-make-$(CROSSMAKE).tar.gz \
 	tarballs/openssl-$(OPENSSL).tar.gz \
 	tarballs/libffi-$(LIBFFI).tar.gz \
 	tarballs/xz-$(LIBLZMA).tar.gz \
@@ -61,7 +58,6 @@ override TARGET = $(ARCH)-linux-$(MUSLABI)
 override NATIVE_ARCH := $(shell uname -m)
 override NATIVE_TARGET := $(NATIVE_ARCH)-linux-musl
 
-USE_CROSSMAKE := 0
 # Set DEBUG_SYMBOLS=1 for DWARF info in perf annotate/gdb builds. The default
 # keeps release-style builds stripped and omits -g.
 DEBUG_SYMBOLS ?= 0
@@ -114,46 +110,19 @@ export EXTRA_LDFLAGS
 
 python3: python-static-$(TARGET)/bin/python$(PYTHONV)
 
-# `clean` deliberately preserves deps-download-prime/: it is the sentinel
-# tree for `make download`, not a build artefact. `distclean` nukes it
-# along with the tarballs cache.
 clean:
-	rm -rf $(filter-out deps-download-prime,$(wildcard deps-*)) build-* python-static-*
+	rm -rf deps-* build-* python-static-*
 
 distclean: clean
-	rm -rf tarballs deps-download-prime
+	rm -rf tarballs
 
-# Single-producer preflight: fetch every tarball any toolchain or python
-# build will need into tarballs/, before parallel workers start. Without
-# this, multiple `make crossmake` runs race on musl-cross-make's
-# sources/% downloads (sources/ is symlinked into the shared tarballs/
-# from each per-target tree).
-#
-# The musl-cross-make sources are populated by bootstrapping a one-shot
-# tree under deps-download-prime/, dropping our config.mak in (so the
-# right GCC_VER expands), and driving `make extract_all` once. That
-# resolves SRC_DIRS against our pinned versions and downloads exactly
-# the tarballs we need (gcc, binutils, musl, gmp, mpc, mpfr, linux,
-# config.{sub,guess}). The extracted source dirs left behind under
-# deps-download-prime/ are a benign disk cache; the next `make download`
-# is a no-op thanks to the .done stamp.
-download: $(EXTERNAL_TARBALLS) deps-download-prime/.done
+# Single-producer preflight: fetch every source tarball a python build will
+# need into tarballs/ before parallel workers start, so concurrent per-arch
+# builds never race on the same download.
+download: $(EXTERNAL_TARBALLS)
 
-deps-download-prime/.done: tarballs/musl-cross-make-$(CROSSMAKE).tar.gz
-	mkdir -p deps-download-prime
-	tar -xzf $< -C deps-download-prime --strip-components=1
-	cp -a ./cross-make/hashes/.  deps-download-prime/hashes/
-	cp -a ./cross-make/patches/. deps-download-prime/patches/
-	cp ./cross-make/config.mak   deps-download-prime/config.mak
-	ln -sfn $(ROOT_DIR)tarballs  deps-download-prime/sources
-	sed -i -e 's|^LINUX_VER =.*|LINUX_VER = $(LINUX_VER)|g' \
-		deps-download-prime/Makefile
-	cd deps-download-prime && env -u MAKEFLAGS -u MAKEOVERRIDES \
-		make TARGET=$(NATIVE_TARGET) extract_all
-	touch $@
-
-# Mirror locally-built toolchain tarballs to dev.mit.junic.kim. The
-# USE_CROSSMAKE=0 branch curls them back from
+# Mirror toolchain tarballs (built by gccfactory) to dev.mit.junic.kim.
+# The toolchain rule below curls them back from
 # https://dev.mit.junic.kim/cross/<host-arch>/<target>-<tctype>.tgz, so
 # the layout has to match: one dir per host arch, one tarball per
 # (target, tctype) pair built on that host.
@@ -176,59 +145,26 @@ update-hashes: $(EXTERNAL_TARBALLS)
 		echo "updated hashes/$$t.sha256"; \
 	done
 
-# build steps for musl toolchain.
-
-tarballs/musl-cross-make-master.tar.gz:
-	mkdir -p tarballs
-	curl -Lf https://github.com/richfelker/musl-cross-make/archive/$(CROSSMAKE).tar.gz -o $@
-	@$(VERIFY_SHA256)
-
-deps-$(TARGET)/musl-cross-make-master/.extracted: tarballs/musl-cross-make-$(CROSSMAKE).tar.gz
-	mkdir -p deps-$(TARGET)
-	tar -xzf $< -C deps-$(TARGET)
-	cp -a ./cross-make/hashes/. deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/hashes/
-	cp -a ./cross-make/patches/. deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/patches/
-	ln -sfn $(ROOT_DIR)tarballs deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/sources
-	touch $@
+# The toolchain itself is not built here. It comes from gccfactory
+# (github.com/junikimm717/gccfactory), which builds the full host x target
+# matrix and packs one relocatable tarball per cell; `make upload-tarballs`
+# mirrors those to dev.mit.junic.kim. bin/ carries both <TARGET>-prefixed
+# and unprefixed tool names, and ld has GCC's LTO plugin linked in, so slim
+# LTO objects work in a fully static toolchain -- which is what
+# configure-wrapper.sh's -fuse-linker-plugin depends on.
 
 tarballs/$(TARGET)-$(TCTYPE).tgz:
 	mkdir -p tarballs
 	curl -Lf https://dev.mit.junic.kim/cross/$(NATIVE_ARCH)/$(TARGET)-$(TCTYPE).tgz\
 		-o tarballs/$(TARGET)-$(TCTYPE).tgz
 
-.PHONY: crossmake
-crossmake: deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted
+.PHONY: toolchain
+toolchain: deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted
 
-ifeq ($(USE_CROSSMAKE),1)
-# Build the toolchain from source via musl-cross-make.
-deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted: deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/.extracted
-	sed\
-		-e 's|^TARGET=.*|TARGET=$(ARCH)-linux-$(MUSLABI)|g'\
-		-e 's|^OUTPUT=.*|OUTPUT=$(ROOT_DIR)deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)|g'\
-		./cross-make/config.mak\
-		> deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/config.mak
-	sed -i\
-		-e 's/\([jJz]x\)vf/\1f/g'\
-		-e 's|^LINUX_VER =.*|LINUX_VER = $(LINUX_VER)|g'\
-		deps-$(TARGET)/musl-cross-make-$(CROSSMAKE)/Makefile
-	# `env -u` (not VAR=) is required: empty MAKEFLAGS/MAKEOVERRIDES lets
-	# our `ARCH=...` leak into musl's Makefile and break archs like
-	# powerpc64le (musl uses arch/powerpc64/), and also clobbers
-	# INSTALL_HDR_PATH in the nested kernel-headers install.
-	cd deps-$(TARGET)/musl-cross-make-$(CROSSMAKE) && env -u MAKEFLAGS -u MAKEOVERRIDES make -j$(JOBS)
-	cd deps-$(TARGET)/musl-cross-make-$(CROSSMAKE) && env -u MAKEFLAGS -u MAKEOVERRIDES make install
-	# Make the install tree relocatable; see cross-make/post-install.sh.
-	./cross-make/post-install.sh \
-		"$(ROOT_DIR)deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)" \
-		"$(ARCH)-linux-$(MUSLABI)" \
-		"$(GCC_VER)"
-	touch $@
-else
 deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted: tarballs/$(TARGET)-$(TCTYPE).tgz
 	mkdir -p deps-$(TARGET)
 	tar -xzf $< -C deps-$(TARGET)
 	touch $@
-endif
 
 # Probe binary used to introspect the cross-compiled toolchain.
 .PHONY: patcher
@@ -279,7 +215,7 @@ deps-$(TARGET)/libffi-$(LIBFFI)/.extracted: tarballs/libffi-$(LIBFFI).tar.gz
 	tar -xzf $< -C deps-$(TARGET)
 	touch $@
 
-build-$(TARGET)/lib/libffi.a: deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted deps-$(TARGET)/libffi-$(LIBFFI)/.extracted
+build-$(TARGET)/lib/libffi.a: deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted deps-$(TARGET)/libffi-$(LIBFFI)/.extracted
 	mkdir -p build-$(TARGET)
 	cd deps-$(TARGET)/libffi-$(LIBFFI) &&\
 		../../configure-wrapper.sh ./configure \
@@ -305,7 +241,7 @@ deps-$(TARGET)/xz-$(LIBLZMA)/.extracted: tarballs/xz-$(LIBLZMA).tar.gz
 	tar -xzf $< -C deps-$(TARGET)
 	touch $@
 
-build-$(TARGET)/lib/liblzma.a: deps-$(TARGET)/xz-$(LIBLZMA)/.extracted deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted
+build-$(TARGET)/lib/liblzma.a: deps-$(TARGET)/xz-$(LIBLZMA)/.extracted deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted
 	mkdir -p build-$(TARGET)
 	cd deps-$(TARGET)/xz-$(LIBLZMA) &&\
 		ARCH="$(ARCH)"\
@@ -333,7 +269,7 @@ deps-$(TARGET)/zlib-$(ZLIB)/.extracted: tarballs/zlib-$(ZLIB).tar.gz
 	tar -xzf $< -C deps-$(TARGET)
 	touch $@
 
-build-$(TARGET)/lib/libz.a: deps-$(TARGET)/zlib-$(ZLIB)/.extracted deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted
+build-$(TARGET)/lib/libz.a: deps-$(TARGET)/zlib-$(ZLIB)/.extracted deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted
 	mkdir -p build-$(TARGET)
 	# --disable-crcvx: works around an s390x VX detection bug in zlib
 	# 1.3.2 where crc32_vx.c gets compiled without -mzarch/-march=z13.
@@ -358,7 +294,7 @@ deps-$(TARGET)/ncurses-$(NCURSES)/.extracted: tarballs/ncurses-$(NCURSES).tar.gz
 	tar -xzf $< -C deps-$(TARGET)
 	touch $@
 
-build-$(TARGET)/lib/libncursesw.a: deps-$(TARGET)/ncurses-$(NCURSES)/.extracted deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted
+build-$(TARGET)/lib/libncursesw.a: deps-$(TARGET)/ncurses-$(NCURSES)/.extracted deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted
 	cd deps-$(TARGET)/ncurses-$(NCURSES) &&\
 		../../configure-wrapper.sh ./configure --without-cxx --without-cxx-binding\
 			--without-shared --prefix=$(ROOT_DIR)build-$(TARGET)\
@@ -389,7 +325,7 @@ deps-$(TARGET)/readline-$(READLINE)/.extracted: tarballs/readline-$(READLINE).ta
 	tar -xzf $< -C deps-$(TARGET)
 	touch $@
 
-build-$(TARGET)/lib/libreadline.a: deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted deps-$(TARGET)/readline-$(READLINE)/.extracted
+build-$(TARGET)/lib/libreadline.a: deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted deps-$(TARGET)/readline-$(READLINE)/.extracted
 	mkdir -p build-$(TARGET)
 	cd deps-$(TARGET)/readline-$(READLINE) &&\
 		../../configure-wrapper.sh ./configure \
@@ -418,7 +354,7 @@ deps-$(TARGET)/sqlite-src-$(SQLITE)/.extracted: tarballs/sqlite-src-$(SQLITE).zi
 	cd deps-$(TARGET) && unzip -o ../tarballs/sqlite-src-$(SQLITE).zip
 	touch $@
 
-build-$(TARGET)/lib/libsqlite3.a: deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted build-$(TARGET)/lib/libreadline.a deps-$(TARGET)/sqlite-src-$(SQLITE)/.extracted
+build-$(TARGET)/lib/libsqlite3.a: deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted build-$(TARGET)/lib/libreadline.a deps-$(TARGET)/sqlite-src-$(SQLITE)/.extracted
 	mkdir -p build-$(TARGET)
 	cd deps-$(TARGET)/sqlite-src-$(SQLITE) &&\
 		../../configure-wrapper.sh ./configure --prefix=$(ROOT_DIR)build-$(TARGET)\
@@ -451,7 +387,7 @@ deps-$(TARGET)/bzip2-$(BZIP2)/.extracted: tarballs/bzip2-$(BZIP2).tar.gz
 		deps-$(TARGET)/bzip2-$(BZIP2)/Makefile
 	touch $@
 
-build-$(TARGET)/lib/libbz2.a: deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted deps-$(TARGET)/bzip2-$(BZIP2)/.extracted
+build-$(TARGET)/lib/libbz2.a: deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted deps-$(TARGET)/bzip2-$(BZIP2)/.extracted
 	mkdir -p build-$(TARGET)
 	cd deps-$(TARGET)/bzip2-$(BZIP2) && ../../configure-wrapper.sh make libbz2.a bzip2 bzip2recover -j$(JOBS)
 	cd deps-$(TARGET)/bzip2-$(BZIP2) && ../../configure-wrapper.sh make install
@@ -471,7 +407,7 @@ deps-$(TARGET)/util-linux-$(UTILLINUX)/.extracted: tarballs/util-linux-$(UTILLIN
 	tar -xzf $< -C deps-$(TARGET)
 	touch $@
 
-build-$(TARGET)/lib/libuuid.a: deps-$(TARGET)/util-linux-$(UTILLINUX)/.extracted deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted
+build-$(TARGET)/lib/libuuid.a: deps-$(TARGET)/util-linux-$(UTILLINUX)/.extracted deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted
 	cd deps-$(TARGET)/util-linux-$(UTILLINUX) && \
 		printf "[properties]\nneeds_exe_wrapper = true\n" > ./cross.ini
 	cd deps-$(TARGET)/util-linux-$(UTILLINUX) && \
@@ -516,7 +452,7 @@ deps-$(TARGET)/Python-$(PYTHON)/Modules/Setup.local: tarballs/Python-$(PYTHON).t
 
 # Cross builds reuse the native interpreter (CPython's build needs a
 # runnable python at $(NATIVE_PATH)).
-PYTHON_DEPS = deps-$(TARGET)/$(ARCH)-linux-$(MUSLABI)-$(TCTYPE)/.extracted\
+PYTHON_DEPS = deps-$(TARGET)/$(TARGET)-$(TCTYPE)/.extracted\
 		openssl libffi libuuid libsqlite liblzma readline zlib libbz2 ncurses \
 		deps-$(TARGET)/Python-$(PYTHON)/Modules/Setup.local
 
