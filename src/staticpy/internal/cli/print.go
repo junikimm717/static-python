@@ -19,9 +19,9 @@ that asks staticpy for the Python version cannot disagree with the interpreter
 staticpy built.
 
 KEYS
-  python-version    the pinned CPython version, e.g. 3.13.13
-  python-abi        its major.minor, e.g. 3.13 - the interpreter's directory and
-                    binary suffix (bin/python3.13, lib/python3.13)
+  python-version    the pinned CPython version, e.g. 3.x.y
+  python-abi        its major.minor, e.g. 3.x - the interpreter's directory and
+                    binary suffix (bin/python3.x, lib/python3.x)
   host              this machine's target triple
   targets           the targets this invocation selects, space separated
   targets-all       every triple in targets.toml
@@ -33,7 +33,7 @@ KEYS
   version:<name>    the pinned version of one source, e.g. version:openssl
   sha256:<name>     its pinned checksum
 
-  staticpy print python-abi   ->  3.13`,
+  staticpy print python-abi   ->  3.x`,
 	Run: runPrint,
 }
 

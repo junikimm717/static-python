@@ -197,12 +197,44 @@ var probedMacros = []string{
 	"ALIGNOF_DOUBLE", "ALIGNOF_LONG_DOUBLE", "ALIGNOF_SIZE_T", "ALIGNOF_WCHAR_T", "ALIGNOF__BOOL",
 }
 
+// probedBooleans must appear in the probe output but may legitimately be an
+// #undef, which is a real answer rather than a missing one. These are the
+// questions configure settles by running a program, so on a cross build they
+// are otherwise guessed: ac_cv_aligned_required in particular defaults to
+// "yes", which silently costs every little-endian target the faster hash.
+var probedBooleans = []string{
+	"HAVE_GCC_UINT128_T", "HAVE_GCC_ASM_FOR_X64", "HAVE_GCC_ASM_FOR_X87",
+	"WORDS_BIGENDIAN", "HAVE_ALIGNED_REQUIRED",
+	"DOUBLE_IS_BIG_ENDIAN_IEEE754", "DOUBLE_IS_LITTLE_ENDIAN_IEEE754",
+}
+
+// boolCache maps a yes/no macro to its cache variable. Inverted means the
+// variable answers the opposite question, as with the little-endian half of the
+// float-endianness pair.
+var boolCache = map[string]struct {
+	Var      string
+	Inverted bool
+}{
+	"HAVE_GCC_UINT128_T":              {"ac_cv_type___uint128_t", false},
+	"HAVE_GCC_ASM_FOR_X64":            {"ac_cv_gcc_asm_for_x64", false},
+	"HAVE_GCC_ASM_FOR_X87":            {"ac_cv_gcc_asm_for_x87", false},
+	"WORDS_BIGENDIAN":                 {"ac_cv_c_bigendian", false},
+	"HAVE_ALIGNED_REQUIRED":           {"ac_cv_aligned_required", false},
+	"DOUBLE_IS_BIG_ENDIAN_IEEE754":    {"ax_cv_c_float_words_bigendian", false},
+	"DOUBLE_IS_LITTLE_ENDIAN_IEEE754": {"ax_cv_c_float_words_bigendian", true},
+}
+
 func requireProbed(t config.Target, probed map[string]define, out string) error {
 	if len(probed) == 0 {
 		return fmt.Errorf("recipe: the ABI probe for %s printed no #define lines at all; it printed %q",
 			t.Triple, strings.TrimSpace(out))
 	}
 	var missing []string
+	for _, m := range probedBooleans {
+		if _, ok := probed[m]; !ok {
+			missing = append(missing, m)
+		}
+	}
 	for _, m := range probedMacros {
 		if d, ok := probed[m]; !ok || d.Undef || d.Value == "" {
 			missing = append(missing, m)
@@ -226,9 +258,10 @@ func autoconfCache(macro string) (string, bool) {
 		kind, name = "sizeof", strings.TrimPrefix(macro, "SIZEOF_")
 	case strings.HasPrefix(macro, "ALIGNOF_"):
 		kind, name = "alignof", strings.TrimPrefix(macro, "ALIGNOF_")
-	case macro == "HAVE_GCC_UINT128_T":
-		return "ac_cv_type___uint128_t", true
 	default:
+		if b, ok := boolCache[macro]; ok {
+			return b.Var, true
+		}
 		return "", false
 	}
 	if name == "_BOOL" {
@@ -257,9 +290,19 @@ func configSite(t config.Target, probed, fromAsset map[string]define) ([]byte, e
 		if !ok {
 			continue
 		}
+		if b, ok := boolCache[macro]; ok {
+			want := boolYesNo(!d.Undef != b.Inverted)
+			// The two DOUBLE_IS_* macros answer one cache variable from opposite
+			// sides. Disagreement means the probe contradicted itself, and map
+			// order would otherwise decide which lie wins.
+			if had, seen := vars[cache]; seen && had != want {
+				return nil, fmt.Errorf("recipe: probe for %s is self-contradictory about %s: %s says %q",
+					t.Triple, cache, macro, want)
+			}
+			vars[cache] = want
+			continue
+		}
 		switch {
-		case macro == "HAVE_GCC_UINT128_T":
-			vars[cache] = boolYesNo(!d.Undef)
 		case d.Undef:
 			return nil, fmt.Errorf("recipe: assets/files/%s undefines %s, but configure has no way to "+
 				"measure it when cross-compiling to %s; give it a value or drop the line",
