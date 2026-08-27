@@ -2,6 +2,8 @@ package recipe
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"io/fs"
 	"os"
@@ -83,6 +85,9 @@ func (j *probeJob) KeyInputs() map[string]string {
 		"target":         j.target.Triple,
 		"patcher":        j.patcherHash,
 		"pyconfig_patch": j.patchHash,
+		// The answers are emitted into config.site, so changing one has to
+		// invalidate the probe that writes it.
+		"cross_answers": crossAnswersHash(),
 	}
 	for k, v := range j.tc.keyInputs() {
 		in[k] = v
@@ -309,6 +314,35 @@ func showDefine(d define) string {
 	return d.Value
 }
 
+// crossAnswers are the questions CPython's configure settles by running a test
+// program, which a cross build cannot do. They are assertions about Linux and
+// musl rather than measurements -- the probe can report a size, it cannot
+// report whether getaddrinfo is buggy -- so each one is stated with its reason.
+//
+// Without ac_cv_buggy_getaddrinfo configure finds getaddrinfo, fails to run its
+// correctness check, assumes the worst, and refuses to continue.
+var crossAnswers = map[string]string{
+	"ac_cv_buggy_getaddrinfo":   "no",  // musl's is fine; the check is for an old glibc bug
+	"ac_cv_file__dev_ptmx":      "yes", // Linux has it; configure stats the *build* machine
+	"ac_cv_file__dev_ptc":       "no",  // AIX only
+	"ac_cv_broken_nice":         "no",
+	"ac_cv_broken_poll":         "no",
+	"ac_cv_broken_unsetenv":     "no",
+	"ac_cv_broken_mbstowcs":     "no",
+	"ac_cv_broken_sem_getvalue": "no", // musl implements sem_getvalue
+	// musl supports PTHREAD_SCOPE_SYSTEM and only that; configure's cross
+	// fallback is "no", which would give up thread scope for no reason.
+	"ac_cv_pthread_system_supported": "yes",
+}
+
+func crossAnswersHash() string {
+	h := sha256.New()
+	for _, k := range sortedKeys(crossAnswers) {
+		fmt.Fprintf(h, "%s=%s\x00", k, crossAnswers[k])
+	}
+	return hex.EncodeToString(h.Sum(nil))[:16]
+}
+
 // configSite is what makes CPython's own configure produce a correct
 // pyconfig.h for a target it cannot execute: every test it would have run and
 // failed to run is pre-answered here.
@@ -324,6 +358,9 @@ func configSite(t config.Target, probed, fromAsset map[string]define) ([]byte, e
 	}
 
 	vars := map[string]string{}
+	for k, v := range crossAnswers {
+		vars[k] = v
+	}
 	for macro, d := range merged {
 		cache, ok := autoconfCache(macro)
 		if !ok {

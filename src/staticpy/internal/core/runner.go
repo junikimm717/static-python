@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/junikimm717/static-python/src/staticpy/internal/logging"
@@ -191,6 +192,20 @@ func (r *Runner) run(ctx context.Context, c Cmd, capture bool) (string, error) {
 	cmd.Stdout = out
 	cmd.Stderr = out
 	cmd.Stdin = nil
+	// Every command gets its own process group so cancelling reaches the whole
+	// tree. make's children are our grandchildren, and killing the supervisor
+	// alone leaves them running: nine orphaned lto1 processes holding 18GB
+	// survived a cancelled cross build and had to be reaped by hand.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error {
+		if cmd.Process == nil {
+			return nil
+		}
+		// Negative pid signals the group. SIGKILL rather than SIGTERM: an lto1
+		// deep in a link ignores polite requests, and a cancelled job's output
+		// is discarded anyway.
+		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	}
 
 	r.log.Debug("exec", "step", step, "cmd", ShellQuote(c.Args), "dir", c.Dir, "log", logPath)
 	runErr := cmd.Run()
