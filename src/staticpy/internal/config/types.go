@@ -21,6 +21,11 @@ type Source struct {
 	TopDir string `toml:"topdir"`
 	// Patches are filenames under patches/<name>-<version>/, applied in order.
 	Patches []string `toml:"patches"`
+	// TargetPatches are keyed by triple and applied on top of Patches, to the
+	// private copy a build stages rather than to the shared srctree. A diff
+	// listed in Patches moves the tree's key and with it every target; one
+	// keyed here reaches that target's key and nothing else.
+	TargetPatches map[string][]string `toml:"target_patches"`
 	// Edits are content-anchored fixups for things a version-pinned diff cannot
 	// survive; see Edit.
 	Edits []Edit `toml:"edits"`

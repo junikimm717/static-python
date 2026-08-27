@@ -56,18 +56,29 @@ func PyHost(cfg *config.Config, srcAssets fs.FS, host config.Target) (core.Job, 
 	if err != nil {
 		return nil, fmt.Errorf("recipe: pyhost needs a native toolchain for %s: %w", host.Triple, err)
 	}
+	tgtPatch, err := sources.TargetPatchSetHash(srcAssets, src, host.Triple)
+	if err != nil {
+		return nil, err
+	}
 	return &pyHost{
-		srctree: sources.SrcTree(src, sources.Options{Assets: srcAssets}),
-		host:    host,
-		version: src.Version,
-		res:     res,
-		setup:   setup,
-		tc:      tc,
+		srctree:      sources.SrcTree(src, sources.Options{Assets: srcAssets}),
+		src:          src,
+		assets:       srcAssets,
+		tgtPatchHash: tgtPatch,
+		host:         host,
+		version:      src.Version,
+		res:          res,
+		setup:        setup,
+		tc:           tc,
 	}, nil
 }
 
 type pyHost struct {
-	srctree core.Job
+	srctree      core.Job
+	src          config.Source
+	assets       fs.FS
+	tgtPatchHash string
+
 	host    config.Target
 	version string
 	res     config.Resolved
@@ -102,6 +113,9 @@ func (j *pyHost) KeyInputs() map[string]string {
 		"toolchain":        j.tc.Key,
 		"toolchain_source": j.tc.Source,
 	}
+	if j.tgtPatchHash != "none" {
+		in["target_patches"] = j.tgtPatchHash
+	}
 	for k, v := range j.res.KeyInputs() {
 		in["profile_"+k] = v
 	}
@@ -119,6 +133,9 @@ func (j *pyHost) Build(ctx context.Context, e *core.Env, r *core.Runner, work, s
 		return err
 	}
 	if err := os.Remove(filepath.Join(src, core.ManifestName)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err := sources.ApplyTargetPatches(ctx, r, j.assets, j.src, j.host.Triple, src, work); err != nil {
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(src, "Modules", "Setup.local"), j.setup, 0o644); err != nil {
@@ -183,7 +200,11 @@ func PyCross(cfg *config.Config, srcAssets fs.FS, host, target config.Target, pr
 type pyBuild struct {
 	cross bool
 
-	srctree   core.Job
+	srctree      core.Job
+	src          config.Source
+	assets       fs.FS
+	tgtPatchHash string
+
 	sysroot   core.Job
 	staticapi core.Job
 	probe     core.Job
@@ -241,19 +262,27 @@ func newPyBuild(cfg *config.Config, srcAssets fs.FS, host, target config.Target,
 		return nil, err
 	}
 
+	tgtPatch, err := sources.TargetPatchSetHash(srcAssets, src, target.Triple)
+	if err != nil {
+		return nil, err
+	}
+
 	j := &pyBuild{
-		cross:     cross,
-		srctree:   srctree,
-		sysroot:   sysroot,
-		staticapi: gen.NewStaticAPI(srctree, pyhost, src.Version),
-		probe:     probe,
-		host:      host,
-		target:    target,
-		profile:   profile,
-		version:   src.Version,
-		bundle:    bundle,
-		res:       res,
-		setup:     setup,
+		cross:        cross,
+		srctree:      srctree,
+		src:          src,
+		assets:       srcAssets,
+		tgtPatchHash: tgtPatch,
+		sysroot:      sysroot,
+		staticapi:    gen.NewStaticAPI(srctree, pyhost, src.Version),
+		probe:        probe,
+		host:         host,
+		target:       target,
+		profile:      profile,
+		version:      src.Version,
+		bundle:       bundle,
+		res:          res,
+		setup:        setup,
 	}
 	j.buildPython = pyhost
 	return j, nil
@@ -300,6 +329,9 @@ func (j *pyBuild) KeyInputs() map[string]string {
 	}
 	if len(j.target.MakeVars) > 0 {
 		in["make_vars"] = strings.Join(j.target.MakeVars, " ")
+	}
+	if j.tgtPatchHash != "none" {
+		in["target_patches"] = j.tgtPatchHash
 	}
 	for k, v := range j.res.KeyInputs() {
 		in["profile_"+k] = v
@@ -355,6 +387,9 @@ func (j *pyBuild) Build(ctx context.Context, e *core.Env, r *core.Runner, work, 
 		return err
 	}
 	if err := os.Remove(filepath.Join(src, core.ManifestName)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err := sources.ApplyTargetPatches(ctx, r, j.assets, j.src, j.target.Triple, src, work); err != nil {
 		return err
 	}
 	if err := installStaticAPI(j.staticapi.ArtifactDir(e), src); err != nil {

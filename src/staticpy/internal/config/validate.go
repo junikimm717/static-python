@@ -55,6 +55,16 @@ func (c *Config) validateSources() error {
 		if !isSHA256(s.SHA256) {
 			return fmt.Errorf("%s: sha256 %q is not 64 lowercase hex digits", where, s.SHA256)
 		}
+		// A mistyped triple is otherwise silent: nothing applies, no key moves.
+		for triple, names := range s.TargetPatches {
+			if _, ok := c.Targets[triple]; !ok {
+				return fmt.Errorf("%s: target_patches names %q, which is not a target in targets.toml (have %s)",
+					where, triple, keysOf(c.Targets))
+			}
+			if len(names) == 0 {
+				return fmt.Errorf("%s: target_patches.%s is empty; drop the key instead", where, triple)
+			}
+		}
 		for i, e := range s.Edits {
 			ew := fmt.Sprintf("%s: edit %d", where, i)
 			if e.File == "" || e.Anchor == "" {

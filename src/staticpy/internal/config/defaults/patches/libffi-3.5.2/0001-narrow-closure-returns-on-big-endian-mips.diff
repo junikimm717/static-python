@@ -1,0 +1,79 @@
+mips: read narrow closure returns from the low-order end of the slot
+
+A closure hands its return value back through an FFI_SIZEOF_ARG-byte slot at
+V0_OFF2, and the n32/n64 epilogue loads the value out of that slot with a load
+sized to the return type.  Every one of those narrow loads reads from offset 0.
+On a little-endian target that is where the value is; on a big-endian one it is
+the *high* half of the word, so a closure returning int hands back the top 32
+bits of its own result:
+
+    f(42)   -> 0      0x000000000000002A, high half = 0
+    f(1000) -> 0      0x00000000000003E8, high half = 0
+    f(-7)   -> -1     0xFFFFFFFFFFFFFFF9, high half = -1
+
+Only closures are affected -- ffi_call's own narrow returns store a full,
+already-extended ffi_arg at offset 0 (see retsint32 and friends above), and
+64-bit closure returns use a full-width ld.  mips64el is unaffected either way,
+which is why this has stood: the fault needs n32/n64 *and* big-endian.
+
+The low-order end is the offset the rest of the world agrees on.  It is where a
+caller following libffi's documented `*(ffi_arg *)ret = value` convention leaves
+the significant bytes, it is where CPython's ctypes writes a narrow callback
+result (Modules/_ctypes/callbacks.c, under WORDS_BIGENDIAN), and it is what the
+other big-endian ports -- s390x, powerpc64 -- already read.  Those two writers
+land on the same bytes on a big-endian target, so one offset serves both.
+
+Found via test.test_ctypes.test_simplesubclasses on mips64-linux-musl, where
+every c_int callback returned 0.
+
+--- a/src/mips/n32.S
++++ b/src/mips/n32.S
+@@ -524,6 +524,15 @@
+ #define RA_OFF2		(1  * FFI_SIZEOF_ARG)
+ #define GP_OFF2		(0  * FFI_SIZEOF_ARG)
+ 
++/* A narrow return sits at the low-order end of the FFI_SIZEOF_ARG-byte slot the
++   closure wrote: offset 0 little-endian, the far end big-endian.  Loading from
++   offset 0 unconditionally hands back the high half on a big-endian target.  */
++#if defined(__MIPSEB__) || defined(_MIPSEB)
++# define V0_OFF2_N(size)	(V0_OFF2 + FFI_SIZEOF_ARG - (size))
++#else
++# define V0_OFF2_N(size)	V0_OFF2
++#endif
++
+ 	.align	2
+ 	.globl	ffi_go_closure_N32
+ 	.ent	ffi_go_closure_N32
+@@ -628,27 +642,27 @@
+ 
+ cls_retsint32:
+ 	bne     v0, FFI_TYPE_SINT32, cls_retsint16
+-	lw	v0, V0_OFF2($sp)
++	lw	v0, V0_OFF2_N(4)($sp)
+ 	b	cls_epilogue
+ 
+ cls_retsint16:
+ 	bne     v0, FFI_TYPE_SINT16, cls_retuint16
+-	lh	v0, V0_OFF2($sp)
++	lh	v0, V0_OFF2_N(2)($sp)
+ 	b	cls_epilogue
+ 
+ cls_retuint16:
+ 	bne     v0, FFI_TYPE_UINT16, cls_retsint8
+-	lhu	v0, V0_OFF2($sp)
++	lhu	v0, V0_OFF2_N(2)($sp)
+ 	b	cls_epilogue
+ 
+ cls_retsint8:
+ 	bne     v0, FFI_TYPE_SINT8, cls_retuint8
+-	lb	v0, V0_OFF2($sp)
++	lb	v0, V0_OFF2_N(1)($sp)
+ 	b	cls_epilogue
+ 
+ cls_retuint8:
+ 	bne     v0, FFI_TYPE_UINT8, cls_retfloat
+-	lbu	v0, V0_OFF2($sp)
++	lbu	v0, V0_OFF2_N(1)($sp)
+ 	b	cls_epilogue
+ 
+ cls_retfloat:

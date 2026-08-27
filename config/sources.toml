@@ -31,6 +31,13 @@ topdir = "libffi-3.5.2"
 urls = ["https://github.com/libffi/libffi/releases/download/v3.5.2/libffi-3.5.2.tar.gz"]
 sha256 = "f3a3082a23b37c293a4fcd1053147b371f2ff91fa7ea1b2a52e335676bac82dc"
 
+# Narrow closure returns come back as the high half of the slot on big-endian
+# n32/n64; see ai/MIPS64_FFI_REPORT.md. Keyed to the one affected target rather
+# than listed in patches, which would move every target's key for a fix that
+# changes nothing anywhere else.
+[source.libffi.target_patches]
+mips64-linux-musl = ["0001-narrow-closure-returns-on-big-endian-mips.diff"]
+
 [source.xz]
 name = "xz"
 version = "5.8.3"

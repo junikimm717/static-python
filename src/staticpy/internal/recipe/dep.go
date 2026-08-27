@@ -91,9 +91,13 @@ func (b *depBuilder) job(name string) (*depJob, error) {
 	}
 	j := &depJob{
 		name: name, pkg: pkg, src: src, target: b.target, profile: b.profile,
-		res: res, tc: id, tree: sources.SrcTree(src, sources.Options{Assets: b.assets}),
+		res: res, tc: id, assets: b.assets,
+		tree: sources.SrcTree(src, sources.Options{Assets: b.assets}),
 	}
 	if j.patchHash, err = sources.PatchSetHash(b.assets, src); err != nil {
+		return nil, err
+	}
+	if j.tgtPatchHash, err = sources.TargetPatchSetHash(b.assets, src, b.target.Triple); err != nil {
 		return nil, err
 	}
 	if pkg.PlatformMap != "" {
@@ -122,17 +126,19 @@ func (b *depBuilder) job(name string) (*depJob, error) {
 }
 
 type depJob struct {
-	name      string
-	pkg       config.Package
-	src       config.Source
-	target    config.Target
-	profile   string
-	res       config.Resolved
-	tc        ToolchainID
-	tree      core.Job
-	needs     []*depJob
-	patchHash string
-	platform  string
+	name         string
+	pkg          config.Package
+	src          config.Source
+	target       config.Target
+	profile      string
+	res          config.Resolved
+	tc           ToolchainID
+	assets       fs.FS
+	tree         core.Job
+	needs        []*depJob
+	patchHash    string
+	tgtPatchHash string
+	platform     string
 }
 
 func (j *depJob) Name() string { return "dep" }
@@ -175,6 +181,9 @@ func (j *depJob) KeyInputs() map[string]string {
 		// The postcondition is part of the recipe: tightening it has to make
 		// the artifact that never satisfied it invalid.
 		"provides": strings.Join(j.pkg.Provides, "\x00"),
+	}
+	if j.tgtPatchHash != "none" {
+		in["target_patches"] = j.tgtPatchHash
 	}
 	if j.platform != "" {
 		in["platform"] = j.platform
@@ -236,6 +245,9 @@ func (j *depJob) Build(ctx context.Context, e *core.Env, r *core.Runner, work, s
 		return fmt.Errorf("recipe: staging %s: %w", sources.Slug(j.src), err)
 	}
 	if err := os.Remove(filepath.Join(src, core.ManifestName)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	if err := sources.ApplyTargetPatches(ctx, r, j.assets, j.src, j.target.Triple, src, work); err != nil {
 		return err
 	}
 

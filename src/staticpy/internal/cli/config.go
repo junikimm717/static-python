@@ -223,6 +223,9 @@ func dumpPatches(cfg *config.Config, dir string) (int, error) {
 		s := cfg.Sources[name]
 		var wanted []string
 		wanted = append(wanted, s.Patches...)
+		for _, names := range s.TargetPatches {
+			wanted = append(wanted, names...)
+		}
 		for _, e := range s.Edits {
 			if e.TextFile != "" {
 				wanted = append(wanted, e.TextFile)

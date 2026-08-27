@@ -278,6 +278,12 @@ Don't commit unless the user explicitly asks. Even then:
   rebuilds whenever either is newer, which is what makes an edit there take
   effect. Building with plain `go build` skips that and will use a stale
   embedded copy.
+- A diff that only one architecture needs goes in
+  `[source.<pkg>.target_patches]` keyed by triple, not in `patches`. `patches`
+  is hashed into the shared srctree, so a fix for one target there invalidates
+  every target's deps and every interpreter; a target patch is applied to the
+  staged copy and reaches that one target's key. Check it with
+  `staticpy --json build --dry-run --target ...` before and after.
 
 ## What "done" looks like for common tasks
 
