@@ -3,6 +3,16 @@
 #
 # [expect.all] applies everywhere. [expect.static] applies to the static
 # interpreter only, so the same list can cover the dynamic build.
+#
+# skip/fail are judged against what regrtest reports, and it reports whole
+# FILES. ignore is handed to regrtest as -i, which matches test cases and
+# methods inside a file. A single impossible method therefore belongs in
+# ignore: declaring its whole file expected-to-fail would hide every future
+# regression in the other few hundred tests that share it. Patterns are globs
+# matched against the dotted test id, so scoping one to its file
+# (*test_ctypes.test_errno*) keeps a common method name from matching elsewhere.
+
+# ---------------------------------------------------------------- musl libc --
 
 [[expect.all.skip]]
 test = "test_re"
@@ -12,7 +22,7 @@ locale-dependent cases in test_re fail. Alpine's apk build excludes the same \
 module.\
 """
 
-[[expect.all.skip]]
+[[expect.all.ignore]]
 test = "test_fma_zero_result"
 why = """
 musl's fma fast path returns the wrong sign of zero for an IEEE-754 corner \
@@ -21,17 +31,108 @@ probe shells out to ldd, which exits non-zero on a fully static -no-pie \
 binary, so the guard never fires. See ai/MUSL_REPORT.md.\
 """
 
-# These load Modules/_ctypes_test at runtime. It is built as a .so, and a
-# static interpreter has no dlopen to load it with -- ctypes here can describe
+[[expect.all.ignore]]
+test = "*TestInvalidFD.test_fpathconf*"
+why = """
+musl's fpathconf answers from a static table without looking at the fd, so \
+fpathconf(10000, 'PC_NAME_MAX') returns 255 where glibc fails with EBADF. \
+The test asserts the glibc behaviour.\
+"""
+
+[[expect.all.ignore]]
+test = "*test_pathconf_negative_fd_uses_fd_semantics*"
+why = "Same musl fpathconf divergence: a bad fd is never inspected."
+
+[[expect.all.ignore]]
+test = "*UDPLITE*"
+why = """
+UDPLITE sockets are unavailable here -- socket(IPPROTO_UDPLITE) fails, so \
+every UDPLITE class fails in setUp with no 'cli' attribute rather than \
+skipping. This is the kernel/runtime, not the interpreter.\
+"""
+
+# ------------------------------------------------------- no dlopen at all --
+#
+# Every extension module is a builtin, so there is no .so to open, no
+# __file__ to read, and no dlerror() to inspect. ctypes here can describe
 # foreign types and reach the interpreter's own symbols, nothing more.
-[[expect.static.skip]]
-test = "test_ctypes.test_loading"
-why = "Loads _ctypes_test.so through CDLL; there is no dlopen."
 
 [[expect.static.skip]]
-test = "test_ctypes.test_find"
+test = "test_bytes"
+why = """
+Imports _testlimitedcapi at module scope, so the whole file skips. That module \
+defines Py_LIMITED_API, which Py_BUILD_CORE forbids, so it cannot be a builtin \
+and a static interpreter cannot dlopen it either. Declared here rather than \
+left silent: a core test that runs nothing must say so. Restoring the module \
+makes this an unexpected pass, which is the signal to delete this entry.\
+"""
+
+[[expect.static.ignore]]
+test = "*test_ctypes.test_dlerror*"
+why = "Asserts on dlerror() text from a dlopen that cannot happen."
+
+[[expect.static.ignore]]
+test = "*test_ctypes.test_find*"
 why = "find_library + CDLL against system shared objects."
 
-[[expect.static.skip]]
-test = "test_ctypes.test_dlerror"
-why = "Asserts on dlerror() text from a dlopen that cannot happen."
+[[expect.static.ignore]]
+test = "*test_ctypes.test_errno*"
+why = "Opens libc through CDLL to exercise errno round-tripping."
+
+[[expect.static.ignore]]
+test = "*test_ctypes.test_values*"
+why = """
+Reads PyImport_FrozenModules and Py_OptimizeFlag through ctypes in_dll. The \
+generated symbol table exports functions by address; the data-symbol path is \
+not wired up.\
+"""
+
+[[expect.static.ignore]]
+test = "*test_incomplete_multi_phase_init_module*"
+why = """
+Interpolates _testmultiphase.__file__ into a script. It is a builtin, and a \
+builtin has no __file__.\
+"""
+
+[[expect.static.ignore]]
+test = "*test_type_check_in_subinterp*"
+why = """
+Re-loads _testcapi from its own .so under a second name inside a \
+subinterpreter. find_spec('_testcapi').origin is "built-in", so \
+ExtensionFileLoader has no file to open and run_in_subinterp returns -1. \
+Also ignored in profile_task, or PGO training aborts the build.\
+"""
+
+# ------------------------------------------------------------- qemu-user --
+#
+# [expect.qemu] applies to every emulated target and to none of the native
+# ones. All of these pass natively on x86_64, which is what identifies them as
+# emulator gaps rather than target or build problems.
+
+[[expect.qemu.ignore]]
+test = "*RecvmsgSCMRightsStreamTest*"
+why = "qemu-user does not carry SCM_RIGHTS descriptor passing through recvmsg."
+
+[[expect.qemu.ignore]]
+test = "*RecvmsgIntoSCMRightsStreamTest*"
+why = "Same SCM_RIGHTS gap, recvmsg_into variant."
+
+[[expect.qemu.ignore]]
+test = "*RFC3542AncillaryUDP6Test*"
+why = "IPv6 ancillary data (RFC 3542) is not reproduced by qemu-user's recvmsg."
+
+[[expect.qemu.ignore]]
+test = "*BasicCANTest*"
+why = "AF_CAN sockets are unavailable under qemu-user."
+
+# --------------------------------------------------------------- i386 x87 --
+
+[[expect.i386-linux-musl.ignore]]
+test = "*MathTests.testSinh*"
+why = """
+sinh is odd, so sinh(1)+sinh(-1) must be exactly 0, and the test permits 5 \
+ulps. i386 has no SSE2 in its baseline, so the x87 FPU evaluates with 80-bit \
+intermediates and rounds the two calls differently, leaving 2.22e-16. \
+Building this target with -msse2 -mfpmath=sse would fix it by raising the \
+minimum CPU, which is an ABI decision rather than a test-suite one.\
+"""

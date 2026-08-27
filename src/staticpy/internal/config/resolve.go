@@ -168,17 +168,25 @@ func remove(list, drop []string, where, field string) ([]string, error) {
 
 // Neither the profile name nor the scope is included: two configurations that
 // resolve to the same flags describe the same artifact and must share it.
+// A dependency is a C library built from cflags and ldflags alone: it has no
+// concept of PGO, of a module set, or of whether CPython ships its test suite.
+// Hashing those into its key anyway means one PGO knob rebuilds openssl on every
+// target, so the scope decides what counts.
 func (r Resolved) keyInputs() map[string]string {
-	return map[string]string{
-		"cflags":       strings.Join(r.CFlags, " "),
-		"cxxflags":     strings.Join(r.CXXFlags, " "),
-		"ldflags":      strings.Join(r.LDFlags, " "),
-		"strip":        strconv.FormatBool(r.Strip),
-		"debug":        strconv.FormatBool(r.Debug),
-		"pgo":          r.PGO,
-		"profile_task": r.ProfileTask,
-		"test_modules": strconv.FormatBool(r.TestModules),
-		"modules":      r.Modules,
-		"bundle":       r.Bundle,
+	in := map[string]string{
+		"cflags":   strings.Join(r.CFlags, " "),
+		"cxxflags": strings.Join(r.CXXFlags, " "),
+		"ldflags":  strings.Join(r.LDFlags, " "),
+		"strip":    strconv.FormatBool(r.Strip),
+		"debug":    strconv.FormatBool(r.Debug),
 	}
+	if r.Scope == ScopeDeps || strings.HasPrefix(r.Scope, ScopeDeps+".") {
+		return in
+	}
+	in["pgo"] = r.PGO
+	in["profile_task"] = r.ProfileTask
+	in["test_modules"] = strconv.FormatBool(r.TestModules)
+	in["modules"] = r.Modules
+	in["bundle"] = r.Bundle
+	return in
 }

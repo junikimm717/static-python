@@ -55,7 +55,9 @@ func SetupLocal(cfg config.Resolved, extra []config.PyModule) ([]byte, error) {
 	// pyhost never imports ctypes, so the 900-entry symbol table is pure weight
 	// there.
 	if cfg.Modules != "minimal" {
-		b.WriteString("\n" + staticapiLine + "\n")
+		// *static* is re-asserted rather than inherited: makesetup carries the
+		// last mode tag forward, and the test section ends in a *disabled* block.
+		b.WriteString("\n*static*\n" + staticapiLine + "\n")
 	}
 
 	if len(extra) > 0 {

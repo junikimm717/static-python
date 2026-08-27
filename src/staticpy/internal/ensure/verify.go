@@ -2,9 +2,12 @@ package ensure
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/junikimm717/static-python/src/staticpy/internal/config"
@@ -70,6 +73,11 @@ func NewJob(interp core.Job, target config.Target, profile string, level Level, 
 	return &Job{interp: interp, target: target, profile: profile, level: level, expect: expect, opts: opts}
 }
 
+// checkerVersion invalidates stored reports when the checks themselves change.
+// Without it a green report written by a laxer checker outlives the fix that
+// tightened it, which is how a verification system lies.
+const checkerVersion = "2"
+
 func (j *Job) Name() string { return "verify" }
 
 func (j *Job) Slug() string {
@@ -85,6 +93,11 @@ func (j *Job) KeyInputs() map[string]string {
 		"profile": j.profile,
 		"expect":  ExpectHash(j.expect),
 		"python":  j.opts.PythonRel,
+		"checker": checkerVersion,
+		// The set of tests a level runs is part of what the report claims, so
+		// editing CoreTests has to invalidate it. checkerVersion covers the
+		// checking code; this covers what was checked.
+		"tests": testSetHash(j.level),
 	}
 	// A skipped verification must never key the same as a real one, or the next
 	// build would reuse it and call the interpreter proven.
@@ -92,6 +105,15 @@ func (j *Job) KeyInputs() map[string]string {
 		in["skipped"] = "1"
 	}
 	return in
+}
+
+// LevelFull runs whatever the interpreter ships, so there is no list to hash.
+func testSetHash(level Level) string {
+	if level != LevelCore {
+		return string(level)
+	}
+	sum := sha256.Sum256([]byte(strings.Join(CoreTests, "\n")))
+	return hex.EncodeToString(sum[:8])
 }
 
 func (j *Job) ArtifactDir(e *core.Env) string {
@@ -168,13 +190,22 @@ func Verify(ctx context.Context, e *core.Env, r *core.Runner, t config.Target, l
 	}
 
 	suiteStart := time.Now()
+	ignore := make([]string, 0, len(expect.Ignore))
+	for _, e := range expect.Ignore {
+		ignore = append(ignore, e.Test)
+	}
 	out, err := RunSuite(ctx, r, l, level, python, work, SuiteOptions{
+		Ignore:      ignore,
 		Jobs:        opts.Jobs,
 		TestTimeout: opts.TestTimeout,
 		Timeout:     opts.SuiteTimeout,
 	})
 	if err != nil {
 		rep.Fail("suite", err, "CPython's test suite could not be run")
+		return rep, rep.Err()
+	}
+	if err := out.CheckCoverage(); err != nil {
+		rep.FailCmd("suite:coverage", out.Result, err, "%s", l.FailDetail(out.Result))
 		return rep, rep.Err()
 	}
 	if out.Result.TimedOut {

@@ -52,10 +52,17 @@ pgo = "native-only"
 #   case wrong. CPython gates this test with @skipIf(linked_to_musl()), but that
 #   probe shells out to ldd, which exits non-zero on a fully static -no-pie
 #   binary, so the skip never fires. See ai/MUSL_REPORT.md.
-profile_task = "-m test --pgo -x test_re -i test_fma_zero_result"
-# The _test* modules are builtins in a static interpreter, so shipping them is
-# a cost paid on every startup rather than an unused directory.
-test_modules = false
+# -i test_type_check_in_subinterp: the test re-loads _testcapi from its own
+#   .so under a second name inside a subinterpreter. Every extension here is a
+#   builtin, so find_spec().origin is "built-in" and there is no file to load.
+#   profile-run-stamp has no `|| true`, so one impossible test aborts the build.
+profile_task = "-m test --pgo -x test_re -i test_fma_zero_result -i test_type_check_in_subinterp"
+# --disable-test-modules governs both the _test* builtins and whether Lib/test
+# is installed, so turning it off also removes the suite the verifier runs.
+# Shipping them costs startup time and size; not shipping them means no
+# interpreter we publish can be tested at core or full level, on qemu or on
+# real hardware. The suite wins.
+test_modules = true
 modules = "full"
 
 # LTO on the CPython tree is where the build time goes and where the compiler
@@ -85,5 +92,10 @@ cflags_add = ["-g"]
 inherit = "default"
 pgo = "off"
 modules = "minimal"
+# The build python never runs the suite, and building the _test* modules in
+# breaks the bootstrap outright: Programs/_freeze_module links getpath_noop.o
+# rather than getpath.o, while _testinternalcapi.c references
+# _Py_Get_Getpath_CodeObject, which only the real one defines.
+test_modules = false
 cflags_remove = ["-flto=auto", "-flto-partition=none", "-fuse-linker-plugin"]
 ldflags_remove = ["-flto=auto", "-flto-partition=none", "-fuse-linker-plugin"]

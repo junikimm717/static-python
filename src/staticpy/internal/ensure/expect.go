@@ -33,13 +33,17 @@ const (
 // than repeated for eleven targets.
 func LookupExpect(all map[string]config.TestExpect, triple, runner string) config.TestExpect {
 	var out config.TestExpect
-	for _, key := range []string{ExpectAll, ExpectStatic, triple, ExpectKey(triple, runner)} {
+	// runner alone ("qemu") is what emulator limitations belong under: they hold
+	// for every emulated target and for none of the native ones, so keying them
+	// per triple would repeat the same entry ten times.
+	for _, key := range []string{ExpectAll, ExpectStatic, runner, triple, ExpectKey(triple, runner)} {
 		e, ok := all[key]
 		if !ok {
 			continue
 		}
 		out.Skip = append(out.Skip, e.Skip...)
 		out.Fail = append(out.Fail, e.Fail...)
+		out.Ignore = append(out.Ignore, e.Ignore...)
 	}
 	return out
 }
@@ -189,12 +193,15 @@ func (c *Classified) Err() error {
 // the run will do, and forcing a re-verification for a reworded comment would
 // make people stop writing them.
 func ExpectHash(expect config.TestExpect) string {
-	names := make([]string, 0, len(expect.Skip)+len(expect.Fail))
+	names := make([]string, 0, len(expect.Skip)+len(expect.Fail)+len(expect.Ignore))
 	for _, e := range expect.Skip {
 		names = append(names, "skip:"+e.Test)
 	}
 	for _, e := range expect.Fail {
 		names = append(names, "fail:"+e.Test)
+	}
+	for _, e := range expect.Ignore {
+		names = append(names, "ignore:"+e.Test)
 	}
 	sort.Strings(names)
 	sum := sha256.Sum256([]byte(strings.Join(names, "\n")))

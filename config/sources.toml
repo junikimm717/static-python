@@ -110,6 +110,11 @@ topdir = "Python-3.13.13"
 urls = ["https://www.python.org/ftp/python/3.13.13/Python-3.13.13.tgz"]
 sha256 = "f9cde7b0e2ec8165d7326e2a0f59ea2686ce9d0c617dbbb3d66a7e54d31b74b9"
 
+# Programs/_freeze_module links getpath_noop.o rather than getpath.o, and with
+# the _test* modules built in, _testinternalcapi.o joins that link referencing
+# _Py_Get_Getpath_CodeObject. Give the stub file the stub.
+patches = ["0001-stub-getpath-codeobject-for-the-freeze-bootstrap.diff"]
+
 # ctypes assumes a libdl underneath it. A fully static interpreter has none, so
 # the three edits below replace dlopen-based access to the interpreter's own
 # symbols with a table generated into the binary (Modules/staticapi).

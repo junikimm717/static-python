@@ -70,10 +70,10 @@ type Package struct {
 	// linux-ppc64le. Empty means the package takes plain --host=<triple>.
 	PlatformMap string `toml:"platform_map"`
 	// Sources and CFlags are used only by Build == "sources".
-	Sources  []string `toml:"sources"`
-	CFlags   []string `toml:"cflags"`
-	Headers  []string `toml:"headers"`
-	Libname  string   `toml:"libname"`
+	Sources []string `toml:"sources"`
+	CFlags  []string `toml:"cflags"`
+	Headers []string `toml:"headers"`
+	Libname string   `toml:"libname"`
 	// MakeVars are passed on the make command line, where they beat any
 	// assignment in the makefile. @BUILD_CC@ expands to a compiler whose output
 	// runs on the build machine, for packages that compile helper programs and
@@ -97,6 +97,10 @@ type Target struct {
 	Status string `toml:"status"`
 	// Maps holds per-package platform names, e.g. maps.openssl = "linux-ppc64le".
 	Maps map[string]string `toml:"maps"`
+	// MakeVars are passed on CPython's make command line, where they beat the
+	// makefile's own assignment. They reach the key only when set, so giving one
+	// target a variable leaves every other target's key untouched.
+	MakeVars []string `toml:"make_vars"`
 }
 
 // Scopes layer on top of the profile-wide values, so a change confined to one
@@ -185,6 +189,12 @@ type PyModule struct {
 type TestExpect struct {
 	Skip []TestEntry `toml:"skip"`
 	Fail []TestEntry `toml:"fail"`
+	// Ignore is handed to regrtest as -i, which matches test cases and methods
+	// rather than files. Skip and Fail are judged against what regrtest reports,
+	// and it reports whole files, so a single impossible method can only be
+	// expressed here -- the alternative is declaring its entire file expected to
+	// fail, which hides every future regression in it.
+	Ignore []TestEntry `toml:"ignore"`
 }
 
 type TestEntry struct {

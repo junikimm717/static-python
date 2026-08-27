@@ -259,13 +259,32 @@ _sqlite3 _sqlite/blob.c _sqlite/connection.c _sqlite/cursor.c _sqlite/microproto
 
 # Upstream builds most of these shared; nothing can be shared here, so they are
 # static or absent.
+# The _testcapi and _testinternalcapi source lists mirror Modules/Setup.stdlib.in
+# and must be re-synced there on a CPython bump; a missing file is a link error
+# naming _PyTestCapi_Init_*, not a silent omission.
 
 *static*
 
 _testbuffer _testbuffer.c
-_testinternalcapi _testinternalcapi.c
-_testcapi _testcapimodule.c
+_testinternalcapi _testinternalcapi.c _testinternalcapi/test_lock.c _testinternalcapi/pytime.c _testinternalcapi/set.c _testinternalcapi/test_critical_sections.c
+_testcapi _testcapimodule.c _testcapi/vectorcall.c _testcapi/heaptype.c _testcapi/abstract.c _testcapi/unicode.c _testcapi/dict.c _testcapi/set.c _testcapi/list.c _testcapi/tuple.c _testcapi/getargs.c _testcapi/datetime.c _testcapi/docstring.c _testcapi/mem.c _testcapi/watchers.c _testcapi/long.c _testcapi/float.c _testcapi/complex.c _testcapi/numbers.c _testcapi/structmember.c _testcapi/exceptions.c _testcapi/code.c _testcapi/buffer.c _testcapi/pyatomic.c _testcapi/run.c _testcapi/file.c _testcapi/codec.c _testcapi/immortal.c _testcapi/gc.c _testcapi/hash.c _testcapi/time.c _testcapi/bytes.c _testcapi/object.c _testcapi/monitoring.c
 _testimportmultiple _testimportmultiple.c
 _testmultiphase _testmultiphase.c
 _testsinglephase _testsinglephase.c
 _xxtestfuzz _xxtestfuzz/_xxtestfuzz.c _xxtestfuzz/fuzzer.c
+_testexternalinspection _testexternalinspection.c
+_testclinic _testclinic.c
+xxsubtype xxsubtype.c
+
+# Everything below defines Py_LIMITED_API, which Py_BUILD_CORE forbids, so none
+# of them can be a builtin -- CPython's own static Modules/Setup keeps xxlimited
+# commented out for the same reason. Left enabled they are built as .so and
+# cannot link against a static libpython. _ctypes_test is disabled for a
+# different reason: it exists only to be dlopened by test_ctypes through CDLL,
+# and the test_ctypes entries in tests.toml already expect it to be absent.
+*disabled*
+_ctypes_test
+_testclinic_limited
+_testlimitedcapi
+xxlimited
+xxlimited_35

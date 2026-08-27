@@ -255,9 +255,7 @@ func newPyBuild(cfg *config.Config, srcAssets fs.FS, host, target config.Target,
 		res:       res,
 		setup:     setup,
 	}
-	if cross {
-		j.buildPython = pyhost
-	}
+	j.buildPython = pyhost
 	return j, nil
 }
 
@@ -300,6 +298,9 @@ func (j *pyBuild) KeyInputs() map[string]string {
 	if j.cross {
 		in["build"] = j.host.Triple
 	}
+	if len(j.target.MakeVars) > 0 {
+		in["make_vars"] = strings.Join(j.target.MakeVars, " ")
+	}
 	for k, v := range j.res.KeyInputs() {
 		in["profile_"+k] = v
 	}
@@ -326,10 +327,15 @@ func (j *pyBuild) pgo() bool {
 func (j *pyBuild) decisionFlags() []string {
 	flags := []string{"--disable-shared", "--with-ensurepip=no", "MODULE_BUILDTYPE=static"}
 	if j.cross {
-		flags = append(flags, "--build="+j.host.Triple, "--host="+j.target.Triple, "--with-build-python")
+		flags = append(flags, "--build="+j.host.Triple, "--host="+j.target.Triple)
 	} else {
 		flags = append(flags, "--build="+j.target.Triple)
 	}
+	// Native too: it costs nothing (staticapi already needs pyhost) and it stops
+	// Programs/_freeze_module from being linked at all. That link pulls in
+	// $(MODOBJS) against a stubbed getpath_noop.o, so a static _testinternalcapi
+	// breaks the bootstrap with an undefined _Py_Get_Getpath_CodeObject.
+	flags = append(flags, "--with-build-python")
 	// Lib/test ships with the _test* builtins or not at all: --disable-test-modules
 	// governs both. It is what lets whoever has real riscv32 or s390x hardware
 	// run the suite there, which is the one thing qemu cannot answer.
@@ -382,17 +388,17 @@ func (j *pyBuild) Build(ctx context.Context, e *core.Env, r *core.Runner, work, 
 
 	args := []string{"./configure", "--prefix=" + prefix, "--exec-prefix=" + prefix, "--with-openssl=" + sysroot}
 	args = append(args, j.decisionFlags()...)
+	// --with-build-python sets PYTHON_FOR_BUILD, PYTHON_FOR_FREEZE,
+	// PYTHON_FOR_REGEN and FREEZE_MODULE_BOOTSTRAP as a consistent set. The old
+	// Makefile instead faked config.status and sed'd the native build's Makefile,
+	// which produced a _sysconfigdata describing the build machine rather than
+	// the target.
+	py, perr := pyhostInterpreter(j.buildPython.ArtifactDir(e))
+	if perr != nil {
+		return perr
+	}
+	args = replaceFlag(args, "--with-build-python", "--with-build-python="+py)
 	if j.cross {
-		// The supported cross path: --with-build-python sets PYTHON_FOR_BUILD,
-		// PYTHON_FOR_FREEZE, PYTHON_FOR_REGEN and FREEZE_MODULE_BOOTSTRAP as a
-		// consistent set. The old Makefile instead faked config.status and sed'd
-		// the native build's Makefile, which produced a _sysconfigdata
-		// describing the build machine rather than the target.
-		py, perr := pyhostInterpreter(j.buildPython.ArtifactDir(e))
-		if perr != nil {
-			return perr
-		}
-		args = replaceFlag(args, "--with-build-python", "--with-build-python="+py)
 		if hr := hostRunner(e, j.target); hr != "" {
 			args = append(args, "HOSTRUNNER="+hr)
 		}
@@ -412,6 +418,7 @@ func (j *pyBuild) Build(ctx context.Context, e *core.Env, r *core.Runner, work, 
 	if j.pgo() {
 		makeArgs = append(makeArgs, "PROFILE_TASK="+j.res.ProfileTask)
 	}
+	makeArgs = append(makeArgs, j.target.MakeVars...)
 	if err := r.Run(ctx, te.cmd(j.Name()+"-make", src, makeArgs, extra)); err != nil {
 		return err
 	}

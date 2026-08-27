@@ -310,11 +310,11 @@ func (c *Config) validateExpect() error {
 			}
 			name = triple
 		}
-		if name == "all" || name == "static" {
+		if name == "all" || name == "static" || name == "native" || name == "qemu" {
 			continue
 		}
 		if _, ok := c.Targets[name]; !ok {
-			return fmt.Errorf("config: expect key %q names no target; use a triple from targets.toml, or the scopes \"all\" or \"static\"", key)
+			return fmt.Errorf("config: expect key %q names no target; use a triple from targets.toml, or one of the scopes \"all\", \"static\", \"native\", \"qemu\"", key)
 		}
 	}
 	return nil

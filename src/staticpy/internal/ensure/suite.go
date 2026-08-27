@@ -43,7 +43,7 @@ func ParseLevel(s string) (Level, error) {
 // _sysconfigdata or a half-linked library breaks.
 var CoreTests = []string{
 	"test_builtin", "test_int", "test_long", "test_float", "test_complex",
-	"test_unicode", "test_bytes", "test_list", "test_dict",
+	"test_str", "test_bytes", "test_list", "test_dict",
 	"test_os", "test_io", "test_time", "test_math", "test_struct",
 	"test_ssl", "test_sqlite3", "test_zlib", "test_bz2", "test_lzma",
 	"test_ctypes", "test_hashlib", "test_socket", "test_subprocess",
@@ -63,6 +63,9 @@ type SuiteOptions struct {
 	TestTimeout time.Duration
 	// Timeout bounds the whole suite run.
 	Timeout time.Duration
+	// Ignore becomes one -i per entry, so an impossible method drops out of the
+	// run instead of failing the file it lives in.
+	Ignore []string
 	// Extra flags appended after the generated ones.
 	Extra []string
 	// PythonArgs is inserted between the interpreter and -m test.
@@ -145,6 +148,9 @@ func RunSuite(ctx context.Context, r *core.Runner, l *Launcher, level Level, pyt
 	if opts.Jobs > 1 {
 		args = append(args, "-j", strconv.Itoa(opts.Jobs))
 	}
+	for _, pat := range opts.Ignore {
+		args = append(args, "-i", pat)
+	}
 	args = append(args, opts.Extra...)
 	args = append(args, tests...)
 
@@ -222,6 +228,36 @@ func collectNames(lines []string, i int, bucket *[]string) int {
 		}
 	}
 	return i - 1
+}
+
+// Accounted is how many distinct tests came back with any result at all.
+func (o *Outcome) Accounted() int {
+	seen := map[string]bool{}
+	for _, b := range [][]string{o.Failed, o.Skipped, o.EnvChanged, o.Omitted, o.NoTests} {
+		for _, t := range b {
+			seen[t] = true
+		}
+	}
+	return o.Passed + len(seen)
+}
+
+// StatusOf treats a requested test that landed in no bucket as passed, because
+// regrtest names the tests that did not pass and counts the ones that did. That
+// inference is only sound while every requested test is accounted for, so this
+// is the check that has to hold for the rest of the classification to mean
+// anything: regrtest prints a summary even when everything fails, so nothing at
+// all came back means the suite never ran.
+func (o *Outcome) CheckCoverage() error {
+	n := o.Accounted()
+	if n == 0 {
+		return fmt.Errorf("the suite reported no results at all (exit %d), so it never ran; "+
+			"a missing Lib/test looks exactly like this", o.Result.ExitCode)
+	}
+	if want := len(o.Requested); want > 0 && n < want {
+		return fmt.Errorf("only %d of the %d requested tests reported a result (exit %d)",
+			n, want, o.Result.ExitCode)
+	}
+	return nil
 }
 
 func contains(ss []string, s string) bool {

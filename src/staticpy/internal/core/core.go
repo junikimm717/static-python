@@ -29,6 +29,7 @@ const (
 	DirArtifact = "artifacts"
 	DirOut      = "out"
 	DirWork     = "work"
+	DirTmp      = ".tmp"
 	DirStaging  = ".staging"
 	DirTrash    = ".trash"
 	DirLocks    = "locks"
