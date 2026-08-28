@@ -3,7 +3,7 @@ FROM alpine
 # Extremely basic dockerfile for dev purposes.
 
 RUN apk add --no-cache\
-  git make curl tar perl meson ninja unzip\
+  git make curl tar perl meson ninja unzip go\
   xz build-base flex bison ncurses rsync patchelf\
   openssl-dev zlib-dev sqlite-dev libffi-dev bzip2-dev xz-dev\
   ncurses-dev readline-dev util-linux-dev expat-dev linux-headers\
