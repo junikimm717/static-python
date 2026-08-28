@@ -51,7 +51,7 @@ pgo = "native-only"
 # -i test_fma_zero_result: musl's fma fast path gets an IEEE-754 negative-zero
 #   case wrong. CPython gates this test with @skipIf(linked_to_musl()), but that
 #   probe shells out to ldd, which exits non-zero on a fully static -no-pie
-#   binary, so the skip never fires. See ai/MUSL_REPORT.md.
+#   binary, so the skip never fires. See the staticpy-traps skill's MUSL_REPORT.
 # -i test_type_check_in_subinterp: the test re-loads _testcapi from its own
 #   .so under a second name inside a subinterpreter. Every extension here is a
 #   builtin, so find_spec().origin is "built-in" and there is no file to load.

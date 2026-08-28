@@ -137,5 +137,5 @@ hides real changes in a large diff.
 Repo rule, from `AGENTS.md`: when you have found a fix, **one line of comment
 max**. The impulse after a hard debugging session is to write a paragraph
 explaining the journey. Don't. One line at the fix; the full story goes in
-`staticpy-traps`, where it is searchable by symptom, or in a report under `ai/`
-if it needs a reproducer.
+`staticpy-traps`, where it is searchable by symptom -- as an entry in its
+`SKILL.md`, or as a sibling write-up file if it needs a reproducer.

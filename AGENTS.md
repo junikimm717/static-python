@@ -131,9 +131,9 @@ H=$(uname -m) && \
 ```
 
 Full writeup, including expected output, falsification controls, and
-"where this would break", is in `ai/PORTABILITY_PROOF.md` -- written
-against the older wrapper-based toolchain, so read its mechanism sections
-as history.
+"where this would break", is `PORTABILITY_PROOF.md` in the `staticpy-traps`
+skill -- written against the older wrapper-based toolchain, so read its
+mechanism sections as history.
 
 ## Tarball hashes and preflight downloads
 
@@ -230,28 +230,37 @@ Don't write overly verbose comments.
 - Avoid baking specific numbers (gcc 9.4, 32 cores, -j32) into prose
   unless the number is the *point* of the comment.
 - Three to five lines is usually the right length. If you find yourself
-  writing a paragraph, the explanation probably belongs in `ai/` (see
-  below) and the comment can just point there.
+  writing a paragraph, the explanation probably belongs in the
+  `staticpy-traps` skill (see below) and the comment can just point there.
 
-## Reports under `ai/`
+## Findings go in the `staticpy-traps` skill
 
 Anything you discover that is more than a one-line comment's worth of
 explanation -- a real bug in an upstream component, a non-obvious
 interaction between flags, the actual root cause of a failure mode that
-took you more than fifteen minutes to corner -- writes up as a markdown
-report under `ai/`. Examples already there:
+took you more than fifteen minutes to corner -- belongs in
+`.agents/skills/staticpy-traps/`, which is the one place a future agent
+is guaranteed to read before debugging.
 
-- `ai/MUSL_REPORT.md` -- musl `fma` losing negative zero on underflow,
-  and the two safety nets that should have caught it.
+Small enough to state in a paragraph: add it to `SKILL.md` as an entry in
+the matching section, phrased symptom-first so it is findable by what you
+would have searched for.
 
-Format follows that example: title, one-paragraph summary, minimal
-reproducer (code or command), each layer of root cause as its own
+Bigger than that: a sibling markdown file next to `SKILL.md`, plus a
+`SKILL.md` entry that links to it at the point where the problem bites.
+The three already there are the format -- title, one-paragraph summary,
+minimal reproducer (code or command), each layer of root cause as its own
 section, and a "what we ended up doing" / "what we'd want upstream" at
-the end.
+the end:
 
-When you write a report, link it from the relevant code with a one-line
-comment like `# See ai/<NAME>.md.`, *not* by inlining the explanation
-into the source.
+- `MUSL_REPORT.md` -- musl `fma` losing negative zero on underflow,
+  and the two safety nets that should have caught it.
+- `MIPS64_FFI_REPORT.md` -- libffi closures returning the high half of
+  the return slot for narrow integers on big-endian mips.
+- `PORTABILITY_PROOF.md` -- a toolchain tarball on a foreign glibc rootfs.
+
+Either way, link it from the relevant code with a one-line comment, *not*
+by inlining the explanation into the source.
 
 ## Commits
 

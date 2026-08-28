@@ -1,6 +1,6 @@
 ---
 name: staticpy-traps
-description: Symptom-to-cause catalogue for a static, cross-compiled, LTO'd CPython — builds that succeed while producing the wrong thing, configure guessing when it cannot run a test program, ctypes symbols that vanish, musl divergences from glibc, and the no-dlopen consequences that shape the whole design. Read before debugging anything that builds but misbehaves, before adding a source fixup, and before trusting a green build. Every entry here cost real time to find.
+description: Symptom-to-cause catalogue for a static, cross-compiled, LTO'd CPython — builds that succeed while producing the wrong thing, configure guessing when it cannot run a test program, ctypes symbols that vanish, musl and libffi divergences, and the no-dlopen consequences that shape the whole design. Carries the full bug write-ups for the musl fma sign-of-zero bug, the mips64 libffi closure bug, and the toolchain portability proof. Read before debugging anything that builds but misbehaves, before adding a source fixup, and before trusting a green build. Every entry here cost real time to find.
 ---
 
 # staticpy traps
@@ -8,6 +8,27 @@ description: Symptom-to-cause catalogue for a static, cross-compiled, LTO'd CPyt
 Ordered by how long each took to corner, not by area. The common thread: on a
 cross build almost nothing fails loudly, so the default failure mode is a
 successful build of the wrong artifact.
+
+## The long write-ups
+
+Three findings needed more than a catalogue entry. They live beside this file,
+and the entries below link to them at the point where they bite:
+
+- **`MUSL_REPORT.md`** — musl's `fma` losing negative zero on underflow, and
+  the two safety nets (the toolchain's missing `-mfma`, CPython's
+  `linked_to_musl()` probe) that both fail specifically on a static non-PIE
+  build.
+- **`MIPS64_FFI_REPORT.md`** — libffi closures returning the high half of the
+  return slot for narrow integers on big-endian mips n32/n64. Root-caused to
+  `src/mips/n32.S`, fixed by a target-scoped patch, unreported upstream.
+- **`PORTABILITY_PROOF.md`** — the end-to-end proof that a toolchain tarball
+  drops onto a foreign glibc rootfs with no compiler on it and still builds
+  through the LTO plugin path. Written against the older wrapper-based
+  toolchain, so read its mechanism sections as history; the property still
+  holds and `test-portability/` still checks it.
+
+A new finding of that size goes here too, as a sibling file plus the entry that
+points at it — not inlined into the source it explains.
 
 ## Silence is the enemy
 
@@ -73,6 +94,16 @@ host and target happen to agree.
 **openssl's `Configure` reads `-static` in LDFLAGS as an instruction to turn
 static off.** It runs `disable('static', 'pic', 'threads')`, which is the exact
 opposite of what a static build means by that flag. Patched out.
+
+**libffi closures return the wrong half of the slot on big-endian mips.** A
+closure returning anything narrower than 64 bits hands back the *high* half of
+the return slot, so every `ctypes` callback returning `c_int` is wrong —
+`cb(42)` gives `0`, `cb(-7)` gives `-1`. The epilogue in `src/mips/n32.S` loads
+from offset 0 of the slot, which is the value little-endian and the high half
+big-endian, so it needs n32/n64 **and** big-endian: mips64el is unaffected,
+which is why it has stood. `ffi_call` and 64-bit returns are both fine, which is
+what narrows it. Fixed by a `target_patches` entry for `mips64-linux-musl`
+alone; full write-up and reproducer in `MIPS64_FFI_REPORT.md`.
 
 **zlib rejects `--host`.** Its configure is hand-rolled, errors on unknown
 options, and reads `$CHOST` instead. Anything that passes `--host` uniformly has
@@ -153,7 +184,7 @@ not do. Alpine's apk skips it for the same reason.
 **`fma` loses negative zero on underflow**, which `test_fma_zero_result` catches.
 Upstream gates that test with a `linked_to_musl()` probe that shells out to
 `ldd` — which exits non-zero on a fully static `-no-pie` binary, so the skip
-never fires. Full write-up in `ai/MUSL_REPORT.md`.
+never fires. Full write-up in `MUSL_REPORT.md`.
 
 **Some targets need `-latomic`** for 64-bit atomics. Which ones is a property of
 the target, not something to rediscover with a regex.
@@ -179,3 +210,14 @@ correct.
 **Benchmarks under qemu measure qemu.** The overhead is not uniform across
 workloads, so the numbers are comparable to nothing — not to native, and not to
 each other.
+
+**A toolchain that works on your box proves nothing about a foreign rootfs.**
+The requirement is that a tarball drops onto *any* Linux rootfs — glibc,
+near-empty, whatever — and compiles through `-flto -fuse-linker-plugin
+-fno-fat-lto-objects`. Both halves come from gccfactory: every binary is
+static-musl, and the LTO plugin is compiled into `libbfd` so `ld` resolves
+`-plugin liblto_plugin.so` to its built-in copy rather than opening a file that
+does not exist. `test-portability/proof.sh` checks it in a Debian image with no
+compiler in it, negative control included; re-run it after every toolchain
+re-publish. `PORTABILITY_PROOF.md` has the expected output and the
+falsification controls.
