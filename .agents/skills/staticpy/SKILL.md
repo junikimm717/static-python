@@ -5,17 +5,13 @@ description: Work on this repo's Go build system (src/staticpy) — the job DAG,
 
 # staticpy
 
-## Orientation: two build systems, only one of them works
+## Orientation
 
-The top-level `Makefile` (driven inside the Alpine dev container, fanned out by
-`parallel-pythons.pl`) is what has actually produced every static interpreter in
-this tree, and it is what to reach for when the task is *"build a Python"*.
-`src/staticpy` is a Go build system that owns the same job in **data** rather
-than recipes — `config/*.toml` holds versions, checksums, per-package configure
-args, per-target quirks and flag profiles — and has **never built an
-interpreter**. Reach for it when the task is *"work on staticpy"*. Both are live:
-a version bump has to move in `config/sources.toml` **and** in the `Makefile` +
-`hashes/`, or the two disagree.
+`src/staticpy` is the build system. It owns the job in **data** rather than
+recipes — `config/*.toml` holds versions, checksums, per-package configure args,
+per-target quirks and flag profiles — and every job's key is hashed over its
+inputs and its dependencies' keys, so an edit rebuilds exactly what depends on
+it. `config/sources.toml` is the single place a version and its sha256 live.
 
 `./staticpy help` and each command's `Long:` in `internal/cli/*.go` are the
 user-facing documentation and are kept authoritative. Read them before writing
@@ -45,7 +41,7 @@ dist/                    everything generated; gitignored, safe to delete
 | question | answer |
 |---|---|
 | what commands and flags exist | `./staticpy help`, `./staticpy help <cmd>`, `help layout`, `help targets` — authoritative |
-| bump a pinned version | `config/sources.toml` (version + file + urls + topdir + **sha256 in the same edit**), and the `Makefile` + `hashes/*.sha256` for the other build system |
+| bump a pinned version | `config/sources.toml` (version + file + urls + topdir + **sha256 in the same edit**) |
 | change a package's configure flags | `config/packages.toml`. Only *decisions* live there: `--prefix`, `--exec-prefix`, `--host` are injected by the recipe because they are absolute or triple-derived |
 | change a compiler/linker flag | `config/profiles.toml`. Profile-wide, then scoped: `deps`, `deps.<pkg>`, `python`, `pyhost`. A scoped change rebuilds only what that scope reaches |
 | add a native library | a `[source.X]` in `config/sources.toml` + a `[package.X]` in `config/packages.toml` (`build` = autotools\|openssl\|make\|sources, `needs`, `provides`). `Deps` picks up every package automatically; `sysroot` composes them |

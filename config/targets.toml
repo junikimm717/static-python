@@ -1,17 +1,17 @@
-# One row per triple in supported.txt. Adding an architecture is a row here
-# plus python/pyconfig/<triple>-patches.h.
+# One row per triple. Adding an architecture is a row here plus
+# src/staticpy/internal/assets/files/pyconfig/<triple>-patches.h.
 #
-# libatomic mirrors the Makefile's `i[3-6]86|arm[^6]?|mips[^6]?|microblaze|sh|
-# m68k|or1k|riscv(32|64)` test: those targets lack inline 64-bit atomics, so
-# CPython's SYSLIBS needs -latomic or the link fails on _Py_atomic_*.
+# libatomic covers `i[3-6]86|arm[^6]?|mips[^6]?|microblaze|sh|m68k|or1k|
+# riscv(32|64)`: those targets lack inline 64-bit atomics, so CPython's SYSLIBS
+# needs -latomic or the link fails on _Py_atomic_*.
 #
 # uint128 is read off the pyconfig patch headers: a target whose header says
 # `#undef HAVE_GCC_UINT128_T` also has to lose -DHAVE_UINT128_T=1 from the
 # generated Makefile, and (being 32-bit here) swaps -DCONFIG_64=1 for
 # -DCONFIG_32=1.
 #
-# maps.openssl is openssl-platform.sh: OpenSSL's own platform names, which do
-# not follow one rule -- some are linux-<arch>, some linux64-<arch>.
+# maps.openssl is OpenSSL's own platform name for the target. They do not follow
+# one rule -- some are linux-<arch>, some linux64-<arch>.
 
 [target.x86_64-linux-musl]
 triple = "x86_64-linux-musl"

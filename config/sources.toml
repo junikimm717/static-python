@@ -3,10 +3,10 @@
 # --sources is passed explicitly, so a stray config/ directory cannot redefine
 # a checksum. See Load.
 #
-# sha256 values are the ones in hashes/*.sha256; they are what the Makefile
-# has been verifying against. Mirrors are only listed where the mirrored file
-# is known to be byte-identical to the primary -- a mirror serving a different
-# tarball is a failed checksum, not a fallback.
+# A version and its sha256 move in the same edit; a pin without its checksum is
+# a build that fetches an unverified tarball. Mirrors are only listed where the
+# mirrored file is known to be byte-identical to the primary -- a mirror serving
+# a different tarball is a failed checksum, not a fallback.
 
 [source.openssl]
 name = "openssl"

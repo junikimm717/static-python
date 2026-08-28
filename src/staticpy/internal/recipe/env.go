@@ -286,9 +286,9 @@ func pickTool(dir, triple string, names ...string) (string, error) {
 		names[0], triple, strings.Join(tried, ", "))
 }
 
-// toolenv is the compiler environment one job hands to every command it runs:
-// what configure-wrapper.sh exported, driven from the resolved profile and the
-// composed dependency view instead of from hard-coded paths.
+// toolenv is the compiler environment one job hands to every command it runs,
+// driven from the resolved profile and the composed dependency view rather than
+// from hard-coded paths.
 type toolenv struct {
 	target config.Target
 	tools  tools

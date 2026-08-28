@@ -11,7 +11,7 @@ build = "openssl"
 platform_map = "openssl"
 configure = [
   "no-shared", "no-dso",
-  # no-asm: the perlasm generators do not cover every triple in supported.txt,
+  # no-asm: the perlasm generators do not cover every triple in targets.toml,
   # and a mixed asm/C build is the classic source of "works on x86_64 only".
   "no-asm",
   # no-dso rules out engines anyway; saying so keeps Configure from probing.

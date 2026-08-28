@@ -334,12 +334,11 @@ runtime deps, and only confirm provenance.
   start passing without exercising the right thing.
 - The tarball `test-portability/<arch>-linux-musl-native.tgz`
   (`<arch>` = host `uname -m`) is the artefact under test. `proof.sh`
-  packs it from `deps-<arch>-linux-musl/` when missing, or regenerate with:
+  packs it from `dist/toolchains/` when missing, or regenerate with:
   ```sh
-  docker compose exec -T spython sh -lc \
-    'cd /workspace && H=$(uname -m) && \
-     tar -czf test-portability/${H}-linux-musl-native.tgz \
-       -C deps-${H}-linux-musl ${H}-linux-musl-native'
+  H=$(uname -m) && \
+    tar -czf test-portability/${H}-linux-musl-native.tgz \
+      -C dist/toolchains ${H}-linux-musl-native
   ```
   Refresh it any time `cross-make/post-install.sh` or `wrapper.c`
   changes -- otherwise the proof is silently re-validating an old

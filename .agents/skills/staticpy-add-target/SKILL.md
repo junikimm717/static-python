@@ -29,17 +29,16 @@ Every field, and what breaks without it (`internal/config/validate.go`,
 - **`libatomic`** — appends `-latomic` to CPython's `LDFLAGS`. Set it for any
   target whose 64-bit `_Py_atomic_*` operations land in libatomic rather than
   compiler builtins; CPython's own link line does not ask for it. The existing
-  rows mirror the Makefile's test: `i[3-6]86`, `arm` (non-64), `mips` (non-64),
-  `microblaze`, `sh`, `m68k`, `or1k`, `riscv32|riscv64`.
+  rows cover `i[3-6]86`, `arm` (non-64), `mips` (non-64), `microblaze`, `sh`,
+  `m68k`, `or1k`, `riscv32|riscv64`.
 - **`uint128`** — today this feeds only the CPython job key; the macro CPython
   actually sees (`HAVE_GCC_UINT128_T`) comes from the probe. Still set it
-  truthfully: a wrong value makes the cache key lie about the build, and the
-  legacy Makefile does consume it.
+  truthfully: a wrong value makes the cache key lie about the build.
 - **`qemu`** — the qemu-user binary name. `QemuBinaryName` prepends `qemu-` if
   absent and falls back to the triple's leading component when the field is
   empty, so spell it out where the arch name and the qemu name diverge
   (`powerpc64le` → `qemu-ppc64le`).
-- **`status`** — `proven` or `experimental`; see §10.
+- **`status`** — `proven` or `experimental`; see §9.
 - **`maps.openssl`** — see §2. Required: `package.openssl` declares
   `platform_map = "openssl"`, and config validation fails at load if any target
   lacks the entry. That failure is cheap and early — it fires on `staticpy print`.
@@ -56,8 +55,7 @@ only for a checkout-relative run. Commit both copies.
 
 OpenSSL's platform names follow no single rule. The authoritative list is
 OpenSSL's own `Configurations/*.conf`; `./Configure LIST` in an unpacked source
-tree prints it. `openssl-platform.sh` at the repo root is the legacy Makefile's
-table and gives the same answers.
+tree prints it.
 
 The pattern that holds for most rows: `linux-<arch>` for x86_64/aarch64,
 `linux64-<arch>` for mips64/riscv64/s390x/sparcv9, `linux-ppc64` /
@@ -205,15 +203,7 @@ Two things to know before editing this file:
   I can tell those two tables are never read by the Go path. Confirm before
   copying that shape for a new target — write per-triple keys.
 
-## 9. The legacy Makefile, if the target must build there too
-
-`AGENTS.md` still calls the Makefile the build system that works. Supporting a
-target there is a separate three-part edit: a line in `supported.txt`, a
-`python/pyconfig/<triple>-patches.h` (the pre-probe copy — hand-written sizes are
-load-bearing there), and a case in `openssl-platform.sh`. None of these are read
-by staticpy.
-
-## 10. Proven versus experimental
+## 9. Proven versus experimental
 
 `status` gates four things, none of them the build itself:
 
@@ -238,7 +228,7 @@ Before promoting, the evidence that should exist:
 3. Any `tests.toml` entries for the triple justified and current — no unexpected
    passes.
 
-## 11. Verifying you got it right, cheapest first
+## 10. Verifying you got it right, cheapest first
 
 ```sh
 staticpy print targets-all                  # row parses, validation passed

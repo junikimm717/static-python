@@ -22,9 +22,9 @@ const (
 )
 
 // MatchCountError is what makes edits safe to keep in a build that runs for
-// years. The Makefile this replaces used sed, which exits 0 when its anchor has
-// moved: the edit silently does nothing and the build ships a subtly broken
-// interpreter. Here a moved anchor stops the job.
+// years. sed exits 0 when its anchor has moved: the edit silently does nothing
+// and the build ships a subtly broken interpreter. Here a moved anchor stops
+// the job.
 type MatchCountError struct {
 	Source string
 	File   string

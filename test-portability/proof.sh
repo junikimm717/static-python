@@ -7,13 +7,12 @@
 #
 # Uses the host's native toolchain: <arch>-linux-musl-native.tgz where
 # <arch> is `uname -m` (x86_64 or aarch64). Re-run after rebuilding the
-# toolchain. Regenerate the tarball from deps-<arch>-linux-musl/ with:
-#   docker compose exec -T spython sh -lc \
-#     'cd /workspace && HOST=$(uname -m) && \
-#      tar -czf test-portability/${HOST}-linux-musl-native.tgz \
-#        -C deps-${HOST}-linux-musl ${HOST}-linux-musl-native'
+# toolchain. Regenerate the tarball from dist/toolchains/ with:
+#   HOST=$(uname -m) && \
+#     tar -czf test-portability/${HOST}-linux-musl-native.tgz \
+#       -C dist/toolchains ${HOST}-linux-musl-native
 #
-# If the tarball is missing but deps-<arch>-linux-musl/<arch>-linux-musl-native/
+# If the tarball is missing but dist/toolchains/<arch>-linux-musl-native/
 # exists, this script packs it automatically before running the proof.
 
 set -eu
@@ -34,7 +33,7 @@ esac
 
 TC_DIR="${HOST_ARCH}-linux-musl-native"
 TARBALL=$HERE/${TC_DIR}.tgz
-DEPS_TREE=$REPO/deps-${HOST_ARCH}-linux-musl/$TC_DIR
+DEPS_TREE=$REPO/dist/toolchains/$TC_DIR
 IMAGE=static-python-portability-alien:latest
 
 if [ ! -f "$TARBALL" ]; then
@@ -43,7 +42,7 @@ if [ ! -f "$TARBALL" ]; then
 		tar -czf "$TARBALL" -C "$(dirname "$DEPS_TREE")" "$(basename "$DEPS_TREE")"
 	else
 		echo "ERROR: missing toolchain tarball: $TARBALL" >&2
-		echo "       (fetch one with 'make toolchain' or see top of $0)" >&2
+		echo "       (the ./staticpy shim fetches it on the first build, or see top of $0)" >&2
 		exit 1
 	fi
 fi

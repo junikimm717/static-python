@@ -1,5 +1,5 @@
-# Flag sets. `default` is exactly what configure-wrapper.sh exported, minus the
-# -I/-L paths: those are absolute and belong to the job, not the profile.
+# Flag sets. A profile carries no -I/-L paths: those are absolute and belong to
+# the job, not the profile.
 #
 # Scopes ([profile.X.python], [profile.X.deps], [profile.X.deps.<pkg>],
 # [profile.X.pyhost]) layer on top of the profile-wide values, so a change

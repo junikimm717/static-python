@@ -222,8 +222,8 @@ lands in `libc.a`. Confirmed by disassembling the built object: it's the
 
 Adding `-mfma` to musl's build would fix this for x86-64-v3-class CPUs but
 would move our toolchain's baseline ABI off plain `x86_64`. It also wouldn't
-help any of the non-x86 architectures in `supported.txt`, where the generic
-`fma.c` is always what runs.
+help any of the non-x86 architectures in `config/targets.toml`, where the
+generic `fma.c` is always what runs.
 
 ### Layer 3 -- CPython's `linked_to_musl()` doesn't recognize static binaries
 
@@ -283,9 +283,12 @@ related test_re failures.
 
 The change is in two places:
 
-- `Makefile` (`PROFILE_TASK ?=`) -- applies to the static `python3` target.
+- `config/profiles.toml` (`profile_task`) -- applies to every static build.
 - `benchmark/dynamic-build.sh` -- mirrored so the dynamic baseline uses the
   same exclusion set (defense-in-depth; layer 3 already covers it there).
+
+`config/tests.toml` carries the matching verification-side entry, so a target
+that skips this test is declared to rather than merely tolerated.
 
 The runtime bug at layer 1 is **not fixed** by this change. `math.fma(x,y,z)`
 in the resulting interpreter will still return the wrong sign for the

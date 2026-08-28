@@ -424,10 +424,9 @@ func (j *pyBuild) Build(ctx context.Context, e *core.Env, r *core.Runner, work, 
 	args := []string{"./configure", "--prefix=" + prefix, "--exec-prefix=" + prefix, "--with-openssl=" + sysroot}
 	args = append(args, j.decisionFlags()...)
 	// --with-build-python sets PYTHON_FOR_BUILD, PYTHON_FOR_FREEZE,
-	// PYTHON_FOR_REGEN and FREEZE_MODULE_BOOTSTRAP as a consistent set. The old
-	// Makefile instead faked config.status and sed'd the native build's Makefile,
-	// which produced a _sysconfigdata describing the build machine rather than
-	// the target.
+	// PYTHON_FOR_REGEN and FREEZE_MODULE_BOOTSTRAP as a consistent set. Faking
+	// config.status and sed'ing the native build's Makefile instead produces a
+	// _sysconfigdata describing the build machine rather than the target.
 	py, perr := pyhostInterpreter(j.buildPython.ArtifactDir(e))
 	if perr != nil {
 		return perr

@@ -3,13 +3,13 @@
 # (Named with the action second so the .gitignore `build-*` rule does not
 # swallow this tracked script.)
 #
-# Arch is detected from `uname -m`; the Python version is read from the
-# project Makefile (PYTHON / PYTHONV), so this script never duplicates any
-# version or architecture string from the Makefile.
+# Arch is detected from `uname -m`; the Python version comes from `staticpy
+# print`, so the baseline cannot drift from the interpreter it is compared
+# against.
 #
 # Designed to run inside the `spython` Docker service.  The result lands at
 # python-dynamic-${HOST_ARCH}-linux-musl/bin/python${PYTHONV}, mirroring the
-# static layout the main Makefile produces.
+# static layout staticpy produces.
 
 set -eu
 
@@ -26,24 +26,23 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
 
 HOST_ARCH="${HOST_ARCH:-$(uname -m)}"
-# $(info ...) directives in the Makefile fire at parse time and bleed into
-# `make`'s stdout; `tail -n1` picks the actual echoed value of the variable.
-PYTHON="$(make -C "$ROOT" -s print-PYTHON 2>/dev/null | tail -n1)"
-PYTHONV="$(make -C "$ROOT" -s print-PYTHONV 2>/dev/null | tail -n1)"
-
-if [ -z "${PYTHON:-}" ] || [ -z "${PYTHONV:-}" ]; then
-    echo "error: could not read PYTHON/PYTHONV from $ROOT/Makefile" >&2
-    exit 1
-fi
+PYTHON="$("$ROOT/staticpy" print python-version)"
+PYTHONV="$("$ROOT/staticpy" print python-abi)"
 
 TARGET="${HOST_ARCH}-linux-musl"
-SRC="$ROOT/tarballs/Python-${PYTHON}.tgz"
 BUILD="$ROOT/deps-dynamic-${TARGET}/Python-${PYTHON}"
 PREFIX="$ROOT/python-dynamic-${TARGET}"
 
-if [ ! -f "$SRC" ]; then
-    echo "error: missing source tarball: $SRC" >&2
-    echo "       run \`make $SRC\` (or any other target that depends on it) first." >&2
+# staticpy names its cache entries <sha256-prefix>-<basename>, so the tarball is
+# found by glob rather than by construction.
+find_src() { ls "$ROOT/dist/src/"*"-Python-${PYTHON}.tgz" 2>/dev/null | head -n1; }
+SRC="$(find_src)"
+if [ -z "$SRC" ]; then
+    "$ROOT/staticpy" sources fetch python
+    SRC="$(find_src)"
+fi
+if [ -z "$SRC" ]; then
+    echo "error: no Python-${PYTHON}.tgz in $ROOT/dist/src" >&2
     exit 1
 fi
 

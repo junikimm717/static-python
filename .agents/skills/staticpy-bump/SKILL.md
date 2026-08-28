@@ -1,6 +1,6 @@
 ---
 name: staticpy-bump
-description: Upgrade a pinned dependency — openssl, sqlite, ncurses, readline, libffi, xz, zlib, bzip2, util-linux/libuuid, or CPython itself — and survive the sharp corners: where the checksum must come from, why a patch that stops applying is the outcome you wanted, the packages whose version is encoded in more than one place, and the two build systems that both have to move. Use whenever changing a version in config/sources.toml or the Makefile.
+description: Upgrade a pinned dependency — openssl, sqlite, ncurses, readline, libffi, xz, zlib, bzip2, util-linux/libuuid, or CPython itself — and survive the sharp corners: where the checksum must come from, why a patch that stops applying is the outcome you wanted, and the packages whose version is encoded in more than one place. Use whenever changing a version in config/sources.toml.
 ---
 
 # Bumping a pinned dependency
@@ -13,9 +13,9 @@ not mechanical.
 
 **1. Get the new version and an authoritative checksum.**
 
-There is no `staticpy sources update`. The Makefile has `make update-hashes`,
-which downloads with verification disabled and records whatever arrived;
-staticpy has no equivalent, and the gap is deliberate enough to state plainly:
+There is no `staticpy sources update` — nothing here downloads with verification
+disabled and records whatever arrived. The gap is deliberate enough to state
+plainly:
 **the sha256 you paste is the sha256 you trust from then on.** Hashing whatever
 your network handed you pins a corrupted or substituted tarball exactly as
 firmly as it pins the real one. Take the digest from upstream's release
@@ -39,14 +39,13 @@ cp -r /tmp/pristine/<pkg> /tmp/edit && (cd /tmp/edit && …apply the change…)
 diff -u --label a/<f> --label b/<f> /tmp/pristine/<pkg>/<f> /tmp/edit/<f>
 ```
 
-Never diff against a tree in `deps-*/`: the Makefile has already `sed`-ed those
-in place, so the diff you get will be empty or wrong.
+Never diff against a tree in `dist/srctrees/`: patches and content-anchored
+edits have already been applied there, so the diff you get will be empty or
+wrong.
 
-**4. Bump the Makefile and `hashes/` in the same commit.** Both build systems are
-live. The Makefile pins `OPENSSL`, `LIBFFI`, `LIBLZMA`, `ZLIB`, `READLINE`,
-`NCURSES`, `SQLITE`, `SQLITE_YEAR`, `BZIP2`, `UTILLINUX` and `PYTHON`
-independently, and `hashes/<file>.sha256` alongside. A bump in only one place
-gives you two build systems that disagree about what they are building.
+**4. The version and its sha256 move in the same edit.** A pin without its
+checksum is not a half-done commit, it is a build that fetches an unverified
+tarball.
 
 **5. Fetch and verify.**
 
@@ -70,11 +69,10 @@ sysroot, the interpreter. For CPython that is the whole tree. Run
 
 ## Sharp corners, per package
 
-**sqlite encodes its version three times.** `3510200` is 3.51.2 as a packed
-integer, the download URL carries a *year* directory
-(`sqlite.org/2026/sqlite-src-3510200.zip`), and the Makefile keeps `SQLITE_YEAR`
-separately. All three move together, and the year is not derivable from the
-version.
+**sqlite encodes its version twice, and one half is a date.** `3510200` is
+3.51.2 as a packed integer, and the download URL carries a *year* directory
+(`sqlite.org/2026/sqlite-src-3510200.zip`). Both move together, and the year is
+not derivable from the version.
 
 **libuuid's source list is hardcoded, and this is the one that fails quietly.**
 `build = "sources"` compiles a declared file list with no configure step — for

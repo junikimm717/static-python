@@ -5,40 +5,73 @@ on:
   schedule:
     - cron: '0 5 * * 0'
 
-
 jobs:
-  build-and-release:
+  # The matrix comes from targets.toml rather than a list here, so adding a
+  # triple is still a one-row change.
+  targets:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.list.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - id: list
+        run: |
+          printf 'matrix=' >> "$GITHUB_OUTPUT"
+          ./staticpy print targets-all \
+            | tr ' ' '\n' | grep . | jq -Rrn '[inputs] | tostring' >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: targets
+    runs-on: ubuntu-latest
+    strategy:
+      # One bad target must not abandon the ten that were fine.
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.targets.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+
+      # busybox supplies sh/awk/sed to the hermetic builds; qemu-user runs the
+      # cross-built interpreter so --verify has something to verify on.
+      - name: Install host tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y busybox-static qemu-user perl patch
+          sudo ln -sf /bin/busybox /usr/local/bin/busybox
+
+      # Toolchains are fetched by the ./staticpy shim from gccfactory; nothing
+      # is compiled here except CPython and its dependencies.
+      - name: Build, verify and pack
+        run: ./staticpy build --target ${{ matrix.target }} --verify core --pack
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-${{ matrix.target }}
+          path: dist/out/default/${{ matrix.target }}/
+          if-no-files-found: error
+
+  release:
+    needs: build
+    # Publish whatever built, rather than nothing when one target regressed.
+    if: always()
     runs-on: ubuntu-latest
     permissions:
       contents: write
-
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential git perl unzip make meson curl tar rsync flex bison
-
-      - name: Build native
-        run: make ARCH=x86_64
-
-      - name: Cross-compile
-        run: make ARCH=arm MUSLABI=musleabihf
-
-      - name: Cross-compile aarch64
-        run: make ARCH=aarch64
-
-      - name: Cross-compile riscv64
-        run: make ARCH=riscv64
-
-      - name: Package binaries
-        run: |
-          tar -czf python-static-x86_64-linux-musl.tar.gz python-static-x86_64-linux-musl/
-          tar -czf python-static-aarch64-linux-musl.tar.gz python-static-aarch64-linux-musl/
-          tar -czf python-static-riscv64-linux-musl.tar.gz python-static-riscv64-linux-musl/
-          tar -czf python-static-arm-linux-musleabihf.tar.gz python-static-arm-linux-musleabihf/
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          pattern: python-*
+          merge-multiple: true
 
       - name: Delete release
         run: |
@@ -54,9 +87,7 @@ jobs:
           name: "Latest Static Binaries"
           body_path: .github/workflows/notes.md
           files: |
-            python-static-x86_64-linux-musl.tar.gz
-            python-static-aarch64-linux-musl.tar.gz
-            python-static-riscv64-linux-musl.tar.gz
-            python-static-arm-linux-musleabihf.tar.gz
+            out/*.tar.gz
+            out/*.tar.gz.sha256
           draft: false
           prerelease: true
