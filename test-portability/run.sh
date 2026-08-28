@@ -1,7 +1,7 @@
 #!/bin/sh
 # Portability proof: extract the static-musl toolchain tarball into a
 # foreign (glibc) rootfs, then build and run three test programs end-to-end.
-# See PORTABILITY_PROOF.md in the staticpy-traps skill.
+# See .agents/skills/staticpy-traps/references/PORTABILITY_PROOF.md.
 #
 # Runs INSIDE the alien container. Expects:
 #   /toolchain.tgz       toolchain tarball as published by gccfactory

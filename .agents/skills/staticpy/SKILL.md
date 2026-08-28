@@ -209,9 +209,9 @@ Honest inventory, because the code reads more finished than it is:
 
 ## Related
 
-- `staticpy-traps` — symptom-to-cause catalogue, and the home of the long bug
-  write-ups (`MUSL_REPORT.md`, `MIPS64_FFI_REPORT.md`, `PORTABILITY_PROOF.md`).
-  **Read it before debugging anything that builds but misbehaves.**
+- `staticpy-traps` — symptom-to-cause catalogue, with the long bug write-ups in
+  its `references/`. **Read it before debugging anything that builds but
+  misbehaves, and write what you find there.**
 - `staticpy-add-target` — adding and proving a new triple.
 - `comment-hygiene` — this repo's comment rule: say *why*, not *what*; no stale
   framing; no baked-in numbers unless the number is the point. Anything longer

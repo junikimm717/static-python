@@ -1,6 +1,7 @@
 # Glibc-based "alien" rootfs for proving the static-musl toolchain
 # tarball is genuinely relocatable. No compilers; only inspection and
-# build orchestration tools. See PORTABILITY_PROOF.md in the staticpy-traps skill.
+# build orchestration tools.
+# See .agents/skills/staticpy-traps/references/PORTABILITY_PROOF.md.
 FROM debian:stable-slim
 
 RUN apt-get update \

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Host-side driver for the portability proof.
-# See PORTABILITY_PROOF.md in the staticpy-traps skill.
+# See .agents/skills/staticpy-traps/references/PORTABILITY_PROOF.md.
 #
 # Builds the alien (debian:stable-slim) image, runs run.sh inside it with
 # the toolchain tarball and tests mounted in, and tees output to

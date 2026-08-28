@@ -9,26 +9,34 @@ Ordered by how long each took to corner, not by area. The common thread: on a
 cross build almost nothing fails loudly, so the default failure mode is a
 successful build of the wrong artifact.
 
-## The long write-ups
+## The long write-ups, in `references/`
 
-Three findings needed more than a catalogue entry. They live beside this file,
-and the entries below link to them at the point where they bite:
+Three findings needed more than a catalogue entry. The entries below link to
+them at the point where they bite:
 
-- **`MUSL_REPORT.md`** — musl's `fma` losing negative zero on underflow, and
-  the two safety nets (the toolchain's missing `-mfma`, CPython's
-  `linked_to_musl()` probe) that both fail specifically on a static non-PIE
-  build.
-- **`MIPS64_FFI_REPORT.md`** — libffi closures returning the high half of the
-  return slot for narrow integers on big-endian mips n32/n64. Root-caused to
-  `src/mips/n32.S`, fixed by a target-scoped patch, unreported upstream.
-- **`PORTABILITY_PROOF.md`** — the end-to-end proof that a toolchain tarball
-  drops onto a foreign glibc rootfs with no compiler on it and still builds
-  through the LTO plugin path. Written against the older wrapper-based
+- **`references/MUSL_REPORT.md`** — musl's `fma` losing negative zero on
+  underflow, and the two safety nets (the toolchain's missing `-mfma`,
+  CPython's `linked_to_musl()` probe) that both fail specifically on a static
+  non-PIE build.
+- **`references/MIPS64_FFI_REPORT.md`** — libffi closures returning the high
+  half of the return slot for narrow integers on big-endian mips n32/n64.
+  Root-caused to `src/mips/n32.S`, fixed by a target-scoped patch, unreported
+  upstream.
+- **`references/PORTABILITY_PROOF.md`** — the end-to-end proof that a toolchain
+  tarball drops onto a foreign glibc rootfs with no compiler on it and still
+  builds through the LTO plugin path. Written against the older wrapper-based
   toolchain, so read its mechanism sections as history; the property still
   holds and `test-portability/` still checks it.
 
-A new finding of that size goes here too, as a sibling file plus the entry that
-points at it — not inlined into the source it explains.
+**When you corner a failure worth documenting, write it up here.** A paragraph
+is enough for most of them: add an entry to the matching section below,
+phrased symptom-first so the next person finds it by what they would have
+searched for. When it needs a reproducer, a disassembly, measured before/after
+numbers, or layers of root cause — anything that would swamp a catalogue entry
+— it becomes a new file in `references/`, and you add the short entry below
+that links to it. Do not leave the long version in a commit message, a scratch
+file, or the source it explains; none of those get read before the next person
+hits the same wall.
 
 ## Silence is the enemy
 
@@ -103,7 +111,7 @@ from offset 0 of the slot, which is the value little-endian and the high half
 big-endian, so it needs n32/n64 **and** big-endian: mips64el is unaffected,
 which is why it has stood. `ffi_call` and 64-bit returns are both fine, which is
 what narrows it. Fixed by a `target_patches` entry for `mips64-linux-musl`
-alone; full write-up and reproducer in `MIPS64_FFI_REPORT.md`.
+alone; full write-up and reproducer in `references/MIPS64_FFI_REPORT.md`.
 
 **zlib rejects `--host`.** Its configure is hand-rolled, errors on unknown
 options, and reads `$CHOST` instead. Anything that passes `--host` uniformly has
@@ -184,7 +192,7 @@ not do. Alpine's apk skips it for the same reason.
 **`fma` loses negative zero on underflow**, which `test_fma_zero_result` catches.
 Upstream gates that test with a `linked_to_musl()` probe that shells out to
 `ldd` — which exits non-zero on a fully static `-no-pie` binary, so the skip
-never fires. Full write-up in `MUSL_REPORT.md`.
+never fires. Full write-up in `references/MUSL_REPORT.md`.
 
 **Some targets need `-latomic`** for 64-bit atomics. Which ones is a property of
 the target, not something to rediscover with a regex.
@@ -219,5 +227,5 @@ static-musl, and the LTO plugin is compiled into `libbfd` so `ld` resolves
 `-plugin liblto_plugin.so` to its built-in copy rather than opening a file that
 does not exist. `test-portability/proof.sh` checks it in a Debian image with no
 compiler in it, negative control included; re-run it after every toolchain
-re-publish. `PORTABILITY_PROOF.md` has the expected output and the
+re-publish. `references/PORTABILITY_PROOF.md` has the expected output and the
 falsification controls.

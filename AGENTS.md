@@ -131,9 +131,10 @@ H=$(uname -m) && \
 ```
 
 Full writeup, including expected output, falsification controls, and
-"where this would break", is `PORTABILITY_PROOF.md` in the `staticpy-traps`
-skill -- written against the older wrapper-based toolchain, so read its
-mechanism sections as history.
+"where this would break", is in
+`.agents/skills/staticpy-traps/references/PORTABILITY_PROOF.md` -- written
+against the older wrapper-based toolchain, so read its mechanism sections
+as history.
 
 ## Tarball hashes and preflight downloads
 
@@ -246,21 +247,26 @@ Small enough to state in a paragraph: add it to `SKILL.md` as an entry in
 the matching section, phrased symptom-first so it is findable by what you
 would have searched for.
 
-Bigger than that: a sibling markdown file next to `SKILL.md`, plus a
-`SKILL.md` entry that links to it at the point where the problem bites.
-The three already there are the format -- title, one-paragraph summary,
-minimal reproducer (code or command), each layer of root cause as its own
+Bigger than that -- it needs a reproducer, a disassembly, before/after
+numbers, or layers of root cause -- it becomes a new file under
+`.agents/skills/staticpy-traps/references/`, plus the short `SKILL.md`
+entry that links to it at the point where the problem bites. The three
+already there are the format: title, one-paragraph summary, minimal
+reproducer (code or command), each layer of root cause as its own
 section, and a "what we ended up doing" / "what we'd want upstream" at
-the end:
+the end.
 
-- `MUSL_REPORT.md` -- musl `fma` losing negative zero on underflow,
-  and the two safety nets that should have caught it.
-- `MIPS64_FFI_REPORT.md` -- libffi closures returning the high half of
-  the return slot for narrow integers on big-endian mips.
-- `PORTABILITY_PROOF.md` -- a toolchain tarball on a foreign glibc rootfs.
+- `references/MUSL_REPORT.md` -- musl `fma` losing negative zero on
+  underflow, and the two safety nets that should have caught it.
+- `references/MIPS64_FFI_REPORT.md` -- libffi closures returning the high
+  half of the return slot for narrow integers on big-endian mips.
+- `references/PORTABILITY_PROOF.md` -- a toolchain tarball on a foreign
+  glibc rootfs.
 
 Either way, link it from the relevant code with a one-line comment, *not*
-by inlining the explanation into the source.
+by inlining the explanation into the source. A long finding left in a
+commit message or a scratch file is a finding nobody reads before hitting
+the same wall.
 
 ## Commits
 

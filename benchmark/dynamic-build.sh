@@ -87,7 +87,7 @@ echo ">>> building"
 # `-i test_fma_zero_result` skips a musl-1.2.5 software-fma sign-of-zero bug
 # that the upstream CPython `linked_to_musl()` skip already covers for shared
 # musl builds, but we mirror it here so static and dynamic stay in sync. See
-# MUSL_REPORT.md.
+# .agents/skills/staticpy-traps/references/MUSL_REPORT.md.
 # JOBS defaults to `nproc` but can be overridden (e.g. `JOBS=8 ./dynamic-build.sh`)
 # to keep this build from saturating the host when another build runs alongside.
 JOBS="${JOBS:-$(nproc)}"

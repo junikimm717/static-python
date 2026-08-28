@@ -28,7 +28,8 @@ why = """
 musl's fma fast path returns the wrong sign of zero for an IEEE-754 corner \
 case. CPython already guards this with @skipIf(linked_to_musl()), but that \
 probe shells out to ldd, which exits non-zero on a fully static -no-pie \
-binary, so the guard never fires. See the staticpy-traps skill's MUSL_REPORT.\
+binary, so the guard never fires. \
+See .agents/skills/staticpy-traps/references/MUSL_REPORT.md.\
 """
 
 [[expect.all.ignore]]

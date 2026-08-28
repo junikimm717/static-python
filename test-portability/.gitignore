@@ -1,3 +1,4 @@
 # Toolchain tarball under test is too big to track in git; regenerate
-# from dist/toolchains/. See proof.sh and the staticpy-traps skill.
+# from dist/toolchains/. See proof.sh and
+# .agents/skills/staticpy-traps/references/PORTABILITY_PROOF.md.
 *-linux-musl-native.tgz
