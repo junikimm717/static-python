@@ -54,6 +54,15 @@ var CoreTests = []string{
 // killed with a traceback instead of hanging the build.
 const DefaultTestTimeout = 20 * time.Minute
 
+// DefaultSuiteTimeout bounds the whole run. It has to exceed DefaultTestTimeout,
+// or the suite kills runs regrtest still considers healthy.
+func DefaultSuiteTimeout(level Level) time.Duration {
+	if level == LevelFull {
+		return 8 * time.Hour
+	}
+	return time.Hour
+}
+
 type SuiteOptions struct {
 	// Tests overrides the level's default set.
 	Tests []string
@@ -160,8 +169,9 @@ func RunSuite(ctx context.Context, r *core.Runner, l *Launcher, level Level, pyt
 	}
 
 	prev := l.Timeout
-	if opts.Timeout > 0 {
-		l.Timeout = opts.Timeout
+	l.Timeout = opts.Timeout
+	if l.Timeout <= 0 {
+		l.Timeout = DefaultSuiteTimeout(level)
 	}
 	start := time.Now()
 	res, err := l.Run(ctx, r, "suite-"+string(level), dir, python, args...)
@@ -249,6 +259,10 @@ func (o *Outcome) Accounted() int {
 // all came back means the suite never ran.
 func (o *Outcome) CheckCoverage() error {
 	n := o.Accounted()
+	if o.Result.TimedOut {
+		return fmt.Errorf("the suite ran out of time after %s with %d of %d tests reported; "+
+			"it was cut off, not answered", o.Result.Dur.Round(time.Second), n, len(o.Requested))
+	}
 	if n == 0 {
 		return fmt.Errorf("the suite reported no results at all (exit %d), so it never ran; "+
 			"a missing Lib/test looks exactly like this", o.Result.ExitCode)
