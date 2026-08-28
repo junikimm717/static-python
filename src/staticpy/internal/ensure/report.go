@@ -34,7 +34,6 @@ const (
 	maxTailBytes = 8 << 10
 )
 
-// Check is one named assertion.
 type Check struct {
 	Name   string        `json:"name"`
 	Status Status        `json:"status"`

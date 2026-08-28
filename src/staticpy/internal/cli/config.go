@@ -270,10 +270,9 @@ func section(name string, data any) (map[string]any, error) {
 	return mergeSections(sec{name, data})
 }
 
-// mergeSections turns typed config tables back into a TOML document. The trip
-// through a map is what lets empty values be dropped: an emitted `cflags = []`
-// would read back as "replace the inherited list with nothing", which is not
-// what an absent field means.
+// The trip through a map is what lets empty values be dropped: an emitted
+// `cflags = []` would read back as "replace the inherited list with nothing",
+// which is not what an absent field means.
 func mergeSections(secs ...sec) (map[string]any, error) {
 	out := map[string]any{}
 	for _, s := range secs {

@@ -14,9 +14,9 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
-// SkipEnv turns verification off. It is an environment variable and not a flag
-// on purpose: skipping the only step that proves the interpreter works should
-// take a deliberate act, not a habit picked up from a shell history.
+// Set as an environment variable rather than a flag on purpose: skipping the
+// only step that proves the interpreter works should take a deliberate act,
+// not a habit picked up from a shell history.
 const SkipEnv = "STATICPY_SKIP_VERIFY"
 
 // ReportName is the file the job publishes: the whole report, in JSON, so a CI
@@ -49,8 +49,8 @@ type Options struct {
 	SuiteTimeout time.Duration
 }
 
-// Job verifies one built interpreter. It depends on the job that produced it
-// and publishes nothing but its own report, so a failed verification leaves no
+// A verification job depends on the job that produced the interpreter and
+// publishes nothing but its own report, so a failed verification leaves no
 // artifact anyone can mistake for a working interpreter.
 type Job struct {
 	interp  core.Job
@@ -61,8 +61,7 @@ type Job struct {
 	opts    Options
 }
 
-// NewJob builds the verification job for an interpreter. expect must already be
-// resolved for (target, runner) — see LookupExpect.
+// expect must already be resolved for (target, runner) — see LookupExpect.
 func NewJob(interp core.Job, target config.Target, profile string, level Level, expect config.TestExpect, opts Options) *Job {
 	if opts.PythonRel == "" {
 		opts.PythonRel = DefaultPythonRel
@@ -143,9 +142,8 @@ func (j *Job) Build(ctx context.Context, e *core.Env, r *core.Runner, work, stag
 	return err
 }
 
-// Verify runs every tier up to level and returns the combined report. The error
-// it returns is the report's, so a caller that only wants the evidence can
-// ignore it and print the report.
+// The returned error is the report's, so a caller that only wants the
+// evidence can ignore it and print the report.
 func Verify(ctx context.Context, e *core.Env, r *core.Runner, t config.Target, level Level, python, work string, expect config.TestExpect, opts Options) (*Report, error) {
 	start := time.Now()
 	rep := NewReport(fmt.Sprintf("verify %s %s", t.Triple, level))

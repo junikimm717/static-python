@@ -88,8 +88,7 @@ type sink struct {
 	runDir string
 }
 
-// Logger writes to both streams. Derive scoped loggers with With/Named; they
-// share the underlying streams.
+// Derive scoped loggers with With/Named; they share the underlying streams.
 type Logger struct {
 	s      *sink
 	fields map[string]any

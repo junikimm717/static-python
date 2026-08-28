@@ -188,10 +188,9 @@ func (c *Classified) Err() error {
 	return fmt.Errorf("%s", b.String())
 }
 
-// ExpectHash identifies an expectation set for a job key. Only test names are
-// hashed: editing the reason attached to an entry changes nothing about what
-// the run will do, and forcing a re-verification for a reworded comment would
-// make people stop writing them.
+// Only test names are hashed: editing the reason attached to an entry changes
+// nothing about what the run will do, and forcing a re-verification for a
+// reworded comment would make people stop writing them.
 func ExpectHash(expect config.TestExpect) string {
 	names := make([]string, 0, len(expect.Skip)+len(expect.Fail)+len(expect.Ignore))
 	for _, e := range expect.Skip {

@@ -29,10 +29,10 @@ type Shim struct {
 	Package bool
 }
 
-// Shims makes dotted builtins importable. BuiltinImporter.find_spec returns None
-// whenever path is not None, so `import lxml.etree` can never reach a builtin
-// named lxml.etree; the submodule has to be a real file that pulls in the
-// flattened builtin and substitutes itself in sys.modules.
+// BuiltinImporter.find_spec returns None whenever path is not None, so `import
+// lxml.etree` can never reach a builtin named lxml.etree; the submodule has to
+// be a real file that pulls in the flattened builtin and substitutes itself in
+// sys.modules.
 func Shims(mods []config.PyModule) ([]Shim, error) {
 	seen := map[string]bool{}
 	var out []Shim

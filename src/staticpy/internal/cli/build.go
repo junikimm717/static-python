@@ -112,9 +112,8 @@ func runBuild(g *Global, args []string) error {
 	return nil
 }
 
-// session is one resolved invocation: the config, the runtime env, and the DAG
-// roots the recipe produced for it. Every command that touches jobs goes
-// through here, so none of them ever constructs a job itself.
+// Every command that touches jobs goes through session, so none of them ever
+// constructs a job itself.
 type session struct {
 	g       *Global
 	cfg     *config.Config
@@ -214,8 +213,8 @@ func (s *session) printPlan(nodes []core.PlanNode, verb string) error {
 	return nil
 }
 
-// printArtifacts names the directories a build produced, since the root jobs
-// are the only ones anybody is going to open by hand.
+// Only the root jobs are named, since they are the only ones anybody is going
+// to open by hand.
 func printArtifacts(e *core.Env, roots []core.Job, nodes []core.PlanNode) {
 	valid := map[string]bool{}
 	for _, n := range nodes {

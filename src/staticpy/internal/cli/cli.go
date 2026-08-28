@@ -320,8 +320,8 @@ func (f kvFlag) Set(v string) error {
 	return nil
 }
 
-// resolve fixes the paths every command needs. It is idempotent: commands call
-// it directly when they need only paths, and through load/newEnv otherwise.
+// resolve is idempotent: commands call it directly when they need only paths,
+// and through load/newEnv otherwise.
 func (g *Global) resolve() error {
 	if g.resolved {
 		return nil
@@ -365,9 +365,8 @@ func (g *Global) resolve() error {
 	return nil
 }
 
-// findRepoRoot looks for the checkout this binary belongs to, so a run from a
-// clone picks up the editable config/ tree next to the shim. A released binary
-// finds nothing and uses only what is embedded in it.
+// A run from a clone picks up the editable config/ tree next to the shim; a
+// released binary finds nothing and uses only what is embedded in it.
 func findRepoRoot() string {
 	var starts []string
 	if exe, err := os.Executable(); err == nil {
@@ -426,9 +425,8 @@ var goarchToArch = map[string]string{
 	"s390x":   "s390x",
 }
 
-// HostTriple is the triple of the machine staticpy is running on. It decides
-// which builds are native and which are crosses, so getting it wrong would
-// silently turn a cross build into a native one.
+// HostTriple decides which builds are native and which are crosses, so getting
+// it wrong would silently turn a cross build into a native one.
 func (g *Global) HostTriple(cfg *config.Config) (string, error) {
 	if g.Host != "" {
 		if _, ok := cfg.Targets[g.Host]; !ok {
@@ -532,9 +530,9 @@ func defaultParallelism(workers, jobs int) (int, int) {
 	return workers, jobs
 }
 
-// newEnv builds the runtime context every job shares. runLog decides whether
-// this invocation opens a dist/logs/runs/<stamp> stream: read-only commands do
-// not, so `staticpy status` in a loop does not litter the log tree.
+// runLog decides whether this invocation opens a dist/logs/runs/<stamp> stream:
+// read-only commands do not, so `staticpy status` in a loop does not litter the
+// log tree.
 func (g *Global) newEnv(cfg *config.Config, runLog bool) (*core.Env, func(), error) {
 	if err := g.resolve(); err != nil {
 		return nil, nil, err
@@ -587,10 +585,9 @@ func (g *Global) newEnv(cfg *config.Config, runLog bool) (*core.Env, func(), err
 	return e, func() { log.Close() }, nil
 }
 
-// qemuMap resolves a qemu-user binary per target. An explicit --qemu always
-// wins; otherwise the binary named by the target row is looked up on PATH,
-// which is what makes verification work on a developer's machine without the
-// shim having to hand every path in.
+// An explicit --qemu always wins; otherwise the binary named by the target row
+// is looked up on PATH, which is what makes verification work on a developer's
+// machine without the shim having to hand every path in.
 func (g *Global) qemuMap(cfg *config.Config) map[string]string {
 	out := map[string]string{}
 	if cfg != nil {
@@ -607,11 +604,10 @@ func (g *Global) qemuMap(cfg *config.Config) map[string]string {
 	return out
 }
 
-// toolchainState is which trees exist for one triple. The two kinds are kept
-// apart because they are not interchangeable in both directions: a build for
-// some other target falls back from cross to native happily, but pyhost - the
-// runnable interpreter a cross build freezes its bytecode with - has to come
-// out of a native tree for this machine.
+// The two kinds are kept apart because they are not interchangeable in both
+// directions: a build for some other target falls back from cross to native
+// happily, but pyhost - the runnable interpreter a cross build freezes its
+// bytecode with - has to come out of a native tree for this machine.
 type toolchainState struct {
 	Override string
 	Cross    string

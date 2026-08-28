@@ -50,7 +50,7 @@ var archAliases = map[string]string{
 	"s390":     "s390x",
 }
 
-// ELFInfo is what verification cares about in a built interpreter.
+// ELFInfo is what verification cares about, not a full parse of the file.
 type ELFInfo struct {
 	Path    string `json:"path"`
 	Machine string `json:"machine"`

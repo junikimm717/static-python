@@ -198,8 +198,8 @@ func renderSymbols(items []abiItem, version, manifestSHA string) ([]byte, error)
 	return b.Bytes(), nil
 }
 
-// Only for entries no header Python.h reaches declares: Windows emits a linker
-// pragma and needs none of this, while we take an address, which needs a
+// Only for entries no header reachable from Python.h declares: Windows emits a
+// linker pragma and needs none of this, while we take an address, which needs a
 // declaration. The signature is a fiction, safe only because the address is all
 // that is ever used.
 func writeExterns(b *bytes.Buffer, funcs, data []abiItem) {

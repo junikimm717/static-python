@@ -224,9 +224,8 @@ func doctorReport(g *Global) error {
 	return doctorVerdict(tools, rows, hostErr, false)
 }
 
-// toolchainDetail says which tree is missing and why this target needs that
-// particular kind, which is not obvious for the host: a native tree there is
-// what pyhost is built with.
+// Which kind a target needs is not obvious for the host: a native tree there
+// is what pyhost is built with.
 func toolchainDetail(g *Global, r targetCheck) string {
 	want := r.Triple + "-" + r.Missing
 	why := ""

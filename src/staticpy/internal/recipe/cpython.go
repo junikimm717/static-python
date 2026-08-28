@@ -343,9 +343,9 @@ func (j *pyBuild) ArtifactDir(e *core.Env) string {
 	return e.Path(core.DirArtifact, artifactName(j.Slug()))
 }
 
-// pgo reports whether this build trains itself. CPython runs PROFILE_TASK as
-// `./python $(PROFILE_TASK)` with no HOSTRUNNER in front of it, so a cross build
-// cannot train at all — "on" means the same thing as "native-only" here.
+// CPython runs PROFILE_TASK as `./python $(PROFILE_TASK)` with no HOSTRUNNER
+// in front of it, so a cross build cannot train at all — "on" means the same
+// thing as "native-only" here.
 func (j *pyBuild) pgo() bool {
 	if j.cross {
 		return false

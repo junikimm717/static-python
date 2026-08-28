@@ -19,12 +19,9 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
-// depScope is the profile scope a package's flags come from. Keeping the
-// spelling in one place means a scope rename cannot half-apply.
+// Keeping the spelling in one place means a scope rename cannot half-apply.
 func depScope(pkg string) string { return config.ScopeDeps + "." + pkg }
 
-// bound is the Env this process builds with.
-//
 // core hands KeyInputs no Env and recipe.Plan takes none, but a key that left
 // the compiler out would survive a toolchain re-publish and keep serving
 // artifacts built by a compiler nobody can name any more. The CLI binds the Env
@@ -40,8 +37,8 @@ func resolveScope(cfg *config.Config, profile, scope string) (config.Resolved, e
 	return cfg.Resolve(profile, scope)
 }
 
-// artifactName maps a slug to a directory name. Slugs carry ':' to stay
-// readable on the CLI; paths get '_', matching what core does for locks.
+// Slugs carry ':' to stay readable on the CLI; paths get '_', matching what
+// core does for locks.
 func artifactName(slug string) string {
 	out := []rune(slug)
 	for i, r := range out {
@@ -104,7 +101,6 @@ func (id ToolchainID) Provenance() map[string]string {
 
 var toolchainCache sync.Map // toolchain dir -> ToolchainID
 
-// Toolchain resolves the compiler for a triple and establishes its identity.
 // Cross is preferred over native exactly as core.Env.PathFor prefers it, so
 // the CC a job names and the PATH the Runner composes can never come from two
 // different trees.
@@ -112,10 +108,10 @@ func Toolchain(e *core.Env, triple string) (ToolchainID, error) {
 	return toolchainOf(e, triple, core.KindCross, core.KindNative)
 }
 
-// ToolchainNative insists on the native tree. pyhost has to *run* on the build
-// machine, so a cross tree carrying the same triple is the wrong compiler even
-// though the name matches; picking it would produce a build-python that cannot
-// execute, and --with-build-python's version check is where that surfaces.
+// pyhost has to *run* on the build machine, so a cross tree carrying the same
+// triple is the wrong compiler even though the name matches; picking it would
+// produce a build-python that cannot execute, and --with-build-python's
+// version check is where that surfaces.
 func ToolchainNative(e *core.Env, triple string) (ToolchainID, error) {
 	return toolchainOf(e, triple, core.KindNative)
 }

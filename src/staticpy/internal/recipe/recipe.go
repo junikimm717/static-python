@@ -36,7 +36,7 @@ const Version = 1
 
 type PlanOptions struct {
 	Profile string
-	// Host is the build machine's triple. Targets equal to it build native.
+	// The build machine's triple; targets equal to it build native.
 	Host    string
 	Targets []string
 	Bundle  string

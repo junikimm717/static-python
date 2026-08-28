@@ -106,9 +106,8 @@ func runVerify(g *Global, args []string) error {
 	return nil
 }
 
-// verifyReport mirrors the JSON that ensure.Report writes. The Report type
-// marshals but does not unmarshal, so the stored evidence is read back into
-// this shape and handed to the same renderer.
+// The Report type marshals but does not unmarshal, so the stored evidence is
+// read back into this shape and handed to the same renderer.
 type verifyReport struct {
 	Subject string `json:"subject"`
 	OK      bool   `json:"ok"`

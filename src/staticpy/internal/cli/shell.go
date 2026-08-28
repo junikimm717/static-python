@@ -104,10 +104,9 @@ type recordedEnv struct {
 	replaced bool
 }
 
-// environ is the environment to exec into. A replaced environment is honoured
-// as recorded, plus the few variables an interactive shell is unusable without
-// - inheriting the rest would quietly undo the hermetic PATH we came here to
-// reproduce.
+// A replaced environment is honoured as recorded, plus the few variables an
+// interactive shell is unusable without - inheriting the rest would quietly
+// undo the hermetic PATH we came here to reproduce.
 func (r recordedEnv) environ(slug string) []string {
 	var out []string
 	if !r.replaced {
@@ -259,8 +258,8 @@ func shUnquote(s string) string {
 	return parts[0]
 }
 
-// resolveWorkDir finds a build tree to land in. The recorded cwd is preferred;
-// a surviving scratch dir for the same job is the next best thing.
+// The recorded cwd is preferred; a surviving scratch dir for the same job is
+// the next best thing.
 func resolveWorkDir(dist, slug, recorded string) (string, string) {
 	if recorded != "" && isDir(recorded) {
 		return recorded, ""

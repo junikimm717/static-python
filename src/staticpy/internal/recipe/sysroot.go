@@ -97,10 +97,9 @@ func (j *sysrootJob) Build(ctx context.Context, e *core.Env, r *core.Runner, wor
 	return nil
 }
 
-// composer merges dependency prefixes into one tree. Files are symlinked, so a
-// sysroot costs nothing to build; the ones carrying a baked-in prefix are
-// copied and rewritten instead, because writing through a symlink would edit a
-// published artifact that other jobs are reading.
+// Files are symlinked, so a sysroot costs nothing to build; the ones carrying
+// a baked-in prefix are copied and rewritten instead, because writing through
+// a symlink would edit a published artifact that other jobs are reading.
 type composer struct {
 	// programs left out because they baked in a prefix; reported, not silent.
 	skipped []string
@@ -243,8 +242,8 @@ func quoteAround(data []byte, at int) string {
 	return string(data[at:end])
 }
 
-// collide reports two packages installing the same path. Letting one win is
-// how a header ends up describing a different build of the library beside it.
+// Letting one win is how a header ends up describing a different build of the
+// library beside it.
 func (c *composer) collide(first, second, rel, src, dst string) error {
 	placed, errA := os.ReadFile(dst)
 	incoming, errB := os.ReadFile(src)

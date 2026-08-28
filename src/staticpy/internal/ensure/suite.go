@@ -37,10 +37,10 @@ func ParseLevel(s string) (Level, error) {
 	return "", fmt.Errorf("unknown verification level %q: want one of smoke, core, full", s)
 }
 
-// CoreTests is the curated subset. It is the language core, the containers and
-// numerics where a miscompiled target shows up first, and every extension
-// module staticpy has to link in by hand — those are the ones a wrong
-// _sysconfigdata or a half-linked library breaks.
+// The set covers the language core, the containers and numerics where a
+// miscompiled target shows up first, and every extension module staticpy has
+// to link in by hand — those are the ones a wrong _sysconfigdata or a
+// half-linked library breaks.
 var CoreTests = []string{
 	"test_builtin", "test_int", "test_long", "test_float", "test_complex",
 	"test_str", "test_bytes", "test_list", "test_dict",

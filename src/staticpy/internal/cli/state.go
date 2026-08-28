@@ -17,9 +17,8 @@ const (
 	stateMissing  = "missing"
 )
 
-// nodeState classifies one planned job. "stale" is the distinction that
-// matters: an artifact is there, but its inputs moved, so a build will replace
-// it rather than skip it.
+// "stale" is the distinction that matters: an artifact is there, but its
+// inputs moved, so a build will replace it rather than skip it.
 func nodeState(e *core.Env, n core.PlanNode) string {
 	if n.Building {
 		return stateBuilding
@@ -94,9 +93,9 @@ func dirSize(root string) int64 {
 	return total
 }
 
-// pathSlug is the on-disk spelling of a job slug. Slugs carry ':' to stay
-// readable on the CLI and in logs; core writes their directories with '_', and
-// both spellings are accepted here so a slug copied out of either place works.
+// Slugs carry ':' to stay readable on the CLI and in logs; core writes their
+// directories with '_', and both spellings are accepted here so a slug copied
+// out of either place works.
 func pathSlug(slug string) string {
 	out := []rune(slug)
 	for i, r := range out {

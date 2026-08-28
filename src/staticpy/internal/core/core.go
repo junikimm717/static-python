@@ -45,7 +45,7 @@ const ManifestName = ".staticpy.json"
 // owner, before startup GC removes it.
 const StaleAge = 10 * time.Minute
 
-// Job is one unit of build work. Implementations live in internal/recipe.
+// Implementations live in internal/recipe.
 type Job interface {
 	// Name is the recipe family, e.g. "dep" or "pycross".
 	Name() string

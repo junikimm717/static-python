@@ -62,7 +62,6 @@ func (r RunResult) Combined() string {
 	return "stdout:\n" + out + "\nstderr:\n" + errOut
 }
 
-// Launcher knows how to execute a binary built for one target.
 type Launcher struct {
 	// Runner is RunnerNative or RunnerQemu; it is half the expectation key.
 	Runner string
@@ -74,8 +73,7 @@ type Launcher struct {
 	Timeout time.Duration
 }
 
-// NewLauncher decides how to run binaries for t and fails loudly when it
-// cannot. staticpy never fetches qemu: the shim provisions it and passes it in
+// staticpy never fetches qemu: the shim provisions it and passes it in
 // through Env.Qemu, so a missing entry is a provisioning bug, not something to
 // paper over by hoping binfmt_misc is registered.
 func NewLauncher(e *core.Env, t config.Target) (*Launcher, error) {
@@ -152,7 +150,6 @@ func Sysroot(e *core.Env, t config.Target) (string, error) {
 	return sysroot, nil
 }
 
-// Argv is the full command line for running prog under this launcher.
 func (l *Launcher) Argv(prog string, args ...string) []string {
 	out := make([]string, 0, len(l.Prefix)+1+len(args))
 	out = append(out, l.Prefix...)

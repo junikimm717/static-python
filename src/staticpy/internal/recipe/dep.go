@@ -25,9 +25,9 @@ const (
 	buildSources   = "sources"
 )
 
-// Dep is one native library, built into its own prefix. Nothing installs into
-// a shared accumulator: that is what let a stale libz.a from an older version
-// survive a version bump and link into everything afterwards.
+// Each dependency is built into its own prefix, never a shared accumulator:
+// that is what let a stale libz.a from an older version survive a version
+// bump and link into everything afterwards.
 func Dep(cfg *config.Config, assets fs.FS, t config.Target, profile, name string) (core.Job, error) {
 	b := &depBuilder{cfg: cfg, assets: assets, target: t, profile: profile,
 		memo: map[string]*depJob{}, onStack: map[string]bool{}}
@@ -349,9 +349,9 @@ func (j *depJob) openssl(ctx context.Context, e *core.Env, r *core.Runner, te *t
 	return hoistDestdir(stage, prefix, j.name)
 }
 
-// plainMake covers a package with no configure step. Its Makefile is assumed
-// to honour CC/AR/CFLAGS from the environment (bzip2 only does because
-// sources.toml deletes the assignments that would otherwise win).
+// The Makefile is assumed to honour CC/AR/CFLAGS from the environment (bzip2
+// only does because sources.toml deletes the assignments that would
+// otherwise win).
 func (j *depJob) plainMake(ctx context.Context, e *core.Env, r *core.Runner, te *toolenv, src, stage string) error {
 	// A hand-written Makefile's default target usually runs a self-test, which
 	// executes the binaries we just cross-compiled. Build exactly the archives
@@ -373,10 +373,10 @@ func (j *depJob) plainMake(ctx context.Context, e *core.Env, r *core.Runner, te 
 		map[string]string{"PREFIX": stage}))
 }
 
-// fromSources compiles a declared file list and archives it. libuuid is built
-// this way: the real util-linux build needs meson, ninja, flex and bison on
-// the host to produce one small library CPython uses for three symbols, and
-// the cross.ini / -Dfeature=disabled dance on top of that.
+// libuuid is built by compiling a declared file list and archiving it: the
+// real util-linux build needs meson, ninja, flex and bison on the host to
+// produce one small library CPython uses for three symbols, and the
+// cross.ini / -Dfeature=disabled dance on top of that.
 func (j *depJob) fromSources(ctx context.Context, r *core.Runner, te *toolenv, src, stage string) error {
 	if j.pkg.Libname == "" {
 		return fmt.Errorf("recipe: package %s has build = %q but no libname, so there is no archive to write",
