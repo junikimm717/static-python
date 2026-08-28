@@ -170,9 +170,22 @@ docker compose exec -T spython sh -c 'cd /workspace && ./benchmark/dynamic-build
 It reads the version from `staticpy print`, so the baseline cannot drift from
 the interpreter it is compared against.
 
-pyperformance is the intended suite -- it is what speed.python.org publishes
-against, so its numbers are comparable to the wider world. `staticpy bench`
-will drive it, and two things have to land first:
+```sh
+./staticpy bench --iters 40
+```
+
+compares up to three interpreters -- `static` (this machine's own pynative
+artifact; pass `--build` to build it first if it is missing), `dynamic` (the
+baseline above, if built) and `system` (whatever `python3` resolves to on
+PATH) -- with a pure-stdlib CPU micro-benchmark suite plus a spawn-latency
+probe, and writes a markdown report to `dist/bench/<stamp>_<arch>.md`.
+`--interp label=path` adds or overrides an entry and `--only label,...`
+restricts the comparison; any interpreter that is missing is skipped with a
+note rather than failing the run.
+
+pyperformance is the longer-term suite -- it is what speed.python.org
+publishes against, so its numbers are comparable to the wider world -- and two
+things have to land before `staticpy bench` can drive it instead:
 
 - pyperformance builds a venv per run and pip-installs each benchmark's
   requirements. This interpreter is `--with-ensurepip=no`, so there is no pip.
@@ -184,7 +197,8 @@ into the interpreter, which arrives with bundles.
 
 Benchmark natively only. Under qemu you are measuring qemu, and the overhead
 is not uniform across workloads, so the numbers are comparable to nothing --
-not to native, and not to each other.
+not to native, and not to each other. `staticpy bench` refuses a `--target`
+other than the build machine's own triple for exactly this reason.
 
 ## Tmux discipline for long jobs
 

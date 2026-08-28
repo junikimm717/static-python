@@ -134,6 +134,10 @@ comparison target for a static build:
 docker compose exec -T spython sh -c 'cd /workspace && ./benchmark/dynamic-build.sh'
 ```
 
-pyperformance is the intended suite, driven by `staticpy bench`. It needs its
-pure-Python dependencies compiled into the interpreter first, since a build
-with no pip and no dlopen cannot install them: that arrives with bundles.
+`./staticpy bench` compares interpreters (the static build, the dynamic
+baseline, and system python by default) with a small interpreter-bound
+micro-benchmark suite and a startup-latency probe, and writes a markdown
+report to `dist/bench/`. pyperformance is the longer-term suite -- it is what
+speed.python.org publishes against -- but it pip-installs each benchmark's
+dependencies into a venv, and this interpreter has no pip and cannot dlopen a
+C extension either way: that arrives with bundles.

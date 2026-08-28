@@ -206,6 +206,10 @@ Honest inventory, because the code reads more finished than it is:
 - **Bundles are declared but empty.** `config/bundles.toml` defines no `[pkg.*]`,
   so `--bundle` has nothing to select yet — and pyperformance benchmarking waits
   on it, because there is no pip in a `--with-ensurepip=no` interpreter.
+  `./staticpy bench` does not wait on it: it runs a small pure-stdlib
+  micro-benchmark + startup-latency suite against the static build, the
+  `benchmark/dynamic-build.sh` baseline and system python, whichever of those
+  are present.
 
 ## Related
 
