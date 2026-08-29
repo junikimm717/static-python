@@ -52,8 +52,28 @@ type Global struct {
 	JSON       bool
 	ColorWhen  string
 
-	repoRoot string
-	resolved bool
+	repoRoot   string
+	resolved   bool
+	givenFlags map[string]bool
+	cfg        *config.Config
+}
+
+// noteGiven records which flags a parse actually saw, so a wizard can skip the
+// questions the command line already answered. Global flags may appear before
+// the subcommand, so Main records its pre-parse too.
+func (g *Global) noteGiven(fs *flag.FlagSet) {
+	if g.givenFlags == nil {
+		g.givenFlags = map[string]bool{}
+	}
+	fs.Visit(func(f *flag.Flag) { g.givenFlags[f.Name] = true })
+}
+
+func (g *Global) flagGiven(name string) bool {
+	if g.givenFlags[name] {
+		return true
+	}
+	// The environment is as deliberate an answer as the flag.
+	return name == "profile" && os.Getenv("STATICPY_PROFILE") != ""
 }
 
 type command struct {
@@ -118,6 +138,7 @@ func Main(args []string) int {
 		fmt.Fprintf(os.Stderr, "staticpy: %v\n\nRun `staticpy help` for usage.\n", err)
 		return 2
 	}
+	g.noteGiven(pre)
 	rest := pre.Args()
 	if len(rest) == 0 {
 		printHelp(os.Stdout, "")
@@ -391,7 +412,12 @@ func findRepoRoot() string {
 	return ""
 }
 
+// The load is cached: the build wizard needs the config before the session
+// opens it again, and the --sources warning must not print twice.
 func (g *Global) load() (*config.Config, error) {
+	if g.cfg != nil {
+		return g.cfg, nil
+	}
 	if err := g.resolve(); err != nil {
 		return nil, err
 	}
@@ -408,6 +434,7 @@ func (g *Global) load() (*config.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	g.cfg = cfg
 	return cfg, nil
 }
 

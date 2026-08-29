@@ -77,19 +77,9 @@ func isTTY(f *os.File) bool {
 
 // Select shows the menu and returns the chosen row.
 func Select(m Menu) (Choice, error) {
-	byValue := map[string]Choice{}
-	var opts []huh.Option[string]
-	for _, g := range m.Groups {
-		for _, c := range g.Choices {
-			byValue[c.Value] = c
-			if c.Disabled {
-				continue
-			}
-			opts = append(opts, huh.NewOption(label(m, g, c), c.Value))
-		}
-	}
-	if len(opts) == 0 {
-		return Choice{}, fmt.Errorf("tui: menu %q has no selectable choices", m.Title)
+	opts, byValue, err := options(m)
+	if err != nil {
+		return Choice{}, err
 	}
 	if !Interactive() {
 		return Choice{}, ErrNotInteractive
@@ -102,7 +92,7 @@ func Select(m Menu) (Choice, error) {
 	form := huh.NewForm(huh.NewGroup(
 		huh.NewSelect[string]().
 			Title(m.Title).
-			Description(describe(m, headerIndent(th))).
+			Description(describe(m, headerIndent(th, false))).
 			Options(opts...).
 			Value(&chosen),
 	)).WithOutput(os.Stderr).WithShowHelp(true).WithTheme(th)
@@ -114,6 +104,78 @@ func Select(m Menu) (Choice, error) {
 		return Choice{}, err
 	}
 	return byValue[chosen], nil
+}
+
+// MultiSelect shows the menu and returns every checked row, in menu order.
+// Menu.Default may pre-check several values, comma-separated. At least one row
+// must be checked to submit; a menu where none is a valid answer should carry
+// an explicit "none" row, so the answer still has a flag to teach.
+func MultiSelect(m Menu) ([]Choice, error) {
+	opts, byValue, err := options(m)
+	if err != nil {
+		return nil, err
+	}
+	if !Interactive() {
+		return nil, ErrNotInteractive
+	}
+
+	chosen := splitDefaults(m.Default)
+	th := huh.ThemeCharm()
+	form := huh.NewForm(huh.NewGroup(
+		huh.NewMultiSelect[string]().
+			Title(m.Title).
+			Description(describe(m, headerIndent(th, true))).
+			Options(opts...).
+			Validate(func(vs []string) error {
+				if len(vs) == 0 {
+					return errors.New("check at least one (space toggles)")
+				}
+				return nil
+			}).
+			Value(&chosen),
+	)).WithOutput(os.Stderr).WithShowHelp(true).WithTheme(th)
+
+	if err := form.Run(); err != nil {
+		if errors.Is(err, huh.ErrUserAborted) {
+			return nil, ErrAborted
+		}
+		return nil, err
+	}
+	out := make([]Choice, 0, len(chosen))
+	for _, v := range chosen {
+		out = append(out, byValue[v])
+	}
+	return out, nil
+}
+
+func options(m Menu) ([]huh.Option[string], map[string]Choice, error) {
+	byValue := map[string]Choice{}
+	var opts []huh.Option[string]
+	for _, g := range m.Groups {
+		for _, c := range g.Choices {
+			byValue[c.Value] = c
+			if c.Disabled {
+				continue
+			}
+			opts = append(opts, huh.NewOption(label(m, g, c), c.Value))
+		}
+	}
+	if len(opts) == 0 {
+		return nil, nil, fmt.Errorf("tui: menu %q has no selectable choices", m.Title)
+	}
+	return opts, byValue, nil
+}
+
+// A default naming a value the menu disabled is silently dropped by huh, which
+// is the behaviour wanted: pre-checking an unbuildable row would be worse.
+func splitDefaults(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // SelectOr runs the menu, falling back to the default when there is no
@@ -157,8 +219,16 @@ func label(m Menu, g Group, c Choice) string {
 // exactly its width. Measuring the selector is what keeps the header aligned
 // through a theme change -- a hardcoded indent was wrong the moment it met the
 // real form, because it had been guessed against a different renderer.
-func headerIndent(t *huh.Theme) string {
-	return strings.Repeat(" ", lipgloss.Width(t.Focused.SelectSelector.String()))
+//
+// A multi-select row additionally carries a checked/unchecked mark between the
+// selector and the text.
+func headerIndent(t *huh.Theme, multi bool) string {
+	w := lipgloss.Width(t.Focused.SelectSelector.String())
+	if multi {
+		w = lipgloss.Width(t.Focused.MultiSelectSelector.String()) +
+			lipgloss.Width(t.Focused.UnselectedPrefix.String())
+	}
+	return strings.Repeat(" ", w)
 }
 
 func describe(m Menu, headerPad string) string {

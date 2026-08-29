@@ -64,6 +64,11 @@ workers.
   ```sh
   ./staticpy build --verify core --pack
   ```
+  On a terminal, `build` with no `--target` opens a short wizard for the flags
+  not given and prints the equivalent command line at the end. Non-interactive
+  runs (CI, pipes, `TERM=dumb`, `STATICPY_NO_TUI=1`) never prompt: no
+  `--target` keeps meaning the host triple with flag defaults, so scripted
+  invocations are unchanged.
 - **Static interpreter, all archs**:
   ```sh
   ./staticpy build --target all --verify core --pack --workers 2 -j 8

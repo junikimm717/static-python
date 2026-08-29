@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 	"github.com/junikimm717/static-python/src/staticpy/internal/ensure"
 	"github.com/junikimm717/static-python/src/staticpy/internal/recipe"
+	"github.com/junikimm717/static-python/src/staticpy/internal/tui"
 )
 
 var cmdBuild = &command{
@@ -20,6 +22,15 @@ var cmdBuild = &command{
 --target the build is for this machine's own triple, which is the only case
 that needs no cross toolchain and the only case where PGO can train against the
 interpreter it is optimizing.
+
+On a terminal, no --target instead opens a short wizard asking for whatever
+the command line left open - targets, profile, verification, packing - and
+skipping whatever it did not; targets this machine cannot build are shown with
+the reason rather than hidden. Every menu names the flag it stands in for, and
+the finished wizard prints the equivalent command line, which is also how to
+skip it. Without a terminal (CI, a pipe, TERM=dumb, STATICPY_NO_TUI set), and
+under --dry-run or --json, nothing is asked: no --target keeps meaning this
+machine's own triple with the flag defaults, exactly as scripts expect.
 
 Everything is content-addressed. A job is rebuilt only when its key changes -
 its sources, its flags, its triples, and its dependencies' keys - so re-running
@@ -58,9 +69,26 @@ func runBuild(g *Global, args []string) error {
 	if err := parse(fs, args); err != nil {
 		return finish("build", err)
 	}
+	g.noteGiven(fs)
 	if *verify != "" {
 		if _, err := ensure.ParseLevel(*verify); err != nil {
 			return usagef("%v", err)
+		}
+	}
+
+	// --dry-run and --json are script surfaces, so they keep the
+	// non-interactive meaning of no --target: this machine's own triple.
+	if len(g.Targets) == 0 && !*dryRun && !g.JSON && tui.Interactive() {
+		err := runBuildWizard(g, buildOpts{verify: verify, pack: pack, bundle: bundle})
+		switch {
+		case errors.Is(err, tui.ErrAborted):
+			fmt.Fprintln(os.Stderr, dim("aborted; nothing was built"))
+			return nil
+		case errors.Is(err, tui.ErrNotInteractive):
+			// The terminal went away between the check and the prompt; fall
+			// through to the host-triple default.
+		case err != nil:
+			return err
 		}
 	}
 
