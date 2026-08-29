@@ -174,7 +174,7 @@ name = "mimalloc"
 build = "sources"
 libname = "mimalloc"
 sources = ["src/static.c"]
-cflags = ["-DMI_MALLOC_OVERRIDE=1", "-DNDEBUG"]
+cflags = ["-Iinclude", "-DMI_MALLOC_OVERRIDE=1", "-DNDEBUG"]
 headers = ["include/mimalloc.h"]
 provides = ["lib/libmimalloc.a", "lib/mimalloc.o"]
 # Collapsed into one object and stripped down to the allocator's public entry
