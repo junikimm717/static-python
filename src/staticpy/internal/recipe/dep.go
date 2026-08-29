@@ -193,6 +193,8 @@ func (j *depJob) KeyInputs() map[string]string {
 		in["cflags"] = strings.Join(j.pkg.CFlags, "\x00")
 		in["headers"] = strings.Join(j.pkg.Headers, "\x00")
 		in["libname"] = j.pkg.Libname
+		in["object"] = j.pkg.Object
+		in["keep_globals"] = strings.Join(j.pkg.KeepGlobals, "\x00")
 	}
 	for k, v := range j.res.KeyInputs() {
 		in["profile."+k] = v
@@ -419,6 +421,12 @@ func (j *depJob) fromSources(ctx context.Context, r *core.Runner, te *toolenv, s
 		return err
 	}
 
+	if j.pkg.Object != "" {
+		if err := j.mergeObject(ctx, r, te, src, stage, objs); err != nil {
+			return err
+		}
+	}
+
 	// Headers land under include/<libname>/ so `#include <uuid.h>` resolves
 	// through the -I<prefix>/include/uuid the flags add, the way util-linux's
 	// own install lays them out.
@@ -500,4 +508,41 @@ func installedSummary(stage string) []string {
 		out = append(out[:40], "...")
 	}
 	return out
+}
+
+// mergeObject collapses a package's objects into one relocatable object and
+// localises everything except KeepGlobals.
+//
+// Both halves matter for an allocator. A single object is what makes the
+// override unconditional: the linker pulls an archive member only to resolve
+// an undefined symbol, and musl's malloc is a weak definition inside libc.a
+// that already satisfies every reference. Localising the rest keeps the
+// allocator's internals from colliding with the copy CPython bundles in
+// obmalloc.o.
+func (j *depJob) mergeObject(ctx context.Context, r *core.Runner, te *toolenv, src, stage string, objs []string) error {
+	if len(j.pkg.KeepGlobals) == 0 {
+		return fmt.Errorf("recipe: package %s sets object but no keep_globals; every symbol would stay global and collide", j.name)
+	}
+	dst := filepath.Join(stage, filepath.FromSlash(j.pkg.Object))
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
+	}
+	merged := "staticpy-merged.o"
+	r.Step("merging " + j.name)
+	if err := r.Run(ctx, te.cmd(j.name+"-ld-r", src,
+		append([]string{te.tools.LD, "-r", "-o", merged}, objs...), nil)); err != nil {
+		return err
+	}
+
+	// A symbol file rather than a flag per name: the list is long enough that
+	// the argv would be the least readable thing in the log.
+	symFile := "staticpy-keep-globals.txt"
+	if err := os.WriteFile(filepath.Join(src, symFile),
+		[]byte(strings.Join(j.pkg.KeepGlobals, "\n")+"\n"), 0o644); err != nil {
+		return err
+	}
+	r.Step("localising " + j.name)
+	return r.Run(ctx, te.cmd(j.name+"-objcopy", src, []string{
+		te.tools.Objcopy, "--keep-global-symbols=" + symFile, merged, dst,
+	}, nil))
 }

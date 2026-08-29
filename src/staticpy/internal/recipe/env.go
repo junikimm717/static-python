@@ -232,12 +232,13 @@ func ccOutput(cc string, arg string) (string, error) {
 // tools are the binaries a build drives directly. Everything else it finds on
 // the PATH the Runner composes.
 type tools struct {
-	CC     string
-	CXX    string
-	AR     string
-	RANLIB string
-	NM     string
-	LD     string
+	CC      string
+	CXX     string
+	AR      string
+	RANLIB  string
+	NM      string
+	LD      string
+	Objcopy string
 }
 
 func toolsFor(dir, triple string) (tools, error) {
@@ -256,6 +257,9 @@ func toolsFor(dir, triple string) (tools, error) {
 		return t, err
 	}
 	if t.NM, err = pickTool(dir, triple, "gcc-nm", "nm"); err != nil {
+		return t, err
+	}
+	if t.Objcopy, err = pickTool(dir, triple, "objcopy"); err != nil {
 		return t, err
 	}
 	if t.LD, err = pickTool(dir, triple, "ld"); err != nil {

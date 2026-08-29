@@ -32,7 +32,9 @@ import (
 // changes in a way the configure flags do not capture — a new step, a different
 // ordering, a changed install layout. Every job key includes it, so bumping it
 // rebuilds the world.
-const Version = 1
+// 2: dependencies may publish a merged relocatable object, and the interpreter
+// links every object a sysroot carries.
+const Version = 2
 
 type PlanOptions struct {
 	Profile string

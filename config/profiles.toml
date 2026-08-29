@@ -100,3 +100,9 @@ modules = "minimal"
 test_modules = false
 cflags_remove = ["-flto=auto", "-flto-partition=none", "-fuse-linker-plugin"]
 ldflags_remove = ["-flto=auto", "-flto-partition=none", "-fuse-linker-plugin"]
+
+# mimalloc is compiled without LTO on purpose. Its malloc must win over musl's
+# weak definition at link time, and as LTO bitcode that resolution happens
+# inside the plugin, where the override does not reliably take.
+[profile.default.deps.mimalloc]
+cflags_remove = ["-flto=auto", "-flto-partition=none", "-fuse-linker-plugin"]

@@ -150,3 +150,14 @@ _ctypes is built without dlopen support, so importing the name fails at \
 module import time and takes all of ctypes with it. Stubbing it keeps \
 CDLL/PyDLL importable; they simply cannot load anything.\
 """
+
+[source.mimalloc]
+name = "mimalloc"
+# An untagged main3 commit rather than a release: 3.5.0's tagged tarball
+# predates the fixes this branch carries, and this is the tree the allocator
+# comparison was measured on.
+version = "3.5.0-cd69707c"
+file = "mimalloc-cd69707c3ca01a4c5fb358e8b92a710554f15356.tar.gz"
+topdir = "mimalloc-cd69707c3ca01a4c5fb358e8b92a710554f15356"
+urls = ["https://github.com/microsoft/mimalloc/archive/cd69707c3ca01a4c5fb358e8b92a710554f15356.tar.gz"]
+sha256 = "0700824da164c6b2ccb9541109ccf2845a8d4a628c763337eb05744a5b27eb72"

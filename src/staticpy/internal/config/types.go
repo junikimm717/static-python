@@ -79,6 +79,15 @@ type Package struct {
 	CFlags  []string `toml:"cflags"`
 	Headers []string `toml:"headers"`
 	Libname string   `toml:"libname"`
+	// Object collapses the compiled sources into one relocatable object at
+	// this path, in addition to the archive. An interpreter links objects
+	// directly: an archive member is only pulled to resolve an undefined
+	// symbol, so it can never override a definition libc already supplies.
+	Object string `toml:"object"`
+	// KeepGlobals are the only symbols left global in Object; everything else
+	// is localised so a whole allocator's internals cannot collide with
+	// whatever else is in the link.
+	KeepGlobals []string `toml:"keep_globals"`
 	// MakeVars are passed on the make command line, where they beat any
 	// assignment in the makefile. @BUILD_CC@ expands to a compiler whose output
 	// runs on the build machine, for packages that compile helper programs and

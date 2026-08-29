@@ -160,3 +160,54 @@ cflags = [
 # and the profile adds -I<prefix>/include/uuid.
 headers = ["libuuid/src/uuid.h"]
 provides = ["lib/libuuid.a", "include/uuid/uuid.h"]
+
+# musl's mallocng returns every allocation above 131052 bytes straight to the
+# kernel and caches nothing, so workloads that cycle mid-sized buffers pay an
+# mmap/munmap pair per operation. Replacing it is possible because musl defines
+# malloc weakly: a strong definition keeps libc.a's member from ever being
+# pulled. See the staticpy-traps skill for the measurements.
+#
+# src/static.c includes every other translation unit, so the whole allocator is
+# one object and there is no archive for the linker to be selective about.
+[package.mimalloc]
+name = "mimalloc"
+build = "sources"
+libname = "mimalloc"
+sources = ["src/static.c"]
+cflags = ["-DMI_MALLOC_OVERRIDE=1", "-DNDEBUG"]
+headers = ["include/mimalloc.h"]
+provides = ["lib/libmimalloc.a", "lib/mimalloc.o"]
+# Collapsed into one object and stripped down to the allocator's public entry
+# points. CPython bundles its own mimalloc in obmalloc.o, so leaving the
+# internals global is a duplicate-symbol link failure waiting to happen.
+object = "lib/mimalloc.o"
+keep_globals = [
+  "malloc",
+  "calloc",
+  "realloc",
+  "free",
+  "cfree",
+  "aligned_alloc",
+  "memalign",
+  "posix_memalign",
+  "__posix_memalign",
+  "valloc",
+  "pvalloc",
+  "vfree",
+  "malloc_usable_size",
+  "malloc_size",
+  "malloc_good_size",
+  "reallocarray",
+  "reallocarr",
+  "reallocf",
+  "strdup",
+  "strndup",
+  "__libc_malloc",
+  "__libc_calloc",
+  "__libc_realloc",
+  "__libc_free",
+  "__libc_cfree",
+  "__libc_memalign",
+  "__libc_valloc",
+  "__libc_pvalloc",
+]

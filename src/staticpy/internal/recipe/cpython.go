@@ -432,6 +432,17 @@ func (j *pyBuild) Build(ctx context.Context, e *core.Env, r *core.Runner, work, 
 		return perr
 	}
 	args = replaceFlag(args, "--with-build-python", "--with-build-python="+py)
+	// Objects a dependency published are linked into the interpreter itself,
+	// which is the only way a definition can beat one libc already provides:
+	// -l would consult the archive, and musl's weak malloc already satisfies
+	// every reference before any member is pulled.
+	objs, oerr := sysrootObjects(sysroot)
+	if oerr != nil {
+		return oerr
+	}
+	if len(objs) > 0 {
+		args = append(args, "LIBS="+strings.Join(objs, " "))
+	}
 	if j.cross {
 		if hr := hostRunner(e, j.target); hr != "" {
 			args = append(args, "HOSTRUNNER="+hr)
@@ -632,3 +643,23 @@ var (
 	_ core.Job = (*pyHost)(nil)
 	_ core.Job = (*pyBuild)(nil)
 )
+
+// sysrootObjects lists the .o files a sysroot carries, sorted so the link line
+// cannot vary between two builds of the same inputs.
+func sysrootObjects(sysroot string) ([]string, error) {
+	ents, err := os.ReadDir(filepath.Join(sysroot, "lib"))
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, e := range ents {
+		if !e.IsDir() && strings.HasSuffix(e.Name(), ".o") {
+			out = append(out, filepath.Join(sysroot, "lib", e.Name()))
+		}
+	}
+	sort.Strings(out)
+	return out, nil
+}
