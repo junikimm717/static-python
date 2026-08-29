@@ -16,10 +16,14 @@ var cmdConfig = &command{
 	Name:     "config",
 	Short:    "show the resolved configuration, or write it out to edit",
 	Synopsis: "staticpy config show [--profile NAME] [--scope SCOPE] | staticpy config dump <dir>",
-	Long: `Configuration is stacked: the copy embedded in this binary, then <repo>/config
-when you are in a checkout, then --config <dir>. Later layers win per entry, so
-a profile redefined on disk replaces the embedded one of the same name and
-profiles only the embedded set knows about survive untouched.
+	Long: `Configuration lives in one place: config/ at the repo root, which is a
+symlink to the tree go:embed compiles into this binary. Editing it and running
+any command rebuilds the binary around the change; there is no second copy to
+keep in step.
+
+--config <dir> layers another directory on top, winning per entry, so a profile
+redefined there replaces the embedded one of the same name and profiles only
+the embedded set knows about survive untouched.
 
 sources.toml and patches/ are deliberately NOT part of that stack. They come
 from the binary unless --sources <dir> is passed explicitly: if any config

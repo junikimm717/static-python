@@ -188,7 +188,7 @@ func (g *Global) register(fs *flag.FlagSet) {
 	fs.StringVar(&g.Dist, "dist", g.Dist,
 		"artifact + build root (default ./dist, or <repo>/dist from a checkout; the ./staticpy shim sets it)")
 	fs.StringVar(&g.ConfigDir, "config", g.ConfigDir,
-		"extra config directory, overlaid on the embedded defaults and on <repo>/config")
+		"extra config directory, overlaid on the embedded defaults")
 	fs.StringVar(&g.SourcesDir, "sources", g.SourcesDir,
 		"read sources.toml and patches/ from here instead of the binary; this is a supply-chain override and is recorded in every artifact's manifest")
 	fs.StringVar(&g.Toolchains, "toolchains", g.Toolchains,

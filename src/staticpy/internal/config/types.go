@@ -3,7 +3,7 @@
 //
 // Files are embedded as defaults and overlaid from disk, so a released binary
 // works alone and a checkout wins over it. Resolution order is
-// embedded -> <repo>/config -> --config <dir>, with sources.toml and patches/
+// embedded -> --config <dir>, with sources.toml and patches/
 // deliberately excluded from the automatic layer; see Load.
 //
 // This file is the contract the rest of the tree compiles against.

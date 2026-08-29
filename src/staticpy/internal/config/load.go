@@ -104,16 +104,6 @@ func Load(opts Options) (*Config, error) {
 	}
 
 	layers := []layer{{fsys: embedded()}}
-	if opts.RepoRoot != "" {
-		dir := filepath.Join(opts.RepoRoot, "config")
-		if st, err := os.Stat(dir); err == nil && st.IsDir() {
-			l, err := diskLayer(dir)
-			if err != nil {
-				return nil, err
-			}
-			layers = append(layers, l)
-		}
-	}
 	if opts.Dir != "" {
 		l, err := diskLayer(opts.Dir)
 		if err != nil {

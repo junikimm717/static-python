@@ -292,12 +292,12 @@ Don't commit unless the user explicitly asks. Even then:
   `config/sources.toml`. A pin without its matching checksum is not a
   half-done commit, it is a build that fetches an unverified tarball.
 - `config/sources.toml` and `config/patches/` are deliberately excluded from
-  the runtime overlay -- a file lying around must not be able to redefine a
+  the `--config` overlay -- a file lying around must not be able to redefine a
   pinned checksum -- so a build reads only the copy embedded in the binary.
-  `./staticpy` re-syncs `internal/config/defaults/` from `config/` and
-  rebuilds whenever either is newer, which is what makes an edit there take
-  effect. Building with plain `go build` skips that and will use a stale
-  embedded copy.
+  `config/` is a symlink to `src/staticpy/internal/config/defaults/`, the tree
+  `go:embed` compiles in, so editing it and running `./staticpy` rebuilds
+  around the change. Building with plain `go build` skips that rebuild and
+  leaves you on whatever was embedded last.
 - A diff that only one architecture needs goes in
   `[source.<pkg>.target_patches]` keyed by triple, not in `patches`. `patches`
   is hashed into the shared srctree, so a fix for one target there invalidates

@@ -95,11 +95,15 @@ never constructs a job.
 
 ## Data, code, generated
 
-Changeable with no Go compiler in the loop: `config/*.toml` at the repo root.
-Resolution is **embedded defaults → `<repo>/config` → `--config <dir>`**, later
-layers winning per top-level entry, so a profile redefined on disk replaces the
-embedded one of the same name and profiles only the embedded set knows about
-survive untouched.
+`config/` at the repo root is a symlink to
+`src/staticpy/internal/config/defaults/`, the tree `go:embed` compiles into the
+binary. `go:embed` cannot reach outside its own package, which is why the real
+directory lives there and the repo root gets the symlink rather than the other
+way round. There is one copy, so there is nothing to keep in sync.
+
+Resolution is **embedded defaults → `--config <dir>`**, the later layer winning
+per top-level entry, so a profile redefined on disk replaces the embedded one of
+the same name and profiles only the embedded set knows about survive untouched.
 
 `sources.toml` and `patches/` are deliberately **outside** that stack. They come
 from the copy embedded in the binary unless `--sources <dir>` is passed
@@ -108,14 +112,12 @@ would document what was downloaded rather than constrain it. `--sources` warns,
 and is recorded in `Manifest.Provenance` of every artifact built with it — a
 build that took a weaker path must never look identical to one that did not.
 
-**The rebuild trap.** The shim rebuilds the binary when any `*.go` is newer than
-it — and only `*.go`. Edits to `internal/config/defaults/*.toml`,
-`internal/config/defaults/patches/`, or `internal/assets/files/` (pyconfig
-fragments, `Setup`, `patcher.c`, staticapi) are `go:embed` inputs that the mtime
-check does not see, so they silently do not take effect. Touch a `.go` file or
-delete `dist/.bin/staticpy` after changing one. Note that a repo-root
-`config/sources.toml` edit does nothing on its own for the same reason plus the
-overlay exclusion above: pass `--sources config`.
+**Rebuilds.** The shim rebuilds when any file under `src/staticpy` is newer than
+the binary, not only `*.go`, because `go:embed` pulls in the config tree and
+`internal/assets/files/` (pyconfig fragments, `Setup`, `patcher.c`, staticapi)
+and none of those would move a `.go` mtime. Editing `config/` therefore takes
+effect on the next command with nothing else to do — the symlink points into
+that tree, so `find` sees it.
 
 ## Invariants — do not break these
 
