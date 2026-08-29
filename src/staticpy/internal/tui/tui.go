@@ -17,6 +17,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 )
 
 var (
@@ -95,13 +96,16 @@ func Select(m Menu) (Choice, error) {
 	}
 
 	chosen := m.Default
+	// The theme is pinned rather than left to huh's default so the column
+	// header can be indented by the very selector the options are drawn with.
+	th := huh.ThemeCharm()
 	form := huh.NewForm(huh.NewGroup(
 		huh.NewSelect[string]().
 			Title(m.Title).
-			Description(describe(m)).
+			Description(describe(m, headerIndent(th))).
 			Options(opts...).
 			Value(&chosen),
-	)).WithOutput(os.Stderr).WithShowHelp(true)
+	)).WithOutput(os.Stderr).WithShowHelp(true).WithTheme(th)
 
 	if err := form.Run(); err != nil {
 		if errors.Is(err, huh.ErrUserAborted) {
@@ -145,7 +149,19 @@ func label(m Menu, g Group, c Choice) string {
 
 // describe renders the rows that cannot be chosen, so the shape of the machine
 // and the reason part of it is unavailable stay visible while choosing.
-func describe(m Menu) string {
+// headerIndent is the gap between where huh draws a description line and where
+// it draws an option's text, so the two can be made to line up.
+//
+// Both sit inside Focused.Base, whose padding therefore cancels; the selector
+// prefix ("> ") is the entire difference, and an unselected row is padded by
+// exactly its width. Measuring the selector is what keeps the header aligned
+// through a theme change -- a hardcoded indent was wrong the moment it met the
+// real form, because it had been guessed against a different renderer.
+func headerIndent(t *huh.Theme) string {
+	return strings.Repeat(" ", lipgloss.Width(t.Focused.SelectSelector.String()))
+}
+
+func describe(m Menu, headerPad string) string {
 	var b strings.Builder
 	if m.Help != "" {
 		b.WriteString(m.Help + "\n")
@@ -169,7 +185,7 @@ func describe(m Menu) string {
 	// description puts it directly above the first option, indented to clear
 	// the cursor huh draws in front of the selected row.
 	if len(m.Headers) > 0 {
-		b.WriteString("\n    " + row(m.Headers, w))
+		b.WriteString("\n" + headerPad + row(m.Headers, w))
 	}
 	return b.String()
 }
