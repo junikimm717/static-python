@@ -19,7 +19,10 @@ func runPyperfSuite(e *core.Env, order []string, paths map[string]string,
 	baseline, suiteRoot, pyperfHint string, useVenv bool, noPin bool, cpu int, timeout time.Duration, offline bool) error {
 
 	var skipped []string
-	pin, topo := choosePin(noPin, cpu)
+	pin, topo, err := choosePin(noPin, cpu)
+	if err != nil {
+		return err
+	}
 
 	sess, err := bench.NewSession(e.Dist, runtime.GOARCH, time.Now())
 	if err != nil {

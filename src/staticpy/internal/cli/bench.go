@@ -274,7 +274,10 @@ func runBench(g *Global, args []string) error {
 	}
 	scriptPath := filepath.Join(tmpDir, "bench", "microbench.py")
 
-	pin, topo := choosePin(*noPin, *cpu)
+	pin, topo, err := choosePin(*noPin, *cpu)
+	if err != nil {
+		return err
+	}
 
 	measurements := map[string]*interpMeasurement{}
 	for _, l := range order {

@@ -64,6 +64,21 @@ is the srctree, so nothing else carried the compiler into its key and a toolchai
 re-publish would silently reuse the old build-python. Any new job whose deps do
 not transitively include a `dep` needs the identity folded in explicitly.
 
+**A hybrid machine reports itself uniform, and every guard downstream stops
+working.** Core *type* was read from `cpu_capacity` first, falling back to
+`cpufreq/cpuinfo_max_freq`. On a Zen 5 + Zen 5c laptop `cpu_capacity` is a flat
+1024 for all 24 threads while `cpuinfo_max_freq` cleanly separates 5157895 from
+3289474 — so the machine classified as one class, and the consequences were all
+silent: `Topology.Hybrid` false, `Fastest()` returning every CPU, the bench menu
+showing one undifferentiated block, and `bench`'s "not in the fastest core
+class" warning unable to ever fire, so `--cpu 7` handed out a 3.29GHz core
+without a word. It landed on a fast core anyway only because CPPC `highest_perf`
+happens to correlate (208 vs 125). Neither source is right everywhere —
+`cpu_capacity` is the correct one on ARM big.LITTLE — so `classSource` now picks
+whichever actually discriminates on the machine in front of it. Symptom: a
+`bench` run that reports `uniform` on a machine you know is not, or a menu where
+no core is ever marked slow.
+
 ## Host-built profiles: the shared-prefix build
 
 Everything here was found building `pyref` (`--profile reference`), the dynamic

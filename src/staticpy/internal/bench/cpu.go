@@ -14,10 +14,12 @@ import (
 
 type CPU struct {
 	ID int
-	// Class is the core TYPE: equal values mean interchangeable cores. Taken
-	// from the scheduler's capacity view, which separates Intel P/E and AMD
-	// Zen/Zen-c alike without naming either.
+	// Class is the core TYPE: equal values mean interchangeable cores. Chosen
+	// per machine by classSource, from whichever sysfs reading actually
+	// separates the types on it.
 	Class int
+	// The two candidate readings Class is chosen between.
+	capacity, maxFreq int
 	// Rank orders cores WITHIN a class -- CPPC preferred-core ordering, where
 	// the firmware reports which silicon clocks highest. Conflating it with
 	// Class splits one core type into several phantom ones.
@@ -60,7 +62,8 @@ func readTopology(root string) (*Topology, error) {
 		coreID, _ := strconv.Atoi(readFile(filepath.Join(dir, "topology", "core_id")))
 		t.CPUs = append(t.CPUs, CPU{
 			ID:       id,
-			Class:    readClass(dir),
+			capacity: readInt(filepath.Join(dir, "cpu_capacity")),
+			maxFreq:  readInt(filepath.Join(dir, "cpufreq", "cpuinfo_max_freq")),
 			Rank:     readRank(dir),
 			CoreID:   coreID,
 			Siblings: parseCPUList(readFile(filepath.Join(dir, "topology", "thread_siblings_list"))),
@@ -70,6 +73,7 @@ func readTopology(root string) (*Topology, error) {
 		return nil, fmt.Errorf("no cpus under %s", root)
 	}
 	sort.Slice(t.CPUs, func(i, j int) bool { return t.CPUs[i].ID < t.CPUs[j].ID })
+	classSource(&t)
 	for _, c := range t.CPUs {
 		if c.Class != t.CPUs[0].Class {
 			t.Hybrid = true
@@ -81,16 +85,39 @@ func readTopology(root string) (*Topology, error) {
 
 func ReadTopology() (*Topology, error) { return readTopology(cpuRoot) }
 
-// Cores of one type report an identical ceiling here, which is what makes this
-// the class and not acpi_cppc: on Zen 5 + Zen 5c the four fast cores all read
-// 5157895 while their CPPC values spread across 196-208.
-func readClass(dir string) int {
-	for _, rel := range []string{"cpu_capacity", "cpufreq/cpuinfo_max_freq"} {
-		if v, err := strconv.Atoi(readFile(filepath.Join(dir, rel))); err == nil && v > 0 {
-			return v
+// classSource settles which reading becomes Class, across the whole machine
+// rather than per CPU: whichever of the two actually separates the core types
+// wins, because neither is right everywhere. See the staticpy-traps skill.
+func classSource(t *Topology) {
+	cap, freq := 0, 0
+	for _, c := range t.CPUs {
+		if c.capacity != t.CPUs[0].capacity {
+			cap++
+		}
+		if c.maxFreq != t.CPUs[0].maxFreq {
+			freq++
 		}
 	}
-	return 0
+	for i := range t.CPUs {
+		switch {
+		case cap > 0:
+			t.CPUs[i].Class = t.CPUs[i].capacity
+		case freq > 0:
+			t.CPUs[i].Class = t.CPUs[i].maxFreq
+		case t.CPUs[i].capacity > 0:
+			t.CPUs[i].Class = t.CPUs[i].capacity
+		default:
+			t.CPUs[i].Class = t.CPUs[i].maxFreq
+		}
+	}
+}
+
+func readInt(path string) int {
+	v, err := strconv.Atoi(readFile(path))
+	if err != nil {
+		return 0
+	}
+	return v
 }
 
 func readRank(dir string) int {

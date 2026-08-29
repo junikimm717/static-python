@@ -164,6 +164,13 @@ func describe(m Menu) string {
 		b.WriteString(strings.Join(unavailable, "\n") + "\n")
 	}
 	b.WriteString("equivalent flag: " + m.Flag)
+	// Headers sized the columns and were then never shown, which left every
+	// menu presenting aligned data with nothing naming it. Last in the
+	// description puts it directly above the first option, indented to clear
+	// the cursor huh draws in front of the selected row.
+	if len(m.Headers) > 0 {
+		b.WriteString("\n    " + row(m.Headers, w))
+	}
 	return b.String()
 }
 
