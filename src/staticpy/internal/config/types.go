@@ -130,6 +130,11 @@ type PackageVariant struct {
 	Configure []string `toml:"configure"`
 	Provides  []string `toml:"provides"`
 	MakeVars  []string `toml:"make_vars"`
+	// Drops the package from this profile entirely. mimalloc is the case:
+	// it exists to beat musl's allocator at static link time, and a reference
+	// build that shipped it would no longer be the stock interpreter it exists
+	// to be measured against.
+	Skip bool `toml:"skip"`
 }
 
 // Scopes layer on top of the profile-wide values, so a change confined to one

@@ -207,13 +207,24 @@ func (r Resolved) keyInputs() map[string]string {
 // exactly as written, so adding a variant for one profile cannot disturb any
 // other profile's key.
 func (c *Config) PackageFor(name, profileName string) (Package, error) {
+	pkg, _, err := c.packageFor(name, profileName)
+	return pkg, err
+}
+
+func (c *Config) PackageSkipped(name, profileName string) (bool, error) {
+	_, skip, err := c.packageFor(name, profileName)
+	return skip, err
+}
+
+func (c *Config) packageFor(name, profileName string) (Package, bool, error) {
+	skip := false
 	pkg, ok := c.Packages[name]
 	if !ok {
-		return Package{}, fmt.Errorf("package %q is not in packages.toml (have %s)", name, c.packageNames())
+		return Package{}, false, fmt.Errorf("package %q is not in packages.toml (have %s)", name, c.packageNames())
 	}
 	chain, err := c.chain(profileName)
 	if err != nil {
-		return Package{}, err
+		return Package{}, false, err
 	}
 	for _, prof := range chain {
 		v, ok := pkg.Variants[prof]
@@ -229,11 +240,14 @@ func (c *Config) PackageFor(name, profileName string) (Package, error) {
 		if v.MakeVars != nil {
 			pkg.MakeVars = append([]string(nil), v.MakeVars...)
 		}
+		if v.Skip {
+			skip = true
+		}
 	}
 	// Leaving the table on the returned package would put every other profile's
 	// overrides into this job's key.
 	pkg.Variants = nil
-	return pkg, nil
+	return pkg, skip, nil
 }
 
 func (c *Config) packageNames() string {

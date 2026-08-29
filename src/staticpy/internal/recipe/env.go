@@ -307,6 +307,11 @@ type toolenv struct {
 	dir    string
 	prefix string
 	view   []string
+	// Prepended to every -I/-L pkg-config derives from a .pc file. A rootfs
+	// build configures each package with the prefix it will finally live at, so
+	// during the build the .pc files describe a directory that does not exist
+	// yet and this is what redirects them at the staged copy.
+	pcSysroot string
 }
 
 func newToolenv(e *core.Env, t config.Target, res config.Resolved, prefix string, view []string) (*toolenv, error) {
@@ -356,6 +361,17 @@ func (te *toolenv) ldflags() []string {
 		// lib64 as well as lib: OpenSSL's platform configs disagree about
 		// which one they install into, and the loser is silently not found.
 		out = append(out, "-L"+filepath.Join(v, "lib"), "-L"+filepath.Join(v, "lib64"))
+		if te.pcSysroot == "" {
+			continue
+		}
+		// ld does not consult -L when resolving a shared library's own NEEDED
+		// entries; it uses -rpath-link and then the library's RUNPATH. In a
+		// rootfs build that RUNPATH is the published path, which does not exist
+		// while the build is running, so a configure test that links -lreadline
+		// fails to find libncursesw and the module is dropped as "necessary bits
+		// not found" -- a green build missing half its extension modules.
+		out = append(out, "-Wl,-rpath-link,"+filepath.Join(v, "lib"),
+			"-Wl,-rpath-link,"+filepath.Join(v, "lib64"))
 	}
 	if te.dir == "" {
 		// Joining an empty dir would produce a relative -L that silently
@@ -384,6 +400,13 @@ func (te *toolenv) pkgConfigPath() string {
 	return strings.Join(dirs, string(os.PathListSeparator))
 }
 
+func (te *toolenv) pathTarget() string {
+	if te.res.HostBuilt() {
+		return ""
+	}
+	return te.target.Triple
+}
+
 func (te *toolenv) vars() map[string]string {
 	pc := te.pkgConfigPath()
 	env := map[string]string{
@@ -405,10 +428,17 @@ func (te *toolenv) vars() map[string]string {
 		// machine. LIBDIR replaces the default search path outright.
 		"PKG_CONFIG_LIBDIR":      pc,
 		"PKG_CONFIG_PATH":        pc,
-		"PKG_CONFIG_SYSROOT_DIR": "",
+		"PKG_CONFIG_SYSROOT_DIR": te.pcSysroot,
 		// The Runner substitutes the hermetic PATH; composing one here would
 		// reintroduce whatever the developer has installed.
-		"PATH": core.PathSentinel + te.target.Triple,
+		//
+		// A host-built profile names no target, which is what keeps the
+		// provisioned toolchain's bin off the PATH. It has to: gcc resolves `ld`
+		// off the PATH it is run with, not from $LD, so leaving the musl
+		// toolchain first makes the host compiler link glibc objects with a musl
+		// linker -- which cannot find libm.so.6 and drops any extension module
+		// whose library needs it.
+		"PATH": core.PathSentinel + te.pathTarget(),
 		// Deterministic diagnostics, and a few configure scripts parse them.
 		"LC_ALL": "C",
 	}

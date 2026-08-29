@@ -81,6 +81,9 @@ func Plan(cfg *config.Config, assets fs.FS, o PlanOptions) ([]core.Job, error) {
 				return nil, err
 			}
 		}
+		if o.Pack && interp.Name() == "pyref" {
+			return nil, fmt.Errorf("recipe: a host-built interpreter links against this machine's libc and is reproducible nowhere else, so there is nothing to pack")
+		}
 		if o.Pack {
 			if final, err = Pack(cfg, t, o.Profile, interp, final); err != nil {
 				return nil, err
@@ -93,6 +96,19 @@ func Plan(cfg *config.Config, assets fs.FS, o PlanOptions) ([]core.Job, error) {
 
 // No caller has to know which shape it is asking for.
 func Interpreter(cfg *config.Config, assets fs.FS, host, target config.Target, profile, bundle string) (core.Job, error) {
+	res, err := resolveScope(cfg, profile, config.ScopePython)
+	if err != nil {
+		return nil, err
+	}
+	if res.HostBuilt() {
+		// Compiled against this machine's own libc, so there is no such thing as
+		// cross-building one: the compiler targets the machine it is on.
+		if host.Triple != target.Triple {
+			return nil, fmt.Errorf("recipe: profile %q is host-built, so it can only build for %s, not %s",
+				profile, host.Triple, target.Triple)
+		}
+		return PyRef(cfg, assets, target, profile)
+	}
 	if host.Triple == target.Triple {
 		return PyNative(cfg, assets, target, profile, bundle)
 	}

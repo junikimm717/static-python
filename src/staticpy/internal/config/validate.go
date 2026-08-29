@@ -151,8 +151,8 @@ func (c *Config) validatePackages() error {
 				return fmt.Errorf("%s: [package.%s.profile.%s] names no profile (have %s)",
 					where, key, prof, keysOf(c.Profiles))
 			}
-			if v.Configure == nil && v.Provides == nil && v.MakeVars == nil {
-				return fmt.Errorf("%s: [package.%s.profile.%s] overrides nothing; drop it, or set configure, provides or make_vars",
+			if v.Configure == nil && v.Provides == nil && v.MakeVars == nil && !v.Skip {
+				return fmt.Errorf("%s: [package.%s.profile.%s] overrides nothing; drop it, or set configure, provides, make_vars or skip",
 					where, key, prof)
 			}
 		}

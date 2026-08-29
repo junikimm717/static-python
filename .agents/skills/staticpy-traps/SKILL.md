@@ -64,6 +64,58 @@ is the srctree, so nothing else carried the compiler into its key and a toolchai
 re-publish would silently reuse the old build-python. Any new job whose deps do
 not transitively include a `dep` needs the identity folded in explicitly.
 
+## Host-built profiles: the shared-prefix build
+
+Everything here was found building `pyref` (`--profile reference`), the dynamic
+interpreter compiled with the machine's own gcc. None of it can happen to the
+static build, which is exactly why it went unnoticed for so long.
+
+**A dependency prefix baked into a shared library.** libtool writes an RPATH,
+OpenSSL writes OPENSSLDIR, ncurses writes its terminfo directory. Those strings
+are only correct when `--prefix` is where the files finally live, so a host-built
+profile builds every dependency into one shared rootfs rather than a prefix each.
+The static build never notices: nothing resolves a path at run time, and a
+slim-LTO archive does not even contain the string as contiguous bytes, so the
+sysroot composer's scan cannot see it. `strings libncursesw.a` returning nothing
+is that, not absence.
+
+**`ld` will not use `-L` to resolve a shared library's own `NEEDED` entries.**
+It uses `-rpath-link`, then the library's `RUNPATH`. In a rootfs build that
+RUNPATH is the published path, which does not exist while the build runs, so
+`configure` link tests against any library that needs a sibling fail and the
+module is dropped as "necessary bits not found" — a green build missing half its
+extension modules. Symptom: `checking for X in -lfoo... no` while
+`checking for foo.h... yes`.
+
+**gcc resolves `ld` off the command PATH, not `$LD`.** Leaving a provisioned
+musl toolchain first on a host build makes the host compiler link glibc objects
+with a musl linker. Symptom: `undefined reference to 'floor@GLIBC_2.2.5'` and
+`libm.so.6 ... not found`. A host-built profile therefore names no target when
+composing PATH.
+
+**An import check that passes against the host's libraries.** CPython imports
+every extension it builds. Without `LD_LIBRARY_PATH` pointing at the staged
+rootfs, the loader finds `/lib64/libssl.so.3`, `libncursesw.so.6`, `libz.so.1`
+— the distro's — and reports success for modules linked against ours. Only
+sqlite failed, because our SONAME is unversioned (`libsqlite3.so`) and the
+host ships `libsqlite3.so.0`. Every other module was being checked against
+somebody else's library.
+
+**The static build's ctypes edits leak through the shared srctree.** `pythonapi`
+is rebound onto the generated `staticapi` table and `dlopen` is stubbed to a
+lambda, both because a fully static interpreter has no libdl. A dynamic build
+inherits both from the same srctree and dies on `import ctypes` with
+`No module named 'staticapi'`. `pyref` restores stock ctypes in its own copy and
+asserts the match count, so an upstream bump that moves either line fails loudly
+rather than shipping the static interpreter's ctypes in a dynamic one.
+
+**Countermeasure for all of the above:** `pyref` imports every module that
+exists only because a dependency was built, *including the Python-level
+wrappers* — `ctypes` fails while `_ctypes` imports cleanly, and checking only
+the extension is how that reached a published artifact. The check runs before
+the artifact is renamed into place, so it needs `LD_LIBRARY_PATH` to load
+libpython at all.
+
 ## configure cannot run a test program
 
 This is the root of most cross-build wrongness. `AC_RUN_IFELSE` has a

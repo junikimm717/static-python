@@ -127,6 +127,22 @@ func (b *depBuilder) job(name string) (*depJob, error) {
 	return j, nil
 }
 
+// A dep builds into a prefix it shares with every other dep, instead of its
+// own artifact. A shared library records where it was configured to live --
+// libtool writes an RPATH, OpenSSL writes OPENSSLDIR, ncurses writes its
+// terminfo directory -- and those strings are only correct when --prefix is the
+// path the files actually end up at. The per-dep prefixes the static build uses
+// cannot satisfy that, because nothing resolves a path at runtime there and a
+// stale one is inert.
+type rootfsMode struct {
+	// The final path, baked into everything installed.
+	prefix string
+	// Where that prefix's contents actually are during the build, and the
+	// ancestor of view that turns one into the other.
+	view    string
+	sysroot string
+}
+
 type depJob struct {
 	name         string
 	pkg          config.Package
@@ -141,6 +157,7 @@ type depJob struct {
 	patchHash    string
 	tgtPatchHash string
 	platform     string
+	roots        *rootfsMode
 }
 
 func (j *depJob) Name() string { return "dep" }
@@ -216,6 +233,11 @@ func (j *depJob) Provenance() map[string]string { return j.tc.Provenance() }
 // view is every prefix this package compiles and links against: its direct
 // needs and theirs, deepest last so a direct need's headers win.
 func (j *depJob) view(e *core.Env) []string {
+	if j.roots != nil {
+		// Everything already installed is in one place, so there is no chain of
+		// per-dep prefixes to walk.
+		return []string{j.roots.view}
+	}
 	var out []string
 	seen := map[string]bool{}
 	var walk func(*depJob)
@@ -238,9 +260,15 @@ func (j *depJob) Build(ctx context.Context, e *core.Env, r *core.Runner, work, s
 	// directory: openssl and libtool bake their prefix into what they install,
 	// and a pid-tagged staging path is gone by the time anyone reads it.
 	prefix := j.ArtifactDir(e)
+	if j.roots != nil {
+		prefix = j.roots.prefix
+	}
 	te, err := newToolenv(e, j.target, j.res, prefix, j.view(e))
 	if err != nil {
 		return err
+	}
+	if j.roots != nil {
+		te.pcSysroot = j.roots.sysroot
 	}
 
 	src := filepath.Join(work, "src")
