@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
 func TestReduceKeepsMinimumAndDropsFailures(t *testing.T) {
@@ -96,20 +98,6 @@ func TestTopologyDetectsHybridAndPicksFastest(t *testing.T) {
 	}
 }
 
-func TestNeedsWheels(t *testing.T) {
-	dir := t.TempDir()
-	plain := filepath.Join(dir, "a.txt")
-	os.WriteFile(plain, []byte("# comment\n\npyperf\n"), 0o644)
-	if _, ok := needsWheels(plain); ok {
-		t.Fatal("a pyperf-only requirements file must not be skipped")
-	}
-	heavy := filepath.Join(dir, "b.txt")
-	os.WriteFile(heavy, []byte("pyperf\ndjango==5.0\n"), 0o644)
-	if what, ok := needsWheels(heavy); !ok || what == "" {
-		t.Fatalf("django must be reported as unavailable, got %q %v", what, ok)
-	}
-}
-
 func TestCompareRatiosAgainstBaseline(t *testing.T) {
 	res := Results{
 		"base": {"x": {10}, "y": {4}},
@@ -140,4 +128,22 @@ func itoa(i int) string {
 		i /= 10
 	}
 	return string(b)
+}
+
+// The reason recorded for a failure is what lands in skipped.json, so it has to
+// be the line the process died on rather than the Runner's cwd/argv preamble.
+func TestReasonForPrefersTheLastOutputLine(t *testing.T) {
+	err := &core.CmdError{
+		ExitCode: 1,
+		Tail: "Traceback (most recent call last):\n" +
+			"  File \"run_benchmark.py\", line 8, in <module>\n" +
+			"ModuleNotFoundError: No module named 'distutils'\n\n",
+	}
+	if got := reasonFor(err); got != "ModuleNotFoundError: No module named 'distutils'" {
+		t.Fatalf("reasonFor = %q", got)
+	}
+	// A process killed before it printed anything still has to say something.
+	if got := reasonFor(&core.CmdError{ExitCode: 137}); got != "exit 137" {
+		t.Fatalf("reasonFor with no tail = %q, want %q", got, "exit 137")
+	}
 }

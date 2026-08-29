@@ -2,9 +2,11 @@ package bench
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
@@ -20,18 +22,47 @@ type Arm struct {
 // Results are keyed arm -> benchmark -> samples.
 type Results map[string]map[string][]float64
 
+// Failure is a measurement that produced no data.
+//
+// A benchmark that dies mid-run is exactly as absent from the table as one
+// whose dependencies never installed, so it has to reach the same accounting:
+// a geomean over a set nobody chose is the thing skipped.json exists to
+// prevent, and until now only the pre-run skips reached it.
+type Failure struct {
+	Benchmark string
+	Arm       string
+	Reason    string
+}
+
+// The Runner's error spans several lines of cwd, argv and log path. What
+// belongs in a one-line accounting is the line the process actually died on.
+func reasonFor(err error) string {
+	var ce *core.CmdError
+	if errors.As(err, &ce) {
+		lines := strings.Split(strings.TrimRight(ce.Tail, "\n"), "\n")
+		for i := len(lines) - 1; i >= 0; i-- {
+			if s := strings.TrimSpace(lines[i]); s != "" {
+				return s
+			}
+		}
+		return fmt.Sprintf("exit %d", ce.ExitCode)
+	}
+	return strings.SplitN(err.Error(), "\n", 2)[0]
+}
+
 // RunSuite measures every case on every arm, interleaved.
 //
 // Interleaving is per benchmark rather than per arm so that machine drift over
 // a long run hits all arms alike and cancels in the ratio. Running one arm to
 // completion and then the next folds hours of drift straight into the result.
-func RunSuite(ctx context.Context, x Exec, s *Session, pin Pin, arms []Arm, cases []Case, timeout time.Duration) (Results, error) {
+func RunSuite(ctx context.Context, x Exec, s *Session, pin Pin, arms []Arm, cases []Case, timeout time.Duration) (Results, []Failure, error) {
 	res := Results{}
+	var failures []Failure
 	for _, a := range arms {
 		res[a.Label] = map[string][]float64{}
 		// Per-command stdout/stderr is the Runner's, under dist/logs.
 		if err := os.MkdirAll(filepath.Join(s.Dir, "raw", a.Label), 0o755); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 	watch := append([]int{pin.CPU}, pin.Siblings...)
@@ -45,12 +76,18 @@ func RunSuite(ctx context.Context, x Exec, s *Session, pin Pin, arms []Arm, case
 
 			before, _ := sampleCPUs(watch)
 			start := time.Now()
-			runErr := x.Run(ctx, core.Cmd{
+			// The deadline is the point of --timeout, and it was accepted and
+			// then never applied: one benchmark that never returns would hold
+			// the whole suite open, and the run would look alive the entire
+			// time because a stalled measurement produces no output at all.
+			runCtx, cancel := context.WithTimeout(ctx, timeout)
+			runErr := x.Run(runCtx, core.Cmd{
 				Dir:    s.Dir,
 				Args:   c.Args(a.Python, out, pin),
 				EnvAdd: a.Env,
 				Name:   fmt.Sprintf("%s-%s", a.Label, c.Name),
 			})
+			cancel()
 			wall := time.Since(start)
 			after, _ := sampleCPUs(watch)
 
@@ -73,6 +110,9 @@ func RunSuite(ctx context.Context, x Exec, s *Session, pin Pin, arms []Arm, case
 			}
 			if runErr != nil {
 				ev.Err = runErr.Error()
+				failures = append(failures, Failure{
+					Benchmark: c.Label(), Arm: a.Label, Reason: reasonFor(runErr),
+				})
 				os.Remove(out) // a partial pyperf file would parse as real data
 			}
 			s.Record(ev)
@@ -86,14 +126,19 @@ func RunSuite(ctx context.Context, x Exec, s *Session, pin Pin, arms []Arm, case
 						res[a.Label][name] = append(res[a.Label][name], v...)
 					}
 				} else {
+					// Exit 0 and nothing usable in the file is still a hole in
+					// the table, and a quieter one than a crash.
 					ev.Err = err.Error()
+					failures = append(failures, Failure{
+						Benchmark: c.Label(), Arm: a.Label, Reason: reasonFor(err),
+					})
 					s.Record(ev)
 				}
 			}
 		}
 	}
 	fmt.Fprintf(os.Stderr, "  done in %s\n", time.Since(suiteStart).Round(time.Second))
-	return res, nil
+	return res, failures, nil
 }
 
 // A suite run is hours long, so every measurement reports as it lands: what

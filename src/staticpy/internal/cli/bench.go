@@ -25,26 +25,31 @@ import (
 var cmdBench = &command{
 	Name:     "bench",
 	Short:    "compare interpreters' CPU and startup performance",
-	Synopsis: "staticpy bench --interp NAME|LABEL=PATH ... [--baseline LABEL] [--cpu N] [--pyperformance DIR]",
-	Long: `Runs a suite of pure-Python micro-benchmarks and a startup-latency probe
-against a lineup of interpreters, and renders a markdown comparison report.
+	Synopsis: "staticpy bench --interp NAME|LABEL=PATH ... [--baseline LABEL] [--cpu N] [--suite NAME]",
+	Long: `Runs pyperformance against a lineup of interpreters and renders a markdown
+comparison report.
 
-pyperformance is the long-term intent - it is what speed.python.org publishes
-against - but it pip-installs each benchmark's dependencies into a venv, and
-this interpreter has no pip (` + "`--with-ensurepip=no`" + `) and cannot dlopen the
-C-extension dependencies pyperformance needs either way. Both are answered by
-a bundle of pure-Python dependencies compiled in, which arrives with bundles
-(see ` + "`config/bundles.toml`" + `). Until then this command uses a small
-interpreter-bound suite (loops, dispatch, attribute access, dict/list churn)
-that needs nothing beyond the standard library, plus a spawn-latency probe.
+pyperformance is the default because it is what speed.python.org publishes
+against. It is installed into each arm's venv, so nothing has to be located or
+passed in. ` + "`--with-ensurepip=no`" + ` means pip was never installed into the
+interpreter's own prefix; it leaves the ensurepip module and its bundled wheel
+in the stdlib, so ` + "`-m venv`" + ` seeds a working pip. What a static interpreter
+genuinely cannot do is load a C extension, so a benchmark whose requirement
+ships one is dropped by name into skipped.json rather than quietly excluded.
+
+--suite micro selects the built-in suite instead: eleven stdlib-only loops
+(dispatch, attribute access, dict/list churn) plus a spawn-latency probe. It
+needs no network and no installation, which makes it the offline answer and a
+quick check - but it is a micro-benchmark suite, and reporting its geometric
+mean as though it described a workload overstates whatever the interpreter is
+good at.
 
 LINEUP
   Nothing is benchmarked unless it is named. --interp is repeatable and takes
   either a well-known name or an explicit path:
     --interp static             the pynative artifact for this machine
-    --interp reference          the dynamic glibc interpreter under dist/,
-                                built by dist/bench-scratch/build-dynamic-glibc.sh
-                                (staticpy cannot build one itself yet)
+    --interp reference          the dynamic interpreter, from
+                                ` + "`staticpy build --profile reference`" + `
     --interp system             python3 from PATH
     --interp LABEL=/path/to/py  any other binary
   --baseline LABEL fixes the denominator of every ratio; without it the first
@@ -59,11 +64,18 @@ LINEUP
   install into each one.
 
 SUITES
-  The built-in suite needs nothing beyond the standard library. Passing
-  --pyperformance DIR runs pyperformance's own benchmarks from that directory
-  instead, skipping pyperformance's own runner and its per-benchmark pip install,
-  which a --with-ensurepip=no interpreter cannot do. Benchmarks needing wheels
-  are skipped and listed in skipped.json rather than silently dropped.
+  --suite pyperformance (the default) installs pyperformance into each venv and
+  runs its benchmarks directly, installing each one's requirements first.
+  --pyperformance DIR uses a copy already on disk instead of installing one,
+  which is also how an --offline run gets a suite.
+
+  pyperformance's own runner is still not used: it builds a venv per benchmark,
+  and the arms have to differ only in the interpreter. Three benchmarks take a
+  required positional sub-benchmark (bm_argparse, bm_async_tree, bm_pickle);
+  one variant of each is run and the report names it, as bm_pickle[pickle].
+  Anything whose dependencies will not install is listed in skipped.json with
+  the reason, because a geometric mean over a silently narrowed set is worse
+  than no number at all.
 
   Results land in dist/bench/<UTC-stamp>-<arch>/, never overwritten and never
   deduplicated: a measurement is not a pure function of its inputs. Alongside
@@ -121,11 +133,16 @@ func runBench(g *Global, args []string) error {
 	var interpOverrides []interpEntry
 	fs.Var(interpFlag{&interpOverrides}, "interp", "<label>=<path> to add or override one interpreter; repeatable")
 	out := fs.String("out", "", "write the report here instead of dist/bench/<stamp>_<arch>.md")
-	suiteRoot := fs.String("pyperformance", "", "run pyperformance's suite from this benchmarks directory instead of the built-in one")
+	suite := fs.String("suite", "pyperformance", "which benchmarks to run: \"pyperformance\" (installed into each venv) or \"micro\" (the built-in stdlib-only suite)")
+	suiteRoot := fs.String("pyperformance", "", "use pyperformance's benchmarks from this directory instead of installing them")
 	pyperfSrc := fs.String("pyperf", "", "directory holding the pyperf package to install into each venv")
 	baselineFlag := fs.String("baseline", "", "the interpreter every ratio is measured against (default: the first --interp)")
 	noVenv := fs.Bool("no-venv", false, "run interpreters directly instead of through a per-arm venv")
-	timeout := fs.Duration("timeout", 400*time.Second, "per-benchmark timeout")
+	// Generous on purpose. This is a hang detector, not a budget: pinned to one
+	// core, bm_base64 legitimately takes over seven minutes, and a limit tight
+	// enough to be interesting would drop real measurements and leave the
+	// geomean quietly computed over the benchmarks that happened to be quick.
+	timeout := fs.Duration("timeout", 20*time.Minute, "per-benchmark timeout; a hang detector, not a budget")
 	if err := parse(fs, args); err != nil {
 		return finish("bench", err)
 	}
@@ -231,14 +248,20 @@ func runBench(g *Global, args []string) error {
 		baseline = *baselineFlag
 	}
 
-	if *suiteRoot != "" {
+	switch *suite {
+	case "pyperformance", "micro":
+	default:
+		return fmt.Errorf("--suite %q: want \"pyperformance\" or \"micro\"", *suite)
+	}
+	// A --pyperformance directory names the suite as surely as --suite does.
+	if *suite == "pyperformance" || *suiteRoot != "" {
 		e, done, err := g.newEnv(cfg, true)
 		if err != nil {
 			return err
 		}
 		defer done()
 		return runPyperfSuite(e, order, paths, baseline, *suiteRoot, *pyperfSrc,
-			!*noVenv, *noPin, *cpu, *timeout)
+			!*noVenv, *noPin, *cpu, *timeout, g.Offline)
 	}
 
 	tmpDir, err := os.MkdirTemp("", "staticpy-bench-")

@@ -115,6 +115,8 @@ type Identity struct {
 	Linkage string `json:"linkage"`
 	Version string `json:"version,omitempty"`
 	BuildID string `json:"build_id,omitempty"`
+	// Core is the libpython a shared build delegates to; see sharedCore.
+	Core *Identity `json:"core,omitempty"`
 }
 
 func Identify(label, path string) (Identity, error) {
@@ -138,6 +140,12 @@ func Identify(label, path string) (Identity, error) {
 		return id, err
 	}
 	id.SHA256 = hex.EncodeToString(h.Sum(nil))
+	id.Linkage, id.BuildID = linkage(real)
+	if lib := sharedCore(real); lib != "" {
+		if core, err := Identify(label+":libpython", lib); err == nil {
+			id.Core = &core
+		}
+	}
 	return id, nil
 }
 

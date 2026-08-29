@@ -28,16 +28,24 @@ type Venv struct {
 // A venv equalises what the arms disagree on: the pyperf version they import,
 // whether distro site-packages (and the .pth files that execute at import) are
 // on the path, and the length of sys.path itself, which is a real cost in
-// import-heavy benchmarks. --without-pip because a --with-ensurepip=no
-// interpreter has none, and pyperf is pure Python so it needs no installer.
+// import-heavy benchmarks.
+//
+// It is seeded with pip. --with-ensurepip=no means pip was not installed into
+// the interpreter's own prefix; it does not remove the ensurepip module or the
+// wheel it bundles, so `-m venv` can still seed one. Believing otherwise is why
+// this command ran its own micro-benchmarks instead of pyperformance: the thing
+// it was waiting for already worked.
+//
+// What a static interpreter genuinely cannot do is load a C extension, so a
+// requirement that ships one fails at import rather than at install.
 func MakeVenv(ctx context.Context, x Exec, label, interp, root, pyperfSrc string) (*Venv, error) {
 	dir := filepath.Join(root, label)
 	if err := x.Run(ctx, core.Cmd{
 		Dir:  root,
-		Args: []string{interp, "-m", "venv", "--without-pip", dir},
+		Args: []string{interp, "-m", "venv", dir},
 		Name: "venv-" + label,
 	}); err != nil {
-		return nil, fmt.Errorf("%s: cannot create a venv (needs the venv module): %w", label, err)
+		return nil, fmt.Errorf("%s: cannot create a venv (needs the venv and ensurepip modules): %w", label, err)
 	}
 	py := filepath.Join(dir, "bin", "python3")
 	if _, err := os.Stat(py); err != nil {
@@ -98,7 +106,7 @@ func FindPyperf(hint string) (string, error) {
 		}
 		return "", fmt.Errorf("no pyperf package under %s", hint)
 	}
-	return "", fmt.Errorf("no pyperf package given; pass --pyperf <site-packages dir>")
+	return "", fmt.Errorf("FindPyperf called with no hint; the caller should install pyperformance instead")
 }
 
 func copyTree(src, dst string) error {
@@ -126,4 +134,25 @@ func copyTree(src, dst string) error {
 		}
 		return os.WriteFile(target, b, 0o644)
 	})
+}
+
+// Network access is the caller's concern: an --offline bench must not reach
+// PyPI, and says so rather than failing on a timeout.
+func (v *Venv) Pip(ctx context.Context, x Exec, name string, args ...string) error {
+	return x.Run(ctx, core.Cmd{
+		Dir:  v.Dir,
+		Args: append([]string{v.Python, "-m", "pip", "--disable-pip-version-check", "--no-input"}, args...),
+		Name: name + "-" + v.Label,
+	})
+}
+
+// Reported so a caller can say which interpreter is short of ensurepip rather
+// than surfacing a bare pip error.
+func (v *Venv) HasPip(ctx context.Context, x Exec) bool {
+	_, err := x.Output(ctx, core.Cmd{
+		Dir:  v.Dir,
+		Args: []string{v.Python, "-m", "pip", "--version"},
+		Name: "pip-check-" + v.Label,
+	})
+	return err == nil
 }

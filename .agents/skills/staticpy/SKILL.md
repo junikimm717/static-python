@@ -157,6 +157,52 @@ that tree, so `find` sees it.
    flags do not capture — a new step, a different ordering, a changed install
    layout. It is in every key, so it rebuilds the world.
 
+## Watching a long build or benchmark
+
+A build or a bench run is not going well merely because it is still running.
+Both here fail *silently and partially*: the process stays alive, the progress
+counter climbs, and the thing being produced is wrong. Poll for the failure
+mode, not for liveness.
+
+**Check the failure count, not the progress count.** A pyperformance run sat at
+"87 of 134, eta 14m" while 43 of the reference arm's 45 measurements had already
+failed on `ModuleNotFoundError: pyperf` -- pyperformance had been installed into
+one arm's venv and not the others. Every one of those was logged, and nothing
+about the progress line said so. `grep -l '^# exit: [^0]' <logdir>/*.log | wc -l`
+is the check that would have caught it in the first thirty seconds.
+
+**A monitor that greps only for success is indistinguishable from a hung job.**
+Whatever filter you arm, ask: *if this crashed right now, would it emit
+anything?* Match the terminal states too -- `ERROR`, `error:`, `Traceback`,
+`FAILED` -- and have the loop exit when the process dies, so "no output" cannot
+mean both "still working" and "died ten minutes ago".
+
+**Check that the arms stayed comparable.** In anything measuring two builds
+against each other, a failure that hits one arm and not the other is worse than
+a failure that hits both: the run completes, the report renders, and the ratios
+are computed over whichever benchmarks happened to survive on both sides. Count
+per arm, not in total.
+
+**Verify the artefact, not the exit code.** `pyref` published an interpreter
+missing `_sqlite3` and `readline` with exit 0, twice, because CPython reports
+"necessary bits not found" and carries on. Whatever the job was for, assert the
+thing it was supposed to produce actually exists -- and prefer a postcondition
+inside the job over a check you have to remember to run.
+
+**A silent monitor is not evidence of health.** A watch that only speaks on
+failure leaves you unable to tell "fine" from "died an hour ago", and the
+temptation is then to poll by hand every thirty seconds, which is worse. Run a
+low-rate heartbeat alongside the failure watch -- one line every few minutes
+carrying the numbers that matter (`87/134 measured, failures static=0
+reference=43`) is roughly a dozen messages across an hour-long run, and it is
+the difference between watching the thing and hoping.
+
+**`pgrep -f` matches your own shell.** Every `pgrep -f "staticpy build"` in this
+session matched the command running it, so "still running" was reported for a
+process that had died and, later, missed a real one whose argv had flags before
+the subcommand. Match on something unique to the job (a session stamp, an
+artifact path) and treat a count of 1 with suspicion.
+
 ## The debug loop
 
 You should never be grepping a multi-megabyte undifferentiated log. Every
@@ -206,12 +252,17 @@ Honest inventory, because the code reads more finished than it is:
   decision (inline asm availability, atomics quirks). Adding a target without
   one is a hard error by design.
 - **Bundles are declared but empty.** `config/bundles.toml` defines no `[pkg.*]`,
-  so `--bundle` has nothing to select yet — and pyperformance benchmarking waits
-  on it, because there is no pip in a `--with-ensurepip=no` interpreter.
-  `./staticpy bench` does not wait on it: it runs a small pure-stdlib
-  micro-benchmark + startup-latency suite against the static build, the
-  `benchmark/dynamic-build.sh` baseline and system python, whichever of those
-  are present.
+  so `--bundle` has nothing to select yet. It was believed that pyperformance
+  benchmarking waited on it "because there is no pip in a
+  `--with-ensurepip=no` interpreter". That is false, and the belief cost this
+  command its whole reason for existing: `--with-ensurepip=no` only skips
+  installing pip into the interpreter's prefix, leaving `ensurepip` and its
+  bundled wheel in the stdlib, so `-m venv` seeds a working pip even on the
+  fully static no-dlopen build. `./staticpy bench` now defaults to
+  pyperformance, installs it into each arm's venv, and installs each
+  benchmark's requirements; `--suite micro` selects the old stdlib-only suite,
+  which is the offline path. What a static interpreter genuinely cannot do is
+  load a C extension, which is a per-benchmark limit, not a suite-wide one.
 
 ## Related
 
