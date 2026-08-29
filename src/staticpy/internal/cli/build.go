@@ -141,7 +141,12 @@ func (g *Global) session(o recipe.PlanOptions, runLog bool) (*session, error) {
 	if err != nil {
 		return nil, err
 	}
-	o.Profile = g.Profile
+	// A caller that already named a profile is asking for that one specifically,
+	// as `bench --interp reference` does while --profile still selects what the
+	// static arm is built from.
+	if o.Profile == "" {
+		o.Profile = g.Profile
+	}
 	o.Host = host
 	o.Targets = targets
 	// Job keys have to include the toolchain's identity, and KeyInputs sees no

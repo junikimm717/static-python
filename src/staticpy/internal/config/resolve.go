@@ -22,6 +22,12 @@ const (
 	ToolchainHost        = "host"
 )
 
+// ProfileReference is the dynamic baseline a static build is measured against:
+// the same source at the same version, built shared by this machine's own
+// compiler. Named here because `bench --interp reference` has to plan for it
+// while --profile still selects what the static arm is built from.
+const ProfileReference = "reference"
+
 // Resolve flattens a profile for one scope. It walks Inherit from the root
 // down, and applies each profile's own values before that profile's scope
 // layers, so a child profile fully overrides its parent rather than being

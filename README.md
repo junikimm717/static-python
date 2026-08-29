@@ -126,18 +126,22 @@ to run this project, you for sure know what you are doing 😇)
 
 ## Benchmarking
 
-`benchmark/dynamic-build.sh` builds the dynamic baseline -- a stock
-`--enable-shared` Python of the same pinned version, which is the honest
-comparison target for a static build:
+`--profile reference` builds the dynamic baseline -- a stock `--enable-shared`
+Python of the same pinned version, compiled by this machine's own gcc against
+shared copies of the same pinned dependencies. Same source at the same version,
+so nothing but linkage and libc can explain a gap:
 
 ```sh
-docker compose exec -T spython sh -c 'cd /workspace && ./benchmark/dynamic-build.sh'
+./staticpy build --profile reference
+./staticpy bench --interp static --interp reference --baseline reference
 ```
 
-`./staticpy bench` compares interpreters (the static build, the dynamic
-baseline, and system python by default) with a small interpreter-bound
-micro-benchmark suite and a startup-latency probe, and writes a markdown
-report to `dist/bench/`. pyperformance is the longer-term suite -- it is what
-speed.python.org publishes against -- but it pip-installs each benchmark's
-dependencies into a venv, and this interpreter has no pip and cannot dlopen a
-C extension either way: that arrives with bundles.
+`./staticpy bench` runs pyperformance -- what speed.python.org publishes
+against -- installing it into a venv per interpreter, and writes a markdown
+report plus the unaggregated pyperf JSON to `dist/bench/`. The run pins to one
+core and interleaves the arms per benchmark, so machine drift cancels in the
+ratio rather than landing on whichever arm ran later. A benchmark whose
+dependencies will not install, or that ships a C extension the static
+interpreter cannot dlopen, is named in `skipped.json` rather than quietly
+narrowing the set the geometric mean is taken over. `--suite micro` runs a
+small stdlib-only loop set instead, which needs no network.

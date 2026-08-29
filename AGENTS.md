@@ -70,10 +70,10 @@ between commands.
   from a partial sweep.
 - **Dynamic baseline (whichever host you're on)**:
   ```sh
-  docker compose exec -T spython sh -c 'cd /workspace && ./benchmark/dynamic-build.sh'
+  ./staticpy build --profile reference
   ```
-  Builds a stock `--enable-shared` Python of the same pinned version, against
-  the container's apk-installed `*-dev` packages.
+  Builds a stock `--enable-shared` Python of the same pinned version with this
+  machine's own gcc, against shared copies of the same pinned dependencies.
 
 Everything staticpy writes lives under `dist/` and is safe to delete; a
 content-addressed rebuild recovers whatever you removed. Within it:
@@ -158,42 +158,42 @@ what makes `--offline` usable afterwards.
 
 ## Benchmarking
 
-`benchmark/dynamic-build.sh` builds the dynamic baseline: a stock
-`--enable-shared` Python of the pinned version, against the container's
-apk-installed `*-dev` packages. It is the honest comparison target for a
-static build, and nothing else produces one.
+The `reference` profile builds the dynamic baseline: a stock `--enable-shared`
+Python of the pinned version, compiled by this machine's own gcc against shared
+copies of the same pinned dependencies. Same source at the same version, so
+nothing but linkage and libc can explain a gap.
 
 ```sh
-docker compose exec -T spython sh -c 'cd /workspace && ./benchmark/dynamic-build.sh'
+./staticpy build --profile reference
+./staticpy bench --interp static --interp reference --baseline reference
 ```
 
-It reads the version from `staticpy print`, so the baseline cannot drift from
-the interpreter it is compared against.
+Nothing is benchmarked unless it is named. `--interp` takes `static` (this
+machine's pynative artifact), `reference` (the baseline above), `system`
+(whatever `python3` resolves to) or an explicit `label=/path/to/python`;
+`--baseline` fixes the denominator of every ratio, because with auto-discovery
+adding an arm could silently change what everything was measured against.
 
-```sh
-./staticpy bench --iters 40
-```
+`bench` runs pyperformance by default and installs it into a venv per arm.
+`--with-ensurepip=no` does not remove pip's *source*: the ensurepip module and
+its bundled wheel stay in the stdlib, so `-m venv` seeds a working pip. What a
+static interpreter genuinely cannot do is dlopen a C extension, so a benchmark
+whose requirement ships one fails at import and is named in `skipped.json`,
+along with anything whose dependencies would not install -- a geometric mean
+over a silently narrowed set is worse than no number at all. `--suite micro`
+selects the built-in stdlib-only loops plus a spawn-latency probe, which is the
+offline answer and a quick check, but reporting its geomean as though it
+described a workload overstates whatever the interpreter is good at.
 
-compares up to three interpreters -- `static` (this machine's own pynative
-artifact; pass `--build` to build it first if it is missing), `dynamic` (the
-baseline above, if built) and `system` (whatever `python3` resolves to on
-PATH) -- with a pure-stdlib CPU micro-benchmark suite plus a spawn-latency
-probe, and writes a markdown report to `dist/bench/<stamp>_<arch>.md`.
-`--interp label=path` adds or overrides an entry and `--only label,...`
-restricts the comparison; any interpreter that is missing is skipped with a
-note rather than failing the run.
+Results land in `dist/bench/<UTC-stamp>-<arch>/`, never overwritten: alongside
+the report are the raw pyperf JSON, a manifest recording each binary's sha256
+and linkage, and `timeline.jsonl` -- one record per measurement with its wall
+time, load average and the busy fraction of the pinned core's SMT sibling,
+which is what lets a suspicious number be audited months later.
 
-pyperformance is the longer-term suite -- it is what speed.python.org
-publishes against, so its numbers are comparable to the wider world -- and two
-things have to land before `staticpy bench` can drive it instead:
-
-- pyperformance builds a venv per run and pip-installs each benchmark's
-  requirements. This interpreter is `--with-ensurepip=no`, so there is no pip.
-- Several benchmark dependencies are C extensions, and no dlopen means no
-  compiled wheel will ever import.
-
-Both are answered by a `bundle.bench` of the pure-Python dependencies compiled
-into the interpreter, which arrives with bundles.
+Check the per-arm failure counts in `timeline.jsonl` before trusting a geomean.
+A run once rendered a perfectly plausible report while 43 of 45 measurements on
+one arm had failed.
 
 Benchmark natively only. Under qemu you are measuring qemu, and the overhead
 is not uniform across workloads, so the numbers are comparable to nothing --

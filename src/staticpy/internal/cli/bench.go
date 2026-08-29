@@ -342,8 +342,10 @@ func isExecutable(p string) bool {
 // pynative artifact. Any failure here - not built, or no toolchain provisioned
 // at all - is meant to be a soft "skip static" for the caller, not fatal: bench
 // is still useful comparing just dynamic and system.
-func findStaticInterp(g *Global, abi string, build bool) (string, error) {
-	s, err := g.session(recipe.PlanOptions{}, build)
+// findBuiltInterp locates the interpreter one profile produces, building it
+// first when asked. An empty profile means whatever --profile selected.
+func findBuiltInterp(g *Global, profile, abi string, build bool) (string, error) {
+	s, err := g.session(recipe.PlanOptions{Profile: profile}, build)
 	if err != nil {
 		return "", err
 	}
@@ -370,7 +372,13 @@ func findStaticInterp(g *Global, abi string, build bool) (string, error) {
 			return "", fmt.Errorf("build did not produce a valid artifact at %s", root.ArtifactDir(s.e))
 		}
 	}
-	return findPythonBinary(root.ArtifactDir(s.e), abi)
+	dir := root.ArtifactDir(s.e)
+	// A host-built reference publishes a whole rootfs; pynative publishes the
+	// prefix itself.
+	if sub := filepath.Join(dir, "rootfs"); isDir(sub) {
+		dir = sub
+	}
+	return findPythonBinary(dir, abi)
 }
 
 func planNodeValid(nodes []core.PlanNode, slug string) bool {
@@ -917,25 +925,19 @@ func applyPin(disabled bool) (bench.Pin, *bench.Topology) {
 func resolveKnownInterp(g *Global, label, abi, host string, build bool) (string, error) {
 	switch label {
 	case "static":
-		p, err := findStaticInterp(g, abi, build)
+		p, err := findBuiltInterp(g, "", abi, build)
 		if err != nil {
 			return "", fmt.Errorf("--interp static: %w\nBuild it with `staticpy build`, or pass --build", err)
 		}
 		return p, nil
 	case "reference":
-		// The pyref job family does not exist yet, so this name has nothing to
-		// resolve to. It stays listed because pointing at the hand-built tree
-		// is what everyone actually wants, and silently omitting the name sends
-		// people looking for a flag instead.
-		p := filepath.Join(g.Dist, "dynamic-glibc-build", "rootfs", "bin", "python"+abi)
-		if isExecutable(p) {
-			return p, nil
+		p, err := findBuiltInterp(g, config.ProfileReference, abi, build)
+		if err != nil {
+			return "", fmt.Errorf("--interp reference: %w\n"+
+				"Build it with `staticpy build --profile %s`, or pass --build",
+				err, config.ProfileReference)
 		}
-		return "", fmt.Errorf("--interp reference: staticpy cannot build a dynamic interpreter yet.\n"+
-			"Build one with dist/bench-scratch/build-dynamic-glibc.sh, which links the same\n"+
-			"pinned dependency versions as the static build against the host glibc, or pass\n"+
-			"any interpreter explicitly with --interp LABEL=/path/to/python.\n"+
-			"Expected at %s", p)
+		return p, nil
 	case "system":
 		p, err := exec.LookPath("python3")
 		if err != nil {

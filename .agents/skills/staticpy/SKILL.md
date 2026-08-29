@@ -237,9 +237,9 @@ job's artifact.
 
 Honest inventory, because the code reads more finished than it is:
 
-- **No interpreter has ever been built with staticpy.** It compiles, its config
-  validates, and `doctor` reports what a build would need. Treat it as the thing
-  being built, not the thing you build with.
+- **Native builds are proven; nothing else is.** `pynative` on
+  x86_64-linux-musl and `pyref` on the host both build, verify and benchmark
+  end to end. Every other target is still only "compiles and validates".
 - **The cross path is unproven.** `pycross` configures with `--build`/`--host`/
   `--with-build-python` pointed at `pyhost`; nothing has run it end to end.
   `--with-build-python`'s version check is where a mismatched `pyhost` would

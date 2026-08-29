@@ -270,9 +270,9 @@ $ echo $?
 swallows it, `linked_to_musl()` returns `False`, the skip never triggers,
 and `test_fma_zero_result` runs to its inevitable failure under PGO.
 
-(For the dynamic baseline -- `benchmark/dynamic-build.sh` -- this layer
-*does* work; ldd on the shared interpreter returns 0 and prints the musl
-loader, so the test is properly skipped without any of our intervention.)
+(For a dynamically linked build this layer *does* work; ldd on a shared
+interpreter returns 0 and prints the loader, so the test is properly skipped
+without any of our intervention.)
 
 ## Current workaround (in tree)
 
@@ -281,11 +281,10 @@ To unblock benchmarking we apply the bluntest fix at layer 3: add
 from the PGO run, the same way `-x test_re` already excludes musl's locale-
 related test_re failures.
 
-The change is in two places:
-
-- `config/profiles.toml` (`profile_task`) -- applies to every static build.
-- `benchmark/dynamic-build.sh` -- mirrored so the dynamic baseline uses the
-  same exclusion set (defense-in-depth; layer 3 already covers it there).
+The change is in `config/profiles.toml` (`profile_task`): in `default`, where
+it applies to every static build, and mirrored in `reference` so the dynamic
+baseline carries the same exclusion set (defense-in-depth; layer 3 already
+covers it there).
 
 `config/tests.toml` carries the matching verification-side entry, so a target
 that skips this test is declared to rather than merely tolerated.
