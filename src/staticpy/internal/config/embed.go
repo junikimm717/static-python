@@ -5,12 +5,10 @@ import (
 	"io/fs"
 )
 
-// defaultsFS is a copy of the repo-root config/ tree, so a released binary
-// builds without a checkout. The repo-root copy is the editable one; keep the
-// two identical.
+// The configuration itself, compiled in so a released binary builds without a
+// checkout. It lives here rather than at the repo root because go:embed cannot
+// reach outside its own package; <repo>/config is a symlink to it.
 //
-//go:generate rm -rf defaults
-//go:generate cp -r ../../../../config defaults
 //go:embed defaults
 var defaultsFS embed.FS
 
