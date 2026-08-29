@@ -143,6 +143,19 @@ func (c *Config) validatePackages() error {
 				return fmt.Errorf("%s: needs %q, which is not a package (have %s)", where, n, keysOf(c.Packages))
 			}
 		}
+		// A variant keyed on a profile that does not exist is dead config: it
+		// looks like the package was overridden while the build silently uses the
+		// original. Same reasoning as a *_remove that matches nothing.
+		for prof, v := range p.Variants {
+			if _, ok := c.Profiles[prof]; !ok {
+				return fmt.Errorf("%s: [package.%s.profile.%s] names no profile (have %s)",
+					where, key, prof, keysOf(c.Profiles))
+			}
+			if v.Configure == nil && v.Provides == nil && v.MakeVars == nil {
+				return fmt.Errorf("%s: [package.%s.profile.%s] overrides nothing; drop it, or set configure, provides or make_vars",
+					where, key, prof)
+			}
+		}
 		if p.PlatformMap == "" {
 			continue
 		}
@@ -156,7 +169,15 @@ func (c *Config) validatePackages() error {
 	return nil
 }
 
+var toolchainSources = map[string]bool{ToolchainProvisioned: true, ToolchainHost: true}
+
 func (c *Config) validateProfiles() error {
+	for name, p := range c.Profiles {
+		if p.Toolchain != "" && !toolchainSources[p.Toolchain] {
+			return fmt.Errorf("profile %q: toolchain %q, want %q or %q",
+				name, p.Toolchain, ToolchainProvisioned, ToolchainHost)
+		}
+	}
 	names := sortedKeys(c.Profiles)
 	// Structure first, resolution second: a profile that only declares a scope
 	// table replaces the whole entry it overlays, so an unresolvable inherited

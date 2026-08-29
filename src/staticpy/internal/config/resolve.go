@@ -14,6 +14,14 @@ const (
 	ScopePyhost = "pyhost"
 )
 
+// Where a profile's compiler comes from. Provisioned is the only one that
+// yields a reproducible artifact: a host-built one is compiled against
+// whatever this machine happens to have.
+const (
+	ToolchainProvisioned = "provisioned"
+	ToolchainHost        = "host"
+)
+
 // Resolve flattens a profile for one scope. It walks Inherit from the root
 // down, and applies each profile's own values before that profile's scope
 // layers, so a child profile fully overrides its parent rather than being
@@ -27,7 +35,7 @@ func (c *Config) Resolve(profileName, scope string) (Resolved, error) {
 	if err != nil {
 		return Resolved{}, err
 	}
-	r := Resolved{Profile: profileName, Scope: scope}
+	r := Resolved{Profile: profileName, Scope: scope, Toolchain: ToolchainProvisioned}
 	for _, name := range chain {
 		p := c.Profiles[name]
 		if err := apply(&r, p, fmt.Sprintf("profile %q", name)); err != nil {
@@ -141,6 +149,9 @@ func apply(r *Resolved, p Profile, where string) error {
 	if p.Bundle != "" {
 		r.Bundle = p.Bundle
 	}
+	if p.Toolchain != "" {
+		r.Toolchain = p.Toolchain
+	}
 	return nil
 }
 
@@ -189,4 +200,47 @@ func (r Resolved) keyInputs() map[string]string {
 	in["modules"] = r.Modules
 	in["bundle"] = r.Bundle
 	return in
+}
+
+// The chain is walked root-first so the most derived profile wins, matching how
+// flags resolve. A profile with no variant for this package gets the package
+// exactly as written, so adding a variant for one profile cannot disturb any
+// other profile's key.
+func (c *Config) PackageFor(name, profileName string) (Package, error) {
+	pkg, ok := c.Packages[name]
+	if !ok {
+		return Package{}, fmt.Errorf("package %q is not in packages.toml (have %s)", name, c.packageNames())
+	}
+	chain, err := c.chain(profileName)
+	if err != nil {
+		return Package{}, err
+	}
+	for _, prof := range chain {
+		v, ok := pkg.Variants[prof]
+		if !ok {
+			continue
+		}
+		if v.Configure != nil {
+			pkg.Configure = append([]string(nil), v.Configure...)
+		}
+		if v.Provides != nil {
+			pkg.Provides = append([]string(nil), v.Provides...)
+		}
+		if v.MakeVars != nil {
+			pkg.MakeVars = append([]string(nil), v.MakeVars...)
+		}
+	}
+	// Leaving the table on the returned package would put every other profile's
+	// overrides into this job's key.
+	pkg.Variants = nil
+	return pkg, nil
+}
+
+func (c *Config) packageNames() string {
+	names := make([]string, 0, len(c.Packages))
+	for n := range c.Packages {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	return strings.Join(names, ", ")
 }

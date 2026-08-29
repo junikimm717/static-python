@@ -179,7 +179,7 @@ func runBench(g *Global, args []string) error {
 	// would let adding an interpreter silently change the baseline, and with
 	// it every ratio the report prints.
 	if len(overrideOrder) == 0 {
-		return fmt.Errorf("nothing to compare: pass --interp at least twice.\n"+
+		return fmt.Errorf("nothing to benchmark: pass --interp at least once, or twice to compare.\n"+
 			"  --interp static                the artifact for %s\n"+
 			"  --interp reference             the dynamic reference build\n"+
 			"  --interp system                python3 from PATH\n"+

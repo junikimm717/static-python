@@ -65,10 +65,12 @@ func (b *depBuilder) job(name string) (*depJob, error) {
 	if b.onStack[name] {
 		return nil, fmt.Errorf("recipe: needs cycle in packages.toml: %s", strings.Join(append(b.path, name), " -> "))
 	}
-	pkg, ok := b.cfg.Packages[name]
-	if !ok {
-		return nil, fmt.Errorf("recipe: package %q is not in packages.toml (have: %s)",
-			name, strings.Join(sortedKeys(b.cfg.Packages), ", "))
+	// PackageFor, not Packages[name]: a profile may override this package's
+	// configure line or its postcondition, and the override has to be in place
+	// before anything derives a key from either.
+	pkg, err := b.cfg.PackageFor(name, b.profile)
+	if err != nil {
+		return nil, fmt.Errorf("recipe: %w", err)
 	}
 	srcName := pkg.Source
 	if srcName == "" {
@@ -85,7 +87,7 @@ func (b *depBuilder) job(name string) (*depJob, error) {
 	if err != nil {
 		return nil, err
 	}
-	id, err := Toolchain(nil, b.target.Triple)
+	id, err := toolchainFor(nil, res, b.target.Triple)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +299,13 @@ func (j *depJob) autotools(ctx context.Context, e *core.Env, r *core.Runner, te 
 	args := []string{"./configure",
 		"--prefix=" + prefix,
 		"--exec-prefix=" + prefix,
-		"--host=" + j.target.Triple,
+	}
+	// --host is what puts autotools into cross mode, where it may not run a test
+	// program and falls back to guessing. It would also send configure looking
+	// for a triple-prefixed gcc that does not exist, since a host compiler
+	// answers to its distro's spelling (x86_64-redhat-linux) rather than ours.
+	if !j.res.HostBuilt() {
+		args = append(args, "--host="+j.target.Triple)
 	}
 	args = append(args, j.pkg.Configure...)
 

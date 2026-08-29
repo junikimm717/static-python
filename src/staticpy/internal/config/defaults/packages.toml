@@ -211,3 +211,55 @@ keep_globals = [
   "__libc_valloc",
   "__libc_pvalloc",
 ]
+
+# Shared-library variants, for host-built profiles. Only the profiles named
+# here are affected, so every other profile's key is untouched by this block.
+#
+# bzip2 and libuuid are absent on purpose. Neither has a configure script --
+# one is build = "make" and the other build = "sources" -- and both recipe
+# shapes produce an archive by construction, so a shared build of them needs
+# recipe support rather than a different argument list.
+
+[package.openssl.profile.reference]
+configure = [
+  "shared", "no-dso", "no-asm", "no-engine",
+  "no-tests", "no-apps",
+  "no-ssl3", "no-comp", "no-idea", "no-rc5", "no-ec2m", "no-weak-ssl-ciphers",
+]
+
+[package.libffi.profile.reference]
+configure = ["--disable-static", "--enable-shared"]
+# libffi installs into lib64 whatever --libdir says: that is its own
+# toolexeclibdir convention, and its .pc file agrees.
+provides = ["lib64/libffi.so"]
+
+[package.xz.profile.reference]
+configure = ["--disable-static", "--enable-shared"]
+provides = ["lib/liblzma.so"]
+
+[package.zlib.profile.reference]
+# zlib builds both by default; --static is what suppresses the shared one.
+configure = ["--disable-crcvx"]
+provides = ["lib/libz.so"]
+
+[package.ncurses.profile.reference]
+configure = [
+  "--with-shared", "--without-normal", "--enable-widec",
+  "--without-cxx", "--without-cxx-binding",
+  "--without-ada", "--without-manpages", "--without-tests",
+  "--without-progs",
+  "--enable-termcap",
+]
+provides = ["lib/libncursesw.so"]
+
+[package.readline.profile.reference]
+configure = [
+  "--disable-static", "--enable-shared",
+  "--with-curses",
+  "--disable-install-examples",
+]
+provides = ["lib/libreadline.so", "lib/libhistory.so"]
+
+[package.sqlite.profile.reference]
+configure = ["--disable-static", "--enable-shared"]
+provides = ["lib/libsqlite3.so"]

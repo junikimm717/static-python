@@ -1,6 +1,7 @@
 package recipe
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/junikimm717/static-python/src/staticpy/internal/config"
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
+	"github.com/junikimm717/static-python/src/staticpy/internal/hostcc"
 )
 
 // Keeping the spelling in one place means a scope rename cannot half-apply.
@@ -55,9 +57,16 @@ func artifactName(slug string) string {
 const (
 	toolchainVerified = "gccfactory"
 	toolchainProbed   = "probe"
+	// Neither: no tree to inspect and no manifest to read, only the machine's
+	// own compiler and headers. Always recorded in provenance, because nothing
+	// built this way is reproducible elsewhere.
+	toolchainHost = "host"
 
 	gccfactoryManifest = ".gccfactory.json"
 )
+
+// Not one of core's provisioned kinds, and the only kind with no directory.
+const KindHost = "host"
 
 // ToolchainID is what a job folds into its key to stand for "the compiler that
 // produced this". Every recipe uses it, so re-publishing a toolchain
@@ -92,7 +101,7 @@ func (id ToolchainID) Provenance() map[string]string {
 	}
 	return map[string]string{
 		"toolchain":        id.Triple + "-" + id.Kind,
-		"toolchain_source": toolchainProbed,
+		"toolchain_source": id.Source,
 		"toolchain_key":    id.Key,
 		"toolchain_dir":    id.Dir,
 		"toolchain_probe":  id.Probe,
@@ -301,6 +310,18 @@ type toolenv struct {
 }
 
 func newToolenv(e *core.Env, t config.Target, res config.Resolved, prefix string, view []string) (*toolenv, error) {
+	if res.HostBuilt() {
+		id, err := ToolchainHost(context.Background())
+		if err != nil {
+			return nil, err
+		}
+		tl, err := hostToolsFor(id.CC)
+		if err != nil {
+			return nil, err
+		}
+		// dir stays empty: there is no tree to point at.
+		return &toolenv{target: t, tools: tl, res: res, prefix: prefix, view: view}, nil
+	}
 	id, err := Toolchain(e, t.Triple)
 	if err != nil {
 		return nil, err
@@ -335,6 +356,11 @@ func (te *toolenv) ldflags() []string {
 		// lib64 as well as lib: OpenSSL's platform configs disagree about
 		// which one they install into, and the loser is silently not found.
 		out = append(out, "-L"+filepath.Join(v, "lib"), "-L"+filepath.Join(v, "lib64"))
+	}
+	if te.dir == "" {
+		// Joining an empty dir would produce a relative -L that silently
+		// resolves against the build cwd.
+		return out
 	}
 	return append(out, "-L"+filepath.Join(te.dir, te.target.Triple, "lib"))
 }
@@ -500,4 +526,80 @@ func sortedKeys[V any](m map[string]V) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+// The one toolchain staticpy does not provision, so the one whose identity has
+// to be derived rather than read: hostcc fingerprints the driver and the libc
+// headers together, because a distro glibc upgrade changes what the artifact is
+// without touching the compiler.
+func ToolchainHost(ctx context.Context) (ToolchainID, error) {
+	cc, err := hostcc.Find()
+	if err != nil {
+		return ToolchainID{}, err
+	}
+	if v, ok := toolchainCache.Load(hostCacheKey + cc); ok {
+		return v.(ToolchainID), nil
+	}
+	id, err := hostcc.Identify(ctx, cc)
+	if err != nil {
+		return ToolchainID{}, err
+	}
+	out := ToolchainID{
+		Triple: id.Triple,
+		Kind:   KindHost,
+		CC:     cc,
+		Key:    id.Key,
+		Source: toolchainHost,
+		Probe:  id.Describe(),
+	}
+	toolchainCache.Store(hostCacheKey+cc, out)
+	return out, nil
+}
+
+// The cache is shared with provisioned toolchains, which key on a directory.
+// A prefix keeps a compiler path from ever colliding with one.
+const hostCacheKey = "host\x00"
+
+// Unlike a provisioned tree there is no triple prefix to prefer, so an
+// unprefixed name is the only candidate and a missing one is fatal rather than
+// something to fall back from.
+func hostToolsFor(cc string) (tools, error) {
+	t := tools{CC: cc}
+	var err error
+	// gcc-ar and friends for the LTO plugin, for the reason toolsFor gives.
+	if t.AR, err = lookHostTool("gcc-ar", "ar"); err != nil {
+		return t, err
+	}
+	if t.RANLIB, err = lookHostTool("gcc-ranlib", "ranlib"); err != nil {
+		return t, err
+	}
+	if t.NM, err = lookHostTool("gcc-nm", "nm"); err != nil {
+		return t, err
+	}
+	if t.Objcopy, err = lookHostTool("objcopy"); err != nil {
+		return t, err
+	}
+	if t.LD, err = lookHostTool("ld"); err != nil {
+		return t, err
+	}
+	t.CXX, _ = lookHostTool("g++", "c++")
+	return t, nil
+}
+
+func lookHostTool(names ...string) (string, error) {
+	for _, n := range names {
+		if p, err := exec.LookPath(n); err == nil {
+			return p, nil
+		}
+	}
+	return "", fmt.Errorf("recipe: no %s on PATH; the host-built profile needs the machine's own binutils", names[0])
+}
+
+// Dispatching here is what keeps every job family from having to know that
+// host-built profiles exist.
+func toolchainFor(e *core.Env, res config.Resolved, triple string) (ToolchainID, error) {
+	if res.HostBuilt() {
+		return ToolchainHost(context.Background())
+	}
+	return Toolchain(e, triple)
 }

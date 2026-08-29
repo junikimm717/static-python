@@ -106,3 +106,31 @@ ldflags_remove = ["-flto=auto", "-flto-partition=none", "-fuse-linker-plugin"]
 # inside the plugin, where the override does not reliably take.
 [profile.default.deps.mimalloc]
 cflags_remove = ["-flto=auto", "-flto-partition=none", "-fuse-linker-plugin"]
+
+# The dynamic reference interpreter: stock CPython, as close to python.org's
+# release build as this machine can produce, linked against shared copies of
+# the same pinned dependency versions the static build uses so that version
+# skew can never explain a gap between them.
+#
+# It deliberately does not inherit "default": that profile's ldflags are
+# -static and -no-pie, and a reference build that quietly picked one of them up
+# would stop being the thing it exists to be compared against.
+[profile.reference]
+toolchain = "host"
+cflags = ["-O3", "-fPIC", "-pipe", "-Wno-error", "-w"]
+# LTO is left to CPython's own --with-lto here rather than driven from the
+# flags: the reason the static build hand-rolls it -- slim LTO bitcode inside
+# static sub-dep archives -- does not arise when every dependency is a .so.
+ldflags = []
+strip = false
+debug_symbols = false
+pgo = "native-only"
+# The exclusions are a superset on purpose: over-excluding costs a little
+# profile coverage, while under-excluding aborts the build outright, and
+# profile-run-stamp has no `|| true`. test_re and test_fma_zero_result are the
+# musl failures, harmless to name on a glibc host and needed on a musl one.
+# test_generators is this build's own: SignalAndYieldFromTest is signal-timing
+# sensitive and failed the training run under gcc 16 / glibc 2.43.
+profile_task = "-m test --pgo -x test_re -x test_generators -i test_fma_zero_result -i test_type_check_in_subinterp"
+test_modules = true
+modules = "full"

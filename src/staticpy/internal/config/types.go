@@ -95,6 +95,11 @@ type Package struct {
 	MakeVars []string `toml:"make_vars"`
 	Needs    []string `toml:"needs"`
 	Provides []string `toml:"provides"` // artifact paths that must exist afterwards
+	// Keyed by profile name: [package.libffi.profile.reference]. The static
+	// build wants --disable-shared and a .a while a host-linked variant wants
+	// the opposite, and that is a per-package decision, so it belongs here
+	// rather than in a flag list.
+	Variants map[string]PackageVariant `toml:"profile"`
 }
 
 // Adding an architecture is a row here plus a pyconfig asset.
@@ -115,6 +120,16 @@ type Target struct {
 	// makefile's own assignment. They reach the key only when set, so giving one
 	// target a variable leaves every other target's key untouched.
 	MakeVars []string `toml:"make_vars"`
+}
+
+// PackageVariant replaces, rather than merges into, the fields it sets: a
+// shared build's configure line is not the static one with extras, and a
+// half-overridden argument list produces a library that links but is not what
+// was asked for.
+type PackageVariant struct {
+	Configure []string `toml:"configure"`
+	Provides  []string `toml:"provides"`
+	MakeVars  []string `toml:"make_vars"`
 }
 
 // Scopes layer on top of the profile-wide values, so a change confined to one
@@ -143,6 +158,10 @@ type Profile struct {
 	// Modules selects a Setup.local module set: "minimal" or "full".
 	Modules string `toml:"modules"`
 	Bundle  string `toml:"bundle"`
+	// A profile property and not a target one because the same triple can be
+	// both: on a musl host, a host-built variant and the shipped static build
+	// are both x86_64-linux-musl, and only the profile tells them apart.
+	Toolchain string `toml:"toolchain"`
 
 	// Scopes are "deps", "deps.<pkg>", "python", "pyhost".
 	Scopes map[string]Profile `toml:"-"`
@@ -165,7 +184,10 @@ type Resolved struct {
 	TestModules bool
 	Modules     string
 	Bundle      string
+	Toolchain   string
 }
+
+func (r Resolved) HostBuilt() bool { return r.Toolchain == ToolchainHost }
 
 // It must contain no absolute path and no value that varies between runs.
 func (r Resolved) KeyInputs() map[string]string { return r.keyInputs() }
