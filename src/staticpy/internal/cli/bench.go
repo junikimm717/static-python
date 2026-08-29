@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/junikimm717/static-python/src/staticpy/internal/assets"
+	"github.com/junikimm717/static-python/src/staticpy/internal/bench"
 	"github.com/junikimm717/static-python/src/staticpy/internal/config"
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 	"github.com/junikimm717/static-python/src/staticpy/internal/recipe"
@@ -24,7 +25,7 @@ import (
 var cmdBench = &command{
 	Name:     "bench",
 	Short:    "compare interpreters' CPU and startup performance",
-	Synopsis: "staticpy bench [--interp LABEL=PATH]... [--only LABEL,...] [--iters N] [--build]",
+	Synopsis: "staticpy bench --interp NAME|LABEL=PATH ... [--baseline LABEL] [--cpu N] [--pyperformance DIR]",
 	Long: `Runs a suite of pure-Python micro-benchmarks and a startup-latency probe
 against a lineup of interpreters, and renders a markdown comparison report.
 
@@ -38,17 +39,63 @@ interpreter-bound suite (loops, dispatch, attribute access, dict/list churn)
 that needs nothing beyond the standard library, plus a spawn-latency probe.
 
 LINEUP
-  By default this compares up to three interpreters, each best-effort:
-    static   the pynative artifact for this machine's own triple. Missing by
-             default until built; pass --build to build it first, or build it
-             yourself with ` + "`staticpy build`" + `.
-    dynamic  the stock --enable-shared baseline built by
-             ` + "`benchmark/dynamic-build.sh`" + `, expected at
-             python-dynamic-<triple>/bin/python<abi> next to the repo root.
-    system   whatever "python3" resolves to on PATH.
-  --interp LABEL=PATH adds or overrides one entry; --only LABEL,LABEL... runs
-  just those. The report's ratio columns are X / <baseline>, where <baseline>
-  is "static" if present, otherwise whichever entry sorts first.
+  Nothing is benchmarked unless it is named. --interp is repeatable and takes
+  either a well-known name or an explicit path:
+    --interp static             the pynative artifact for this machine
+    --interp reference          the dynamic reference build
+    --interp system             python3 from PATH
+    --interp LABEL=/path/to/py  any other binary
+  --baseline LABEL fixes the denominator of every ratio; without it the first
+  --interp wins. Naming it matters: with auto-discovery, adding an interpreter
+  could silently change which one everything was measured against.
+
+  Each arm runs inside its own venv, so the arms differ only in the
+  interpreter. Without one, a system python drags in distro site-packages --
+  whose .pth files execute during the startup probe -- and sys.path ends up a
+  different length per arm, which is a real cost in import-heavy benchmarks.
+  --no-venv opts out; --pyperf DIR says where to find the pyperf package to
+  install into each one.
+
+SUITES
+  The built-in suite needs nothing beyond the standard library. Passing
+  --pyperformance DIR runs pyperformance's own benchmarks from that directory
+  instead, skipping pyperformance's own runner and its per-benchmark pip install,
+  which a --with-ensurepip=no interpreter cannot do. Benchmarks needing wheels
+  are skipped and listed in skipped.json rather than silently dropped.
+
+  Results land in dist/bench/<UTC-stamp>-<arch>/, never overwritten and never
+  deduplicated: a measurement is not a pure function of its inputs. Alongside
+  the report are the unaggregated pyperf JSON, a manifest recording each
+  binary's sha256, and timeline.jsonl -- one record per measurement with its
+  wall time, load average and the busy fraction of the pinned core's SMT
+  sibling, which is what lets a suspicious number be audited months later.
+
+MEASUREMENT
+  The run is confined to one logical CPU with sched_setaffinity, inherited by
+  every interpreter spawned. On a hybrid CPU the fast and slow core types can
+  differ by more than 1.5x, so an unpinned run that migrates between them
+  varies by more than most effects under test. --no-pin opts out and says so
+  in the report.
+
+  --cpu N picks the core. Without it, and on a terminal, bench shows the
+  machine's topology and asks; the slower core type is listed but not
+  selectable. With no terminal it takes the fastest-class core the firmware
+  ranks highest, skipping cpu0 because it takes the most interrupts, and
+  prints the --cpu that would have pinned the choice.
+
+  Pinning is not isolation. Nothing here reserves the core from the rest of
+  the system, and an SMT sibling under load biases the pinned core through
+  shared execution units. bench samples the pinned CPU and its siblings before
+  measuring and warns when one is busy, but a clean warning is not a promise:
+  for numbers you intend to publish, run on an otherwise idle machine.
+
+  --repeat N runs the CPU suite N times and keeps each benchmark's MINIMUM,
+  not its mean. Benchmark noise is one-sided -- scheduling, cache eviction and
+  frequency scaling can only make a run slower than the machine is capable of
+  -- so the minimum is the best estimate of the true speed, and an average
+  folds in exactly the contamination the repeats exist to remove. The spread
+  between the best and worst repeat is reported alongside as the noise
+  indicator.
 
 Native only: under qemu you would be measuring qemu, and the overhead is not
 uniform across benchmarks, so the numbers would be comparable to nothing - not
@@ -63,17 +110,28 @@ printed to stdout; --json prints the raw measurements instead.`,
 func runBench(g *Global, args []string) error {
 	fs := g.flagSet("bench")
 	iters := fs.Int("iters", 40, "startup-probe iterations per scenario")
+	repeat := fs.Int("repeat", 1, "run the CPU suite this many times and keep each benchmark's minimum")
+	noPin := fs.Bool("no-pin", false, "do not confine the run to one CPU (results will vary with scheduler placement)")
+	cpu := fs.Int("cpu", -1, "logical CPU to pin every arm to; unset opens a picker showing the machine's topology")
 	build := fs.Bool("build", false, "build the static interpreter first if it is missing")
 	var only []string
 	fs.Var(listFlag{&only}, "only", "restrict to these labels, comma-separated or repeated")
 	var interpOverrides []interpEntry
 	fs.Var(interpFlag{&interpOverrides}, "interp", "<label>=<path> to add or override one interpreter; repeatable")
 	out := fs.String("out", "", "write the report here instead of dist/bench/<stamp>_<arch>.md")
+	suiteRoot := fs.String("pyperformance", "", "run pyperformance's suite from this benchmarks directory instead of the built-in one")
+	pyperfSrc := fs.String("pyperf", "", "directory holding the pyperf package to install into each venv")
+	baselineFlag := fs.String("baseline", "", "the interpreter every ratio is measured against (default: the first --interp)")
+	noVenv := fs.Bool("no-venv", false, "run interpreters directly instead of through a per-arm venv")
+	timeout := fs.Duration("timeout", 400*time.Second, "per-benchmark timeout")
 	if err := parse(fs, args); err != nil {
 		return finish("bench", err)
 	}
 	if *iters < 1 {
 		return usagef("--iters must be at least 1, got %d", *iters)
+	}
+	if *repeat < 1 {
+		return usagef("--repeat must be at least 1, got %d", *repeat)
 	}
 
 	cfg, err := g.load()
@@ -115,35 +173,25 @@ func runBench(g *Global, args []string) error {
 		paths[label] = path
 	}
 
-	if p, ok := overrides["static"]; ok {
-		add("static", p)
-	} else if p, err := findStaticInterp(g, abi, *build); err != nil {
-		fmt.Fprintf(os.Stderr, "%s no static interpreter: %v\n", yellow("note:"), err)
-	} else {
-		add("static", p)
+	// Nothing is benchmarked unless it was asked for by name. Auto-discovery
+	// would let adding an interpreter silently change the baseline, and with
+	// it every ratio the report prints.
+	if len(overrideOrder) == 0 {
+		return fmt.Errorf("nothing to compare: pass --interp at least twice.\n"+
+			"  --interp static                the artifact for %s\n"+
+			"  --interp reference             the dynamic reference build\n"+
+			"  --interp system                python3 from PATH\n"+
+			"  --interp LABEL=/path/to/python any other binary", host)
 	}
-
-	if p, ok := overrides["dynamic"]; ok {
-		add("dynamic", p)
-	} else if p := filepath.Join(g.repoRoot, "python-dynamic-"+host, "bin", "python"+abi); isExecutable(p) {
-		add("dynamic", p)
-	} else {
-		fmt.Fprintf(os.Stderr, "%s no dynamic baseline at %s - build one with `./benchmark/dynamic-build.sh`\n", yellow("note:"), p)
-	}
-
-	if p, ok := overrides["system"]; ok {
-		add("system", p)
-	} else if p, err := exec.LookPath("python3"); err == nil {
-		add("system", p)
-	} else {
-		fmt.Fprintf(os.Stderr, "%s no system python3 on PATH\n", yellow("note:"))
-	}
-
 	for _, label := range overrideOrder {
-		if label == "static" || label == "dynamic" || label == "system" {
-			continue // already applied above, in lineup order
+		p := overrides[label]
+		if p == "" {
+			var err error
+			if p, err = resolveKnownInterp(g, label, abi, host, *build); err != nil {
+				return err
+			}
 		}
-		add(label, overrides[label])
+		add(label, p)
 	}
 
 	if len(only) > 0 {
@@ -173,11 +221,22 @@ func runBench(g *Global, args []string) error {
 		}
 	}
 	baseline := order[0]
-	for _, l := range order {
-		if l == "static" {
-			baseline = l
-			break
+	if *baselineFlag != "" {
+		if !slices.Contains(order, *baselineFlag) {
+			return fmt.Errorf("--baseline %q is not one of the interpreters being compared (have: %s)",
+				*baselineFlag, strings.Join(order, ", "))
 		}
+		baseline = *baselineFlag
+	}
+
+	if *suiteRoot != "" {
+		e, done, err := g.newEnv(cfg, true)
+		if err != nil {
+			return err
+		}
+		defer done()
+		return runPyperfSuite(e, order, paths, baseline, *suiteRoot, *pyperfSrc,
+			!*noVenv, *noPin, *cpu, *timeout)
 	}
 
 	tmpDir, err := os.MkdirTemp("", "staticpy-bench-")
@@ -190,10 +249,12 @@ func runBench(g *Global, args []string) error {
 	}
 	scriptPath := filepath.Join(tmpDir, "bench", "microbench.py")
 
+	pin, topo := choosePin(*noPin, *cpu)
+
 	measurements := map[string]*interpMeasurement{}
 	for _, l := range order {
 		fmt.Fprintf(os.Stderr, "%s %s (%s)\n", bold("benchmarking:"), l, paths[l])
-		m, err := measureInterpreter(paths[l], scriptPath, *iters)
+		m, err := measureInterpreter(paths[l], scriptPath, *iters, *repeat)
 		if err != nil {
 			return fmt.Errorf("%s: %w", l, err)
 		}
@@ -201,6 +262,10 @@ func runBench(g *Global, args []string) error {
 	}
 
 	env := gatherBenchEnv()
+	env.Affinity = pin.Describe()
+	if topo != nil {
+		env.Topology = topo.Describe()
+	}
 	arch := cfg.Targets[host].Arch
 	stamp := time.Now().UTC().Format("2006-01-02T1504Z")
 
@@ -322,9 +387,19 @@ func (f interpFlag) String() string {
 	return strings.Join(parts, ",")
 }
 
+// A bare well-known name resolves to the artifact staticpy built; anything
+// else must say where it is.
 func (f interpFlag) Set(v string) error {
 	label, path, ok := strings.Cut(v, "=")
-	if !ok || label == "" || path == "" {
+	if !ok {
+		if !slices.Contains(knownInterps, v) {
+			return fmt.Errorf("want <label>=<path>, or one of %s; got %q",
+				strings.Join(knownInterps, ", "), v)
+		}
+		*f.v = append(*f.v, interpEntry{Label: v})
+		return nil
+	}
+	if label == "" || path == "" {
 		return fmt.Errorf("want <label>=<path>, got %q", v)
 	}
 	abs, err := filepath.Abs(path)
@@ -334,6 +409,9 @@ func (f interpFlag) Set(v string) error {
 	*f.v = append(*f.v, interpEntry{Label: label, Path: abs})
 	return nil
 }
+
+// Names that resolve without a path.
+var knownInterps = []string{"static", "reference", "system"}
 
 // cpuBenchOrder fixes the CPU table's row order. It must match the
 // registration order of BENCHMARKS in assets/files/bench/microbench.py -
@@ -365,10 +443,12 @@ type interpMeasurement struct {
 	SizeBytes int64
 	SizeLabel string
 	CPU       map[string]float64
+	// Whether the minimum can be trusted: (max-min)/min across repeats.
+	CPUSpread map[string]float64
 	Startup   map[string]startupStat
 }
 
-func measureInterpreter(path, scriptPath string, iters int) (*interpMeasurement, error) {
+func measureInterpreter(path, scriptPath string, iters, repeat int) (*interpMeasurement, error) {
 	version, err := runCapture(path, "-c", "import sys; print(sys.version.split()[0])")
 	if err != nil {
 		return nil, fmt.Errorf("version probe: %w", err)
@@ -377,9 +457,26 @@ func measureInterpreter(path, scriptPath string, iters int) (*interpMeasurement,
 	if err != nil {
 		return nil, fmt.Errorf("inspect binary: %w", err)
 	}
-	cpu, err := runMicrobench(path, scriptPath)
-	if err != nil {
-		return nil, fmt.Errorf("cpu micro-benchmarks: %w", err)
+	// Minimum per benchmark, not averaged: see bench.Reduce.
+	series := map[string][]float64{}
+	for range repeat {
+		one, err := runMicrobench(path, scriptPath)
+		if err != nil {
+			return nil, fmt.Errorf("cpu micro-benchmarks: %w", err)
+		}
+		for k, v := range one {
+			series[k] = append(series[k], v)
+		}
+	}
+	cpu := make(map[string]float64, len(series))
+	spread := make(map[string]float64, len(series))
+	for k, vs := range series {
+		agg, ok := bench.Reduce(vs)
+		if !ok {
+			return nil, fmt.Errorf("cpu micro-benchmarks: %s produced no usable samples", k)
+		}
+		cpu[k] = agg.Min
+		spread[k] = agg.Spread()
 	}
 	startup, err := measureStartup(path, iters)
 	if err != nil {
@@ -388,7 +485,7 @@ func measureInterpreter(path, scriptPath string, iters int) (*interpMeasurement,
 	return &interpMeasurement{
 		Path: path, Version: version, Linkage: linkage,
 		SizeBytes: sizeBytes, SizeLabel: sizeLabel,
-		CPU: cpu, Startup: startup,
+		CPU: cpu, CPUSpread: spread, Startup: startup,
 	}, nil
 }
 
@@ -533,6 +630,9 @@ type benchEnv struct {
 	CacheL2   string
 	CacheL3   string
 	Kernel    string
+	// A ratio is only meaningful alongside the placement it was measured under.
+	Topology string
+	Affinity string
 }
 
 func gatherBenchEnv() benchEnv {
@@ -600,7 +700,11 @@ func renderBenchReport(arch, stamp, baseline string, env benchEnv, order []strin
 	fmt.Fprintf(&b, "- cpu: %s\n", env.CPUModel)
 	fmt.Fprintf(&b, "- logical cores: %d\n", env.Cores)
 	fmt.Fprintf(&b, "- caches: L1d %s / L1i %s / L2 %s / L3 %s\n", env.CacheL1d, env.CacheL1i, env.CacheL2, env.CacheL3)
-	fmt.Fprintf(&b, "- kernel: %s\n\n", env.Kernel)
+	fmt.Fprintf(&b, "- kernel: %s\n", env.Kernel)
+	if env.Topology != "" {
+		fmt.Fprintf(&b, "- topology: %s\n", env.Topology)
+	}
+	fmt.Fprintf(&b, "- affinity: %s\n\n", env.Affinity)
 
 	writeRow := func(label string, get func(string) string) {
 		fmt.Fprintf(&b, "| %s |", label)
@@ -742,8 +846,66 @@ func benchJSONReport(arch, stamp, baseline string, env benchEnv, order []string,
 		"environment": map[string]any{
 			"container": env.Container, "cpu_model": env.CPUModel, "logical_cores": env.Cores,
 			"cache_l1d": env.CacheL1d, "cache_l1i": env.CacheL1i, "cache_l2": env.CacheL2, "cache_l3": env.CacheL3,
-			"kernel": env.Kernel,
+			"kernel": env.Kernel, "topology": env.Topology, "affinity": env.Affinity,
 		},
 		"interpreters": interps,
 	}
+}
+
+func applyPin(disabled bool) (bench.Pin, *bench.Topology) {
+	topo, err := bench.ReadTopology()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s cannot read cpu topology (%v); running unpinned\n", yellow("note:"), err)
+		return bench.Pin{}, nil
+	}
+	fmt.Fprintf(os.Stderr, "%s %s\n", bold("machine:"), topo.Describe())
+	if disabled {
+		if topo.Hybrid {
+			fmt.Fprintf(os.Stderr, "%s --no-pin on a hybrid cpu: runs that migrate between core classes are not comparable\n", yellow("warning:"))
+		}
+		return bench.Pin{}, topo
+	}
+	pin, err := topo.Apply()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s %v; running unpinned\n", yellow("note:"), err)
+		return pin, topo
+	}
+	fmt.Fprintf(os.Stderr, "%s %s\n", bold("affinity:"), pin.Describe())
+
+	busy, err := pin.CheckQuiet(300*time.Millisecond, 0.20)
+	if err == nil && len(busy) > 0 {
+		for _, b := range busy {
+			what := "the pinned cpu"
+			if b.CPU != pin.CPU {
+				what = "an SMT sibling of the pinned cpu"
+			}
+			fmt.Fprintf(os.Stderr, "%s cpu%d (%s) is %.0f%% busy; measurements taken now will be biased\n",
+				yellow("warning:"), b.CPU, what, b.Frac*100)
+		}
+	}
+	return pin, topo
+}
+
+func resolveKnownInterp(g *Global, label, abi, host string, build bool) (string, error) {
+	switch label {
+	case "static":
+		p, err := findStaticInterp(g, abi, build)
+		if err != nil {
+			return "", fmt.Errorf("--interp static: %w\nBuild it with `staticpy build`, or pass --build", err)
+		}
+		return p, nil
+	case "reference":
+		p := filepath.Join(g.Dist, "artifacts", "pyref_default_"+host, "rootfs", "bin", "python"+abi)
+		if !isExecutable(p) {
+			return "", fmt.Errorf("--interp reference: no reference interpreter at %s\nBuild it with `staticpy build --reference`", p)
+		}
+		return p, nil
+	case "system":
+		p, err := exec.LookPath("python3")
+		if err != nil {
+			return "", fmt.Errorf("--interp system: no python3 on PATH")
+		}
+		return p, nil
+	}
+	return "", fmt.Errorf("--interp %s: unknown name", label)
 }
