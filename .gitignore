@@ -16,6 +16,10 @@ tarballs
 venv
 *.tar.gz
 *.o
+# qemu-user drops a core dump into the cwd when a target binary faults, and
+# when that binary is being debugged by hand the cwd is the repo root.
+qemu_*.core
+
 compile_flags.txt
 __pycache__
 .perf_tmp
