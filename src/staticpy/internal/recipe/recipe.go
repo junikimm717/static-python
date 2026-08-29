@@ -34,7 +34,8 @@ import (
 // rebuilds the world.
 // 2: dependencies may publish a merged relocatable object, and the interpreter
 // links every object a sysroot carries.
-const Version = 2
+// 3: that object is localised before it is merged, not after.
+const Version = 3
 
 type PlanOptions struct {
 	Profile string

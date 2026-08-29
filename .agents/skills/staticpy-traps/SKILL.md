@@ -180,6 +180,24 @@ which is why it has stood. `ffi_call` and 64-bit returns are both fine, which is
 what narrows it. Fixed by a `target_patches` entry for `mips64-linux-musl`
 alone; full write-up and reproducer in `references/MIPS64_FFI_REPORT.md`.
 
+**Localise before `ld -r`, never after.** mimalloc ships as one relocatable
+object with everything but the allocator's entry points made local. Doing that
+with `objcopy --keep-global-symbols` *after* the relocatable link builds a
+mips64 interpreter that SIGBUSes before `main` ever runs: `R_MIPS_GOT16` and
+`CALL16` mean one thing for a global symbol and another for a local one, so
+rebinding afterwards leaves the linker reading those relocations under the wrong
+rule and the allocator dereferences garbage. Every other arch tolerates either
+order, which is what makes it easy to ship. objcopy each compiled object first,
+then merge. The cost is that `keep_globals` must cover any symbol the package's
+own sources reference across object files -- a loud failure at the final link.
+
+**Merge relocatable objects with the compiler driver, not `ld`.** A bare
+`ld -r` selects its own default emulation, which is not the toolchain's ABI
+everywhere: mips64 defaults to n32 and refuses the n64 input outright with
+"ABI is incompatible with that of the selected emulation". `gcc -r -nostdlib`
+passes the right `-m`, and its output is byte-identical to `ld -r` wherever
+`ld -r` worked at all.
+
 **zlib rejects `--host`.** Its configure is hand-rolled, errors on unknown
 options, and reads `$CHOST` instead. Anything that passes `--host` uniformly has
 to special-case it.

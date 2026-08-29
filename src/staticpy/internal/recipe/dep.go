@@ -546,8 +546,8 @@ func installedSummary(stage string) []string {
 	return out
 }
 
-// mergeObject collapses a package's objects into one relocatable object and
-// localises everything except KeepGlobals.
+// mergeObject localises everything except KeepGlobals and collapses a
+// package's objects into one relocatable object.
 //
 // Both halves matter for an allocator. A single object is what makes the
 // override unconditional: the linker pulls an archive member only to resolve
@@ -555,6 +555,10 @@ func installedSummary(stage string) []string {
 // that already satisfies every reference. Localising the rest keeps the
 // allocator's internals from colliding with the copy CPython bundles in
 // obmalloc.o.
+//
+// The order is load-bearing on mips64, and keep_globals must therefore cover
+// what a package references across its own objects; see the staticpy-traps
+// skill.
 func (j *depJob) mergeObject(ctx context.Context, r *core.Runner, te *toolenv, src, stage string, objs []string) error {
 	if len(j.pkg.KeepGlobals) == 0 {
 		return fmt.Errorf("recipe: package %s sets object but no keep_globals; every symbol would stay global and collide", j.name)
@@ -563,13 +567,6 @@ func (j *depJob) mergeObject(ctx context.Context, r *core.Runner, te *toolenv, s
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return err
 	}
-	merged := "staticpy-merged.o"
-	r.Step("merging " + j.name)
-	if err := r.Run(ctx, te.cmd(j.name+"-ld-r", src,
-		append([]string{te.tools.LD, "-r", "-o", merged}, objs...), nil)); err != nil {
-		return err
-	}
-
 	// A symbol file rather than a flag per name: the list is long enough that
 	// the argv would be the least readable thing in the log.
 	symFile := "staticpy-keep-globals.txt"
@@ -577,8 +574,22 @@ func (j *depJob) mergeObject(ctx context.Context, r *core.Runner, te *toolenv, s
 		[]byte(strings.Join(j.pkg.KeepGlobals, "\n")+"\n"), 0o644); err != nil {
 		return err
 	}
+
 	r.Step("localising " + j.name)
-	return r.Run(ctx, te.cmd(j.name+"-objcopy", src, []string{
-		te.tools.Objcopy, "--keep-global-symbols=" + symFile, merged, dst,
-	}, nil))
+	local := make([]string, 0, len(objs))
+	for _, o := range objs {
+		lo := "staticpy-local-" + o
+		if err := r.Run(ctx, te.cmd(j.name+"-objcopy", src, []string{
+			te.tools.Objcopy, "--keep-global-symbols=" + symFile, o, lo,
+		}, nil)); err != nil {
+			return err
+		}
+		local = append(local, lo)
+	}
+
+	r.Step("merging " + j.name)
+	// Through the compiler driver: a bare ld -r picks its own default
+	// emulation, which is not every toolchain's ABI.
+	return r.Run(ctx, te.cmd(j.name+"-merge", src,
+		append([]string{te.tools.CC, "-r", "-nostdlib", "-o", dst}, local...), nil))
 }
