@@ -42,7 +42,9 @@ LINEUP
   Nothing is benchmarked unless it is named. --interp is repeatable and takes
   either a well-known name or an explicit path:
     --interp static             the pynative artifact for this machine
-    --interp reference          the dynamic reference build
+    --interp reference          the dynamic glibc interpreter under dist/,
+                                built by dist/bench-scratch/build-dynamic-glibc.sh
+                                (staticpy cannot build one itself yet)
     --interp system             python3 from PATH
     --interp LABEL=/path/to/py  any other binary
   --baseline LABEL fixes the denominator of every ratio; without it the first
@@ -895,11 +897,19 @@ func resolveKnownInterp(g *Global, label, abi, host string, build bool) (string,
 		}
 		return p, nil
 	case "reference":
-		p := filepath.Join(g.Dist, "artifacts", "pyref_default_"+host, "rootfs", "bin", "python"+abi)
-		if !isExecutable(p) {
-			return "", fmt.Errorf("--interp reference: no reference interpreter at %s\nBuild it with `staticpy build --reference`", p)
+		// The pyref job family does not exist yet, so this name has nothing to
+		// resolve to. It stays listed because pointing at the hand-built tree
+		// is what everyone actually wants, and silently omitting the name sends
+		// people looking for a flag instead.
+		p := filepath.Join(g.Dist, "dynamic-glibc-build", "rootfs", "bin", "python"+abi)
+		if isExecutable(p) {
+			return p, nil
 		}
-		return p, nil
+		return "", fmt.Errorf("--interp reference: staticpy cannot build a dynamic interpreter yet.\n"+
+			"Build one with dist/bench-scratch/build-dynamic-glibc.sh, which links the same\n"+
+			"pinned dependency versions as the static build against the host glibc, or pass\n"+
+			"any interpreter explicitly with --interp LABEL=/path/to/python.\n"+
+			"Expected at %s", p)
 	case "system":
 		p, err := exec.LookPath("python3")
 		if err != nil {
