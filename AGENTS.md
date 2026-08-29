@@ -29,8 +29,9 @@ The interpreter is the artefact under
 `dist/artifacts/pynative_<profile>_<triple>/bin/python3.13` for a native build
 and `dist/artifacts/pycross_<profile>_<host>_<triple>/` for a cross one;
 `--pack` also writes a relocatable tarball to
-`dist/out/<profile>/<triple>/`. The stock dynamically-linked baseline used for
-benchmarking sits at `python-dynamic-${HOST_ARCH}-linux-musl/bin/python3.13`.
+`dist/out/<profile>/<triple>/`. The dynamically-linked baseline used for
+benchmarking is the `reference` profile's own artifact,
+`dist/artifacts/pyref_reference_<triple>/rootfs/bin/python3.13`.
 
 The dev container is still the easiest way to get a clean host, and its
 `/workspace` is a bind mount of the repo, but staticpy builds hermetically
@@ -50,7 +51,12 @@ docker compose up -d spython
 
 `docker compose exec` requires the service to be up. The compose file holds
 the container alive with a `while sleep` entrypoint, so it does not auto-exit
-between commands.
+between commands. Starting it also registers the qemu interpreters in
+binfmt_misc, which is why the service is privileged: that table belongs to the
+host kernel, so the registration is machine-wide and not container-scoped.
+staticpy still execs qemu by path and needs none of it -- what does is
+CPython's own suite, which re-execs the target interpreter to spawn its
+workers.
 
 ## Builds
 

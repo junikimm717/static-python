@@ -1,8 +1,8 @@
-# Python with Static + Cross + LTO
+# Python with Static + Cross + LTO (Rewritten in Go)
 
 Building a (mostly) functional cross-compiled python interpreter with zero
 shared libraries and full link-time optimization (-O3 -flto). We gain up to
-**20% geomean speedup** on benchmarks over dynamically linked python (!!)
+**20% geomean speedup** on pyperf over dynamically linked python on glibc (!!)
 
 **Warning:** this project is exclusively as a hobby. For basically all intents
 and purposes, you should use your standard dynamically linked python
@@ -43,36 +43,27 @@ docker compose up -d
 ./dev.sh
 ```
 
-Alternatively, make sure you have the following on your system. `./staticpy
-doctor` checks for them and says what is missing.
+That container also registers qemu in binfmt, which is why it runs privileged.
 
-- **go**, to build the builder itself
-- **perl** with **FindBin.pm** (openssl's Configure; apparently on some distros
-  you need to install perl-core?)
-- **patch**
-- **busybox**, which supplies `sh`/`awk`/`sed` to the hermetic builds. Without
-  it the host's own tools get used and the result is not reproducible elsewhere.
-- **qemu-user** for whichever target you want to verify
-- cURL and tar
+Otherwise, `./staticpy doctor` says what your machine is missing. It is a short
+list -- go, perl, patch, busybox, cURL, tar, and a qemu-user for whichever
+target you want to verify.
 
 ## The build system
 
-`src/staticpy` is a Go build system. Versions, checksums, configure flags and
-per-target quirks live in `config/*.toml`, and underneath is a
-content-addressed job graph: every job's key is hashed over its sources,
-patches, flags, triples and its dependencies' keys, so rebuilding with identical
-inputs is a no-op and changing one configure flag rebuilds exactly what depends
-on it.
-
-`./staticpy` is a shim around that binary. It rebuilds the binary whenever the
-sources are newer, and fetches the toolchain a given build needs. staticpy
-itself never fetches a compiler -- it is handed one, and fails loudly when one
-is missing rather than falling back to whatever the host happens to have.
+`src/staticpy` is a Go build system with a content-addressed job graph:
+rebuilding with identical inputs is a no-op, and changing one configure flag
+rebuilds exactly what depends on it. `./staticpy` is a shim around it that
+rebuilds the binary when the sources move and fetches the toolchain a build
+needs.
 
 ```sh
 ./staticpy doctor   # what this machine has and is missing
 ./staticpy help     # or `help <command>` for the details
 ```
+
+`./staticpy help` is the real documentation and is kept honest;
+[`AGENTS.md`](AGENTS.md) has the design, the toolchain story and the workflows.
 
 ## Building Native
 
@@ -85,6 +76,10 @@ is missing rather than falling back to whatever the host happens to have.
 
 Add `--pack` and the result is also written as a relocatable tarball under
 `dist/out/<profile>/<triple>/`, next to its sha256.
+
+The compilers come from [gccfactory](https://github.com/junikimm717/gccfactory),
+which builds the whole host x target matrix of GCC + musl and publishes one
+relocatable tarball per cell; the shim fetches the one it needs.
 
 ## Cross Compiling
 
@@ -100,25 +95,9 @@ Cross-compiling is now officially supported from x86_64 and aarch64! This
 took soooo long to do, and it doesn't seem like that I will be able to support
 all the architectures I initially wanted to :/
 
-A cross build needs a static host interpreter of the same version to freeze
-bytecode against -- never the host's shipped python, which would not agree
-exactly with the one being built. staticpy builds that itself as a dependency,
-so you don't have to remember to do it first.
-
-`--verify` runs the built interpreter under qemu before it is allowed to become
-an artifact. `smoke` is import probes only, `core` is a curated subset of
-CPython's own test suite covering the language core plus every extension module
-staticpy links in by hand, and `full` is the whole suite.
-
-The toolchains themselves are not built here. They come from
-[gccfactory](https://github.com/junikimm717/gccfactory), which builds the whole
-host x target matrix of GCC + musl toolchains and publishes one relocatable
-tarball per cell to
-[dev.mit.junic.kim](https://dev.mit.junic.kim/cross/); the `./staticpy` shim
-fetches the one it needs into `dist/toolchains/`. Every binary in them is
-static-musl, so a tarball drops onto any Linux rootfs -- glibc, near-empty,
-whatever -- and just works. `test-portability/` proves exactly that, in a Debian
-image with no compiler in it.
+`--verify` runs the thing under qemu before it is allowed to become an
+artifact: `smoke` is import probes, `core` is a curated subset of CPython's
+suite, `full` is all of it.
 
 Supported architectures are one row each in `config/targets.toml`;
 `./staticpy print targets-all` lists them. (I assume if you are actually trying
@@ -126,22 +105,12 @@ to run this project, you for sure know what you are doing 😇)
 
 ## Benchmarking
 
-`--profile reference` builds the dynamic baseline -- a stock `--enable-shared`
-Python of the same pinned version, compiled by this machine's own gcc against
-shared copies of the same pinned dependencies. Same source at the same version,
-so nothing but linkage and libc can explain a gap:
-
 ```sh
+# a stock --enable-shared build of the same pinned source, by this machine's gcc
 ./staticpy build --profile reference
 ./staticpy bench --interp static --interp reference --baseline reference
 ```
 
-`./staticpy bench` runs pyperformance -- what speed.python.org publishes
-against -- installing it into a venv per interpreter, and writes a markdown
-report plus the unaggregated pyperf JSON to `dist/bench/`. The run pins to one
-core and interleaves the arms per benchmark, so machine drift cancels in the
-ratio rather than landing on whichever arm ran later. A benchmark whose
-dependencies will not install, or that ships a C extension the static
-interpreter cannot dlopen, is named in `skipped.json` rather than quietly
-narrowing the set the geometric mean is taken over. `--suite micro` runs a
-small stdlib-only loop set instead, which needs no network.
+That runs pyperformance -- what speed.python.org publishes against -- and
+writes a markdown report plus the raw pyperf JSON to `dist/bench/`.
+`--suite micro` runs a stdlib-only loop set instead, which needs no network.
