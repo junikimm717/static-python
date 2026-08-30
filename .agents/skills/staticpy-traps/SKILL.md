@@ -22,11 +22,6 @@ them at the point where they bite:
   half of the return slot for narrow integers on big-endian mips n32/n64.
   Root-caused to `src/mips/n32.S`, fixed by a target-scoped patch, unreported
   upstream.
-- **`references/PORTABILITY_PROOF.md`** — the end-to-end proof that a toolchain
-  tarball drops onto a foreign glibc rootfs with no compiler on it and still
-  builds through the LTO plugin path. Written against the older wrapper-based
-  toolchain, so read its mechanism sections as history; the property still
-  holds and `test-portability/` still checks it.
 
 **When you corner a failure worth documenting, write it up here.** A paragraph
 is enough for most of them: add an entry to the matching section below,
@@ -310,7 +305,6 @@ near-empty, whatever — and compiles through `-flto -fuse-linker-plugin
 -fno-fat-lto-objects`. Both halves come from gccfactory: every binary is
 static-musl, and the LTO plugin is compiled into `libbfd` so `ld` resolves
 `-plugin liblto_plugin.so` to its built-in copy rather than opening a file that
-does not exist. `test-portability/proof.sh` checks it in a Debian image with no
-compiler in it, negative control included; re-run it after every toolchain
-re-publish. `references/PORTABILITY_PROOF.md` has the expected output and the
-falsification controls.
+does not exist. Proving that belongs in gccfactory, where the tarballs are
+built; a failure surfaces here as a link that cannot find `liblto_plugin.so`,
+or a driver that will not start at all.

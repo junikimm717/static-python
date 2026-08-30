@@ -107,46 +107,6 @@ If you absolutely must use the host system, you need all the dependencies
 specified in the Dockerfile. Furthermore, you must check that the entire
 filesystem is owned by you before proceeding.
 
-## Portability check
-
-A toolchain tarball has to drop onto **any** Linux rootfs -- glibc,
-near-empty, whatever -- and just work, including the
-`-flto -fuse-linker-plugin -fno-fat-lto-objects` path. Both halves of that
-come from gccfactory: every binary is static-musl (nothing to dlopen, no
-loader to find) and GCC's LTO plugin is compiled into `libbfd`, so `ld`
-resolves a `-plugin liblto_plugin.so` argument to its built-in copy rather
-than opening a file that does not exist. The end-to-end proof lives in
-`test-portability/`:
-
-```sh
-./test-portability/proof.sh
-# tee's full output to build-logs/portability-alien.log
-```
-
-That builds a `debian:stable-slim` "alien" image with no compiler in it
-(only `make`/`file`/`binutils`), extracts the host-native toolchain tarball
-(`<uname -m>-linux-musl-native.tgz`) into `/opt`, checks no driver binary
-has a `PT_INTERP` and that the unprefixed tool names (`cc`, `ld`, `make`,
-...) are all present, then compiles + runs three nontrivial programs (C,
-C++ with libstdc++, and a two-TU LTO build through a static archive),
-including a negative control that links the slim LTO objects *without* the
-plugin to confirm the link actually fails. Re-run after a toolchain
-re-publish. `proof.sh` packs the tarball from
-`dist/toolchains/<arch>-linux-musl-native/` when missing; or regenerate
-explicitly with:
-
-```sh
-H=$(uname -m) && \
-  tar -czf test-portability/${H}-linux-musl-native.tgz \
-    -C dist/toolchains ${H}-linux-musl-native
-```
-
-Full writeup, including expected output, falsification controls, and
-"where this would break", is in
-`.agents/skills/staticpy-traps/references/PORTABILITY_PROOF.md` -- written
-against the older wrapper-based toolchain, so read its mechanism sections
-as history.
-
 ## Tarball hashes and preflight downloads
 
 Every external tarball is sha256-pinned in `config/sources.toml`, in the same
@@ -285,8 +245,6 @@ the end.
   underflow, and the two safety nets that should have caught it.
 - `references/MIPS64_FFI_REPORT.md` -- libffi closures returning the high
   half of the return slot for narrow integers on big-endian mips.
-- `references/PORTABILITY_PROOF.md` -- a toolchain tarball on a foreign
-  glibc rootfs.
 
 Either way, link it from the relevant code with a one-line comment, *not*
 by inlining the explanation into the source. A long finding left in a
@@ -321,5 +279,5 @@ Don't commit unless the user explicitly asks. Even then:
 | task | done when |
 |---|---|
 | version bump | `config/sources.toml` edited with the new version and sha256, x86_64 static build green, `staticpy verify --level core` clean |
-| toolchain change (re-publish from gccfactory) | the shim fetches it into `dist/toolchains/`, `./test-portability/proof.sh` is green, x86_64 static build green, sanity imports clean, and the banner from the new binary mentions the expected gcc version (`python3 -c 'import sys; print(sys.version)'`) |
+| toolchain change (re-publish from gccfactory) | the shim fetches it into `dist/toolchains/`, x86_64 static build green, sanity imports clean, and the banner from the new binary mentions the expected gcc version (`python3 -c 'import sys; print(sys.version)'`) |
 | cross-arch interpreter fan-out | `staticpy status --target all` reports 0 stale and 0 missing, every target has a verify artifact with `failed=0`, every packed tarball's sha256 checks out, and at least one non-x86_64 arch benchmarked |
