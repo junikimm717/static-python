@@ -59,9 +59,8 @@ type Global struct {
 	cfg        *config.Config
 }
 
-// noteGiven records which flags a parse actually saw, so a wizard can skip the
-// questions the command line already answered. Global flags may appear before
-// the subcommand, so Main records its pre-parse too.
+// A wizard can skip the questions the command line already answered. Global
+// flags may appear before the subcommand, so Main records its pre-parse too.
 func (g *Global) noteGiven(fs *flag.FlagSet) {
 	if g.givenFlags == nil {
 		g.givenFlags = map[string]bool{}
@@ -567,10 +566,8 @@ func defaultParallelism(workers, jobs int) (int, int) {
 const linkPeakGB = 8
 
 // memWorkers caps concurrency by RAM, returning 0 when it cannot be read.
-// Sizing by cores alone is what let 24 cores ask for four concurrent links on a
-// 30GB machine, where ~24GB of assembler and lto1 drove the OOM killer into the
-// desktop instead. MemTotal rather than MemAvailable: the cap is a property of
-// the machine, not of whatever happens to be open when the build starts.
+// MemTotal rather than MemAvailable: the cap is a property of the machine, not
+// of whatever happens to be open when the build starts.
 func memWorkers() int {
 	b, err := os.ReadFile("/proc/meminfo")
 	if err != nil {

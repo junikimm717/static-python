@@ -209,8 +209,7 @@ func (r *Runner) run(ctx context.Context, c Cmd, capture bool) (string, error) {
 	// A grandchild that left the group -- the suite double-forks, and qemu's
 	// children come back reparented to init -- survives that kill still holding
 	// the write end of these pipes, and Wait blocks on the copy goroutine
-	// forever. Three orphaned qemu-riscv32 processes hung a cancelled verify
-	// indefinitely at load 0.11. WaitDelay closes the pipes and gives up.
+	// forever. WaitDelay closes the pipes and gives up.
 	cmd.WaitDelay = 10 * time.Second
 
 	r.log.Debug("exec", "step", step, "cmd", ShellQuote(c.Args), "dir", c.Dir, "log", logPath)
@@ -481,12 +480,9 @@ func (l *lineWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// RecordRun files the same evidence Run leaves for a command the Runner did
-// not execute itself: verification runs the target under an emulator with
-// stdout and stderr kept apart and a non-zero exit treated as data rather than
-// a build failure, neither of which Run can express. Without it a verify job
-// left nothing behind but its step markers, so a suite failure was
-// undiagnosable the moment the process exited.
+// RecordRun exists because verification runs the target under an emulator
+// with stdout and stderr kept apart and a non-zero exit treated as data
+// rather than a build failure, neither of which Run can express.
 func (r *Runner) RecordRun(name, dir string, argv, explicit []string, stdout, stderr string, code int, start time.Time, dur time.Duration) string {
 	if len(argv) == 0 {
 		return ""

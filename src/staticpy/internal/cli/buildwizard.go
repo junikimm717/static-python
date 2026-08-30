@@ -9,17 +9,16 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/tui"
 )
 
-// buildOpts are the build flags the wizard may fill in; each points at the
-// variable the flag would have set.
+// Each field points at the variable the flag would have set.
 type buildOpts struct {
 	verify *string
 	pack   *bool
 	bundle *string
 }
 
-// runBuildWizard walks the choices `build` was not given. It runs only when
-// --target is absent, so the printed equivalent command - which always pins
-// --target - is also what skips the wizard entirely.
+// The wizard runs only when --target is absent, so the printed equivalent
+// command - which always pins --target - is also what skips the wizard
+// entirely.
 func runBuildWizard(g *Global, o buildOpts) error {
 	cfg, err := g.load()
 	if err != nil {
@@ -109,9 +108,8 @@ func buildStages(g *Global, cfg *config.Config, host string, o buildOpts) ([]tui
 	return stages, nil
 }
 
-// targetMenu offers every configured triple, the unbuildable ones visible but
-// disabled: a target absent from the menu reads as unsupported, when all it is
-// missing is a toolchain the shim fetches the moment --target names it.
+// A target absent from the menu reads as unsupported, when all it is missing
+// is a toolchain the shim fetches the moment --target names it.
 func targetMenu(g *Global, cfg *config.Config, host string) (tui.Menu, error) {
 	qemu := g.qemuMap(cfg)
 	m := tui.Menu{

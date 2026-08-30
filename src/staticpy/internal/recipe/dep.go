@@ -546,15 +546,13 @@ func installedSummary(stage string) []string {
 	return out
 }
 
-// mergeObject localises everything except KeepGlobals and collapses a
-// package's objects into one relocatable object.
-//
-// Both halves matter for an allocator. A single object is what makes the
-// override unconditional: the linker pulls an archive member only to resolve
-// an undefined symbol, and musl's malloc is a weak definition inside libc.a
-// that already satisfies every reference. Localising the rest keeps the
-// allocator's internals from colliding with the copy CPython bundles in
-// obmalloc.o.
+// Both localising everything except KeepGlobals and collapsing a package's
+// objects into one relocatable object matter for an allocator. A single
+// object is what makes the override unconditional: the linker pulls an
+// archive member only to resolve an undefined symbol, and musl's malloc is a
+// weak definition inside libc.a that already satisfies every reference.
+// Localising the rest keeps the allocator's internals from colliding with the
+// copy CPython bundles in obmalloc.o.
 //
 // The order is load-bearing on mips64, and keep_globals must therefore cover
 // what a package references across its own objects; see the staticpy-traps

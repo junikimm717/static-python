@@ -208,9 +208,8 @@ func (l *Launcher) environ() []string {
 	return append(os.Environ(), l.overlay()...)
 }
 
-// overlay is the launcher's own variables, sorted: what a reader needs to
-// reproduce the run by hand, as opposed to whatever the build machine happened
-// to export.
+// Output is sorted so a reader can reproduce the run by hand, rather than
+// guessing at whatever the build machine happened to export.
 func (l *Launcher) overlay() []string {
 	keys := make([]string, 0, len(l.Env))
 	for k := range l.Env {

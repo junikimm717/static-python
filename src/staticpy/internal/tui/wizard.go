@@ -6,9 +6,9 @@ import (
 	"strings"
 )
 
-// Stage is one decision in a multi-step wizard. A command assembles a slice of
-// these - one per flag the wizard can stand in for - so adding a question is
-// adding a stage, not editing a prompt sequence.
+// A command assembles a slice of Stage values - one per flag the wizard can
+// stand in for - so adding a question is adding a stage, not editing a prompt
+// sequence.
 type Stage struct {
 	// Given marks the choice as already made on the command line; the stage
 	// is skipped without a word.

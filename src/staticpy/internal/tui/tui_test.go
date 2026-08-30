@@ -48,9 +48,8 @@ func TestColumnHeaderAlignsWithOptionRows(t *testing.T) {
 	}
 }
 
-// A multi-select row carries a checked/unchecked mark between the selector and
-// the text, so its header needs the wider indent -- the single-select one left
-// every column label two cells short of its data.
+// The single-select indent left every column label two cells short of its
+// data.
 func TestMultiSelectHeaderIndentCoversTheCheckMark(t *testing.T) {
 	th := huh.ThemeCharm()
 	want := lipgloss.Width(th.Focused.MultiSelectSelector.String()) +
