@@ -24,7 +24,7 @@ import (
 // packVersion is the archive layout generation: bump it when the entry order,
 // the top-level directory or the header normalisation changes, since none of
 // that shows up in the interpreter's key.
-const packVersion = "1"
+const packVersion = "2"
 
 // tarEpoch is the timestamp every entry carries. Unix zero rather than the Go
 // zero time: a pre-1970 mtime cannot be written as a plain ustar field, so it
@@ -162,6 +162,9 @@ func tarEntries(root string) ([]string, error) {
 		}
 		if rel == "." || rel == core.ManifestName {
 			return nil
+		}
+		if d.IsDir() && d.Name() == "__pycache__" {
+			return fs.SkipDir
 		}
 		out = append(out, filepath.ToSlash(rel))
 		return nil
