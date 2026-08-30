@@ -1,0 +1,149 @@
+# One row per triple. Adding an architecture is a row here plus
+# src/staticpy/internal/assets/files/pyconfig/<triple>-patches.h.
+#
+# libatomic covers `i[3-6]86|arm[^6]?|mips[^6]?|microblaze|sh|m68k|or1k|
+# riscv(32|64)`: those targets lack inline 64-bit atomics, so CPython's SYSLIBS
+# needs -latomic or the link fails on _Py_atomic_*.
+#
+# uint128 is read off the pyconfig patch headers: a target whose header says
+# `#undef HAVE_GCC_UINT128_T` also has to lose -DHAVE_UINT128_T=1 from the
+# generated Makefile, and (being 32-bit here) swaps -DCONFIG_64=1 for
+# -DCONFIG_32=1.
+#
+# maps.openssl is OpenSSL's own platform name for the target. They do not follow
+# one rule -- some are linux-<arch>, some linux64-<arch>.
+
+[target.x86_64-linux-musl]
+triple = "x86_64-linux-musl"
+arch = "x86_64"
+abi = "musl"
+bits = 64
+libatomic = false
+uint128 = true
+qemu = "qemu-x86_64"
+status = "proven"
+maps.openssl = "linux-x86_64"
+
+[target.aarch64-linux-musl]
+triple = "aarch64-linux-musl"
+arch = "aarch64"
+abi = "musl"
+bits = 64
+libatomic = false
+uint128 = true
+qemu = "qemu-aarch64"
+status = "proven"
+maps.openssl = "linux-aarch64"
+
+[target.riscv64-linux-musl]
+triple = "riscv64-linux-musl"
+arch = "riscv64"
+abi = "musl"
+bits = 64
+libatomic = true
+uint128 = true
+qemu = "qemu-riscv64"
+status = "experimental"
+maps.openssl = "linux64-riscv64"
+# GCC's riscv_can_inline_p compares x_target_flags wholesale before it honours
+# always_inline, and -fPIC flips MASK_EXPLICIT_RELOCS via the code model -- so
+# libmpdec's PIC objects refuse to inline into _decimal.c's non-PIC ones under
+# LTO. Nothing here is ever dlopened, so dropping CCSHARED removes the mismatch.
+make_vars = ["CCSHARED="]
+
+[target.riscv32-linux-musl]
+triple = "riscv32-linux-musl"
+arch = "riscv32"
+abi = "musl"
+bits = 32
+libatomic = true
+uint128 = false
+qemu = "qemu-riscv32"
+status = "experimental"
+# OpenSSL ships no linux64-riscv32; linux32-riscv32 is the only config.
+maps.openssl = "linux32-riscv32"
+# GCC's riscv_can_inline_p compares x_target_flags wholesale before it honours
+# always_inline, and -fPIC flips MASK_EXPLICIT_RELOCS via the code model -- so
+# libmpdec's PIC objects refuse to inline into _decimal.c's non-PIC ones under
+# LTO. Nothing here is ever dlopened, so dropping CCSHARED removes the mismatch.
+make_vars = ["CCSHARED="]
+
+[target.i386-linux-musl]
+triple = "i386-linux-musl"
+arch = "i386"
+abi = "musl"
+bits = 32
+libatomic = true
+uint128 = false
+qemu = "qemu-i386"
+status = "experimental"
+# Not linux-x32: that is the x86_64 ILP32 ABI and forces -mx32, which a
+# genuinely 32-bit gcc cannot do. Without an explicit name OpenSSL guesses it.
+maps.openssl = "linux-x86"
+
+[target.arm-linux-musleabihf]
+triple = "arm-linux-musleabihf"
+arch = "arm"
+abi = "musleabihf"
+bits = 32
+libatomic = true
+uint128 = false
+qemu = "qemu-arm"
+status = "experimental"
+# armv4 is OpenSSL's generic 32-bit ARM config; the toolchain's -march wins.
+maps.openssl = "linux-armv4"
+
+[target.arm-linux-musleabi]
+triple = "arm-linux-musleabi"
+arch = "arm"
+abi = "musleabi"
+bits = 32
+libatomic = true
+uint128 = false
+qemu = "qemu-arm"
+status = "experimental"
+maps.openssl = "linux-armv4"
+
+[target.mips64-linux-musl]
+triple = "mips64-linux-musl"
+arch = "mips64"
+abi = "musl"
+bits = 64
+libatomic = true
+uint128 = true
+qemu = "qemu-mips64"
+status = "experimental"
+maps.openssl = "linux64-mips64"
+
+[target.powerpc64le-linux-musl]
+triple = "powerpc64le-linux-musl"
+arch = "powerpc64le"
+abi = "musl"
+bits = 64
+libatomic = false
+uint128 = true
+qemu = "qemu-ppc64le"
+status = "experimental"
+maps.openssl = "linux-ppc64le"
+
+[target.powerpc64-linux-musl]
+triple = "powerpc64-linux-musl"
+arch = "powerpc64"
+abi = "musl"
+bits = 64
+libatomic = false
+uint128 = true
+qemu = "qemu-ppc64"
+status = "experimental"
+maps.openssl = "linux-ppc64"
+
+[target.s390x-linux-musl]
+triple = "s390x-linux-musl"
+arch = "s390x"
+abi = "musl"
+bits = 64
+libatomic = false
+uint128 = true
+qemu = "qemu-s390x"
+status = "experimental"
+maps.openssl = "linux64-s390x"

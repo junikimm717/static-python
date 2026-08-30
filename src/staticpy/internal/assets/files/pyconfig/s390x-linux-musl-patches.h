@@ -1,0 +1,7 @@
+// endians solved!
+#define WORDS_BIGENDIAN 1
+#undef DOUBLE_IS_LITTLE_ENDIAN_IEEE754
+#define DOUBLE_IS_BIG_ENDIAN_IEEE754 1
+
+/* Alignment */
+#define HAVE_ALIGNED_REQUIRED 1

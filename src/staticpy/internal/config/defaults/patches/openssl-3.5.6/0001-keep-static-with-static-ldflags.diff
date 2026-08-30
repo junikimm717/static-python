@@ -1,0 +1,15 @@
+Configure disables static/pic/threads the moment it sees -static in LDFLAGS,
+which is exactly what a static build passes. Drop the check.
+
+--- a/Configure
++++ b/Configure
+@@ -1510,9 +1510,6 @@
+         unless file_name_is_absolute($config{prefix});
+ }
+ 
+-if (grep { $_ =~ /(?:^|\s)-static(?:\s|$)/ } @{$config{LDFLAGS}}) {
+-    disable('static', 'pic', 'threads');
+-}
+ 
+ # Allow overriding the build file name
+ $config{build_file} = env('BUILDFILE') || $target{build_file} || "Makefile";

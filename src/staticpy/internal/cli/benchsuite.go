@@ -1,0 +1,250 @@
+package cli
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"time"
+
+	"github.com/junikimm717/static-python/src/staticpy/internal/bench"
+	"github.com/junikimm717/static-python/src/staticpy/internal/core"
+)
+
+// runPyperfSuite drives the pyperformance suite across the selected arms and
+// writes a session directory that can be re-read long after the run.
+func runPyperfSuite(e *core.Env, order []string, paths map[string]string,
+	baseline, suiteRoot, pyperfHint string, useVenv bool, noPin bool, cpu int, timeout time.Duration, offline bool) error {
+
+	var skipped []string
+	pin, topo, err := choosePin(noPin, cpu)
+	if err != nil {
+		return err
+	}
+
+	sess, err := bench.NewSession(e.Dist, runtime.GOARCH, time.Now())
+	if err != nil {
+		return err
+	}
+	defer sess.Close()
+
+	runner, err := core.NewRunner(e, "bench:"+sess.Stamp)
+	if err != nil {
+		return err
+	}
+	defer runner.Close()
+
+	ctx := context.Background()
+	var ids []bench.Identity
+	venvs := map[string]*bench.Venv{}
+	arms := make([]bench.Arm, 0, len(order))
+	for _, label := range order {
+		id, err := bench.Identify(label, paths[label])
+		if err != nil {
+			return fmt.Errorf("%s: %w", label, err)
+		}
+		ids = append(ids, id)
+
+		a := bench.Arm{Label: label, Python: paths[label]}
+		if useVenv {
+			runner.Step("venv-" + label)
+			// A copied pyperf tree is now the override, not the requirement:
+			// installing pyperformance brings its own, pinned to the version
+			// its benchmarks were written against.
+			var pyperfSrc string
+			if pyperfHint != "" {
+				if pyperfSrc, err = bench.FindPyperf(pyperfHint); err != nil {
+					return err
+				}
+			}
+			v, err := bench.MakeVenv(ctx, runner, label, paths[label],
+				filepath.Join(sess.Dir, "venv"), pyperfSrc)
+			if err != nil {
+				return err
+			}
+			a.Python, a.Env = v.Python, v.Env()
+			venvs[label] = v
+		}
+		arms = append(arms, a)
+	}
+
+	// pyperformance is the default suite, so with no --pyperformance directory
+	// it is installed rather than demanded. The benchmarks are data files, so
+	// one arm's copy serves every arm.
+	if suiteRoot == "" {
+		if !useVenv {
+			return fmt.Errorf("--no-venv leaves nowhere to install pyperformance.\n" +
+				"Pass --pyperformance DIR to point at a copy on disk, or drop --no-venv")
+		}
+		runner.Step("install pyperformance")
+		all := make([]*bench.Venv, 0, len(order))
+		for _, label := range order {
+			all = append(all, venvs[label])
+		}
+		if suiteRoot, err = bench.Bootstrap(ctx, runner, all, offline); err != nil {
+			return err
+		}
+	}
+	suite, discovered, err := bench.DiscoverSuite(suiteRoot)
+	if err != nil {
+		return err
+	}
+	skipped = append(skipped, discovered...)
+
+	// Each benchmark's dependencies go into every arm, before anything is
+	// measured. A benchmark whose requirement will not install is dropped here
+	// with the reason, rather than failing mid-run and leaving a geomean over
+	// a set nobody chose.
+	if useVenv {
+		runner.Step("requirements")
+		runnable := suite.Cases[:0:0]
+		for _, c := range suite.Cases {
+			failed := ""
+			for _, label := range order {
+				if err := bench.InstallRequirements(ctx, runner, venvs[label], c); err != nil {
+					failed = label
+					break
+				}
+			}
+			if failed == "" {
+				runnable = append(runnable, c)
+				continue
+			}
+			skipped = append(skipped, c.Label()+" (dependencies would not install for "+failed+")")
+		}
+		suite.Cases = runnable
+		if len(suite.Cases) == 0 {
+			return fmt.Errorf("every benchmark's dependencies failed to install; see skipped.json")
+		}
+		// After the requirements, never before: --help executes the script, so
+		// a benchmark that imports its dependency at module level cannot answer
+		// until that dependency is installed.
+		runner.Step("detect sub-benchmarks")
+		bench.DetectSubBenchmarks(ctx, runner, venvs[order[0]].Python, suite)
+	}
+
+	// Written before the measurements and again after them. The early copy is
+	// what a run killed halfway still leaves behind; the late one is the only
+	// place a runtime failure can appear, since it is not known until then.
+	writeAccounting := func() error {
+		if err := sess.WriteJSON("manifest.json", map[string]any{
+			"stamp": sess.Stamp, "baseline": baseline, "suite_root": suiteRoot,
+			"venv": useVenv, "interpreters": ids, "skipped": skipped,
+		}); err != nil {
+			return err
+		}
+		if err := sess.WriteJSON("env.json", map[string]any{
+			"topology": describeTopo(topo), "affinity": pin.Describe(),
+			"benchmarks_found": len(suite.Cases), "benchmarks_skipped": len(skipped),
+			"machine": gatherBenchEnv(),
+		}); err != nil {
+			return err
+		}
+		// Always written, empty list included: an absent skipped.json would
+		// otherwise read the same as a run that skipped nothing.
+		return sess.WriteJSON("skipped.json", skipped)
+	}
+	if err := writeAccounting(); err != nil {
+		return err
+	}
+
+	runner.Step("measure")
+	fmt.Fprintf(os.Stderr, "%s %d benchmarks x %d interpreters, interleaved\n",
+		bold("running:"), len(suite.Cases), len(arms))
+	res, failures, err := bench.RunSuite(ctx, runner, sess, pin, arms, suite.Cases, timeout)
+	if err != nil {
+		return err
+	}
+	skipped = append(skipped, summarizeFailures(failures)...)
+	if err := writeAccounting(); err != nil {
+		return err
+	}
+	if len(skipped) > 0 {
+		fmt.Fprintf(os.Stderr, "%s %d benchmarks missing from the table; see skipped.json\n",
+			yellow("note:"), len(skipped))
+	}
+
+	rows, geo := bench.Compare(res, baseline, order)
+	if err := sess.WriteJSON("report.json", map[string]any{
+		"baseline": baseline, "rows": rows, "geomean_vs_baseline": geo,
+	}); err != nil {
+		return err
+	}
+	md := renderSuiteReport(baseline, order, rows, geo, pin, topo)
+	if err := os.WriteFile(filepath.Join(sess.Dir, "report.md"), []byte(md), 0o644); err != nil {
+		return err
+	}
+	fmt.Print(md)
+	fmt.Fprintf(os.Stderr, "\n%s %s\n", bold("session:"), sess.Dir)
+	return nil
+}
+
+// One line per benchmark, naming every arm that lost it. Which arms failed is
+// the part that matters: all of them is a suite problem, one of them is a
+// difference between the interpreters under test.
+func summarizeFailures(fs []bench.Failure) []string {
+	var order []string
+	arms := map[string][]string{}
+	reason := map[string]string{}
+	for _, f := range fs {
+		if _, seen := arms[f.Benchmark]; !seen {
+			order = append(order, f.Benchmark)
+		}
+		arms[f.Benchmark] = append(arms[f.Benchmark], f.Arm)
+		if reason[f.Benchmark] == "" {
+			reason[f.Benchmark] = f.Reason
+		}
+	}
+	out := make([]string, 0, len(order))
+	for _, b := range order {
+		out = append(out, fmt.Sprintf("%s (failed at runtime on %s: %s)",
+			b, strings.Join(arms[b], ", "), reason[b]))
+	}
+	return out
+}
+
+func describeTopo(t *bench.Topology) string {
+	if t == nil {
+		return "unknown"
+	}
+	return t.Describe()
+}
+
+func renderSuiteReport(baseline string, order []string, rows []bench.Row,
+	geo map[string]float64, pin bench.Pin, topo *bench.Topology) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "# pyperformance comparison\n\n")
+	fmt.Fprintf(&b, "- baseline: %s\n- %s\n- %s\n- rows: %d\n\n",
+		baseline, describeTopo(topo), pin.Describe(), len(rows))
+
+	fmt.Fprintf(&b, "| benchmark |")
+	for _, a := range order {
+		fmt.Fprintf(&b, " %s |", a)
+	}
+	fmt.Fprintf(&b, "\n|---|")
+	for range order {
+		fmt.Fprintf(&b, "---:|")
+	}
+	b.WriteString("\n")
+	for _, r := range rows {
+		fmt.Fprintf(&b, "| %s |", r.Benchmark)
+		for _, a := range order {
+			if v, ok := r.Ratio[a]; ok {
+				fmt.Fprintf(&b, " %.2fx |", v)
+			} else {
+				b.WriteString(" - |")
+			}
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString("\nGeomean vs baseline (>1 is faster):\n\n")
+	for _, a := range order {
+		if a == baseline {
+			continue
+		}
+		fmt.Fprintf(&b, "- %s: %.3fx\n", a, geo[a])
+	}
+	return b.String()
+}

@@ -6,5 +6,12 @@ services:
       dockerfile: Dockerfile
     volumes:
       - .:/workspace
-    entrypoint: /bin/sh -c "trap 'exit 0' SIGTERM; while :; do sleep 1; done"
+    # Registering qemu in binfmt_misc means mounting it under /proc/sys, which
+    # docker keeps read-only unless the container is privileged. The table is
+    # the host kernel's, so this is registering for the machine, not the
+    # container -- drop both lines if that is not a trade you want. On a host
+    # that already has an arch registered, `docker compose logs` shows a red
+    # "Failed to register" for it; that one means "already there".
+    privileged: true
+    entrypoint: /bin/sh -c "binfmt start; trap 'exit 0' SIGTERM; while :; do sleep 1; done"
     tty: true

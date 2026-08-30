@@ -8,25 +8,36 @@ reference -- what to run, where to write, what to leave behind.
 
 A from-source static Python toolchain. Version pins:
 
-- Top-level `Makefile` pins `OPENSSL`, `LIBFFI`, `LIBLZMA`, `ZLIB`,
-  `READLINE`, `NCURSES`, `SQLITE`, `BZIP2`, `UTILLINUX`, and `PYTHON`.
+- `config/sources.toml` pins every upstream tarball -- version, URL and
+  sha256 in one place. `staticpy print version:<name>` reads one back.
 - The toolchain is **not** built here. gcc, binutils, musl, gmp, mpc, mpfr
   and the kernel headers are pinned in
   [gccfactory](https://github.com/junikimm717/gccfactory), which publishes
   one relocatable tarball per (host, target) cell to dev.mit.junic.kim.
   A compiler version bump is a gccfactory change plus a re-upload, not a
   change here.
-- Supported targets: `supported.txt`.
+- Supported targets: one row each in `config/targets.toml`;
+  `staticpy print targets-all` lists them.
 
-Builds run **inside the Alpine dev container**, never on the host. The
-container's `/workspace` is a bind mount of the repo, so anything you create
-on disk shows up on the host immediately. Use `tmux` *on the host* (the
-container image does not ship `tmux`) to keep long-running build jobs alive.
+`src/staticpy` is the build system, driven through the `./staticpy` shim. It
+owns the job in data rather than recipes -- `config/*.toml` holds the versions,
+checksums, per-package configure args, per-target quirks and flag profiles --
+and every job's key is hashed over its inputs and its dependencies' keys, so an
+edit rebuilds exactly what depends on it and nothing else.
 
-The static interpreter is the artefact under
-`python-static-${HOST_ARCH}-linux-musl/bin/python3.13`. The stock
-dynamically-linked baseline used for benchmarking sits at
-`python-dynamic-${HOST_ARCH}-linux-musl/bin/python3.13`.
+The interpreter is the artefact under
+`dist/artifacts/pynative_<profile>_<triple>/bin/python3.13` for a native build
+and `dist/artifacts/pycross_<profile>_<host>_<triple>/` for a cross one;
+`--pack` also writes a relocatable tarball to
+`dist/out/<profile>/<triple>/`. The dynamically-linked baseline used for
+benchmarking is the `reference` profile's own artifact,
+`dist/artifacts/pyref_reference_<triple>/rootfs/bin/python3.13`.
+
+The dev container is still the easiest way to get a clean host, and its
+`/workspace` is a bind mount of the repo, but staticpy builds hermetically
+against a fetched toolchain and busybox, so the host is no longer load-bearing.
+Use `tmux` *on the host* (the container image does not ship `tmux`) to keep
+long-running build jobs alive.
 
 ## Container handle
 
@@ -40,46 +51,51 @@ docker compose up -d spython
 
 `docker compose exec` requires the service to be up. The compose file holds
 the container alive with a `while sleep` entrypoint, so it does not auto-exit
-between commands.
+between commands. Starting it also registers the qemu interpreters in
+binfmt_misc, which is why the service is privileged: that table belongs to the
+host kernel, so the registration is machine-wide and not container-scoped.
+staticpy still execs qemu by path and needs none of it -- what does is
+CPython's own suite, which re-execs the target interpreter to spawn its
+workers.
 
 ## Builds
 
-- **Static, native arch** (this is `python3` -- the repo's default target):
+- **Static, native arch** (the default with no `--target`):
   ```sh
-  docker compose exec -T spython sh -c 'cd /workspace && make python3 -j$(nproc)'
+  ./staticpy build --verify core --pack
   ```
-  The toolchain is fetched as a tarball and unpacked into
-  `deps-$(TARGET)/$(TARGET)-$(TCTYPE)/`. `make toolchain` does just that
-  step, which is the cheapest way to check a fresh publish before spending
-  an hour on a python build.
-- **Static interpreter, all archs**: `./parallel-pythons.pl` from inside
-  the container, inside a tmux session. Builds the native interpreter serially
-  first (cross targets need it), then supervises N concurrent cross builds
-  (default 4 workers x -j8 each), prefixes `make download`, and writes
-  per-platform logs to `build-logs/python-static-<platform>.log`. Default is
-  fail-fast; pass `-k` for keep-going. Default skips any platform whose
-  `python-static-<platform>/bin/python<PYTHONV>` already exists; pass
-  `--force` to rebuild. Plan for a multi-hour wall clock.
-- **Dynamic baseline (x86_64 / aarch64 / whichever host you're on)**:
+  On a terminal, `build` with no `--target` opens a short wizard for the flags
+  not given and prints the equivalent command line at the end. Non-interactive
+  runs (CI, pipes, `TERM=dumb`, `STATICPY_NO_TUI=1`) never prompt: no
+  `--target` keeps meaning the host triple with flag defaults, so scripted
+  invocations are unchanged.
+- **Static interpreter, all archs**:
   ```sh
-  docker compose exec -T spython sh -c 'cd /workspace && ./benchmark/dynamic-build.sh'
+  ./staticpy build --target all --verify core --pack --workers 2 -j 8
   ```
-  Builds a stock `--enable-shared` Python of the same version pinned in the
-  Makefile, against the container's apk-installed `*-dev` packages.
+  `--workers` times `-j` is what actually loads the machine. The default is 4
+  workers, which peaks around 11 GB of RSS per target during the LTO link --
+  measure before trusting it on a machine with less than 48 GB. Plan for a
+  multi-hour wall clock. Note that the build is fail-fast: one target's flake
+  abandons the jobs still queued, so re-run rather than concluding anything
+  from a partial sweep.
+- **Dynamic baseline (whichever host you're on)**:
+  ```sh
+  ./staticpy build --profile reference
+  ```
+  Builds a stock `--enable-shared` Python of the same pinned version with this
+  machine's own gcc, against shared copies of the same pinned dependencies.
 
-Build artefacts you can safely nuke if you need to re-do work:
-- `deps-${TARGET}/` and `build-${TARGET}/`: per-target intermediates. The
-  Makefile is idempotent so a partial removal triggers a partial rebuild.
-- `python-static-${TARGET}/`, `python-dynamic-${TARGET}/`: the installed
-  interpreters.
-- `tarballs/`: mixed cache. Contains (a) external dep sources pulled by
-  the Makefile (openssl, libffi, ..., Python), each sha256-pinned in
-  `hashes/`, and (b) per-platform toolchain tarballs
-  (`<platform>-<tctype>.tgz`) downloaded from dev.mit.junic.kim. The (b)
-  entries are deliberately not hashed here -- they are our own build
-  output, verified in gccfactory.
-- *Never* nuke `hashes/` -- those are the trusted checksums for every
-  externally fetched tarball.
+Everything staticpy writes lives under `dist/` and is safe to delete; a
+content-addressed rebuild recovers whatever you removed. Within it:
+- `dist/artifacts/`: the published outputs, one directory per job key.
+- `dist/work/`, `dist/srctrees/`: per-job intermediates and extracted sources.
+- `dist/src/`: the sha256-verified upstream tarball cache.
+- `dist/toolchains/`: toolchains the shim fetched from dev.mit.junic.kim.
+  Deliberately not hashed here -- they are our own build output, verified in
+  gccfactory.
+- `dist/logs/jobs/<slug>/latest/`: every command's full output, always, whether
+  or not `-v` was passed.
 
 ## Docker
 
@@ -91,157 +107,69 @@ If you absolutely must use the host system, you need all the dependencies
 specified in the Dockerfile. Furthermore, you must check that the entire
 filesystem is owned by you before proceeding.
 
-## Portability check
-
-A toolchain tarball has to drop onto **any** Linux rootfs -- glibc,
-near-empty, whatever -- and just work, including the
-`-flto -fuse-linker-plugin -fno-fat-lto-objects` path. Both halves of that
-come from gccfactory: every binary is static-musl (nothing to dlopen, no
-loader to find) and GCC's LTO plugin is compiled into `libbfd`, so `ld`
-resolves a `-plugin liblto_plugin.so` argument to its built-in copy rather
-than opening a file that does not exist. The end-to-end proof lives in
-`test-portability/`:
-
-```sh
-./test-portability/proof.sh
-# tee's full output to build-logs/portability-alien.log
-```
-
-That builds a `debian:stable-slim` "alien" image with no compiler in it
-(only `make`/`file`/`binutils`), extracts the host-native toolchain tarball
-(`<uname -m>-linux-musl-native.tgz`) into `/opt`, checks no driver binary
-has a `PT_INTERP` and that the unprefixed tool names (`cc`, `ld`, `make`,
-...) are all present, then compiles + runs three nontrivial programs (C,
-C++ with libstdc++, and a two-TU LTO build through a static archive),
-including a negative control that links the slim LTO objects *without* the
-plugin to confirm the link actually fails. Re-run after a toolchain
-re-publish. `proof.sh` packs the tarball from
-`deps-<arch>-linux-musl/<arch>-linux-musl-native/` when missing; or
-regenerate explicitly with:
-
-```sh
-docker compose exec -T spython sh -lc \
-  'cd /workspace && H=$(uname -m) && \
-   tar -czf test-portability/${H}-linux-musl-native.tgz \
-     -C deps-${H}-linux-musl ${H}-linux-musl-native'
-```
-
-Full writeup, including expected output, falsification controls, and
-"where this would break", is in `ai/PORTABILITY_PROOF.md` -- written
-against the older wrapper-based toolchain, so read its mechanism sections
-as history.
-
 ## Tarball hashes and preflight downloads
 
-Every external tarball is sha256-pinned in `hashes/<basename>.sha256`.
-When you bump a version in the Makefile:
+Every external tarball is sha256-pinned in `config/sources.toml`, in the same
+edit as its version -- there is no second file to keep in step and no
+`update-hashes` step. A tarball whose hash does not match the pin is deleted
+rather than left for the next run to reuse. The checksum is part of every
+dependent job's content key, so changing a pin invalidates exactly the
+artifacts that depend on it.
+
+`staticpy sources` is the handle:
 
 ```sh
-# fetch fresh tarballs and rewrite hashes/*.sha256 (skips verification so the
-# new download isn't rejected for not matching the old hash).
-docker compose exec -T spython sh -c 'cd /workspace && make update-hashes'
+./staticpy sources list      # the pins, and what is already in dist/src
+./staticpy sources fetch     # download whatever is missing, verifying as it lands
+./staticpy sources verify    # re-hash what is on disk, ignoring the .done markers
 ```
 
-Then commit the new `hashes/*.sha256` files alongside the Makefile change.
+`fetch` is worth running on its own before a long build on a flaky link, and is
+what makes `--offline` usable afterwards.
 
-Before any parallel build, preflight the cache with `make download`. It
-pulls every source tarball into `tarballs/` serially, so two workers can
-never race the same curl. `parallel-pythons.pl` runs it automatically;
-pass `--no-download` if you know the cache is already warm.
+## Benchmarking
 
-## Benchmarking workflow
-
-The benchmark harness in `benchmark/` exists to put numbers on the "is `-O3
--flto` + static linking actually worth anything?" question and to catch
-regressions when libraries or the compiler get bumped. Three pieces:
-
-| file | purpose |
-|---|---|
-| `benchmark/microbench.py` | CPU-bound interpreter loops, ns/op timing |
-| `benchmark/measure_startup.py` | external cold-start / first-import probe |
-| `benchmark/run.sh` | orchestrator -- runs both, emits a markdown report |
-
-### Required state before you run
-
-1. Container is up (`docker compose up -d spython`).
-2. Static build exists at
-   `python-static-${HOST_ARCH}-linux-musl/bin/python3.13`. If not, build it
-   (see above).
-3. (Optional but recommended) dynamic baseline exists at
-   `python-dynamic-${HOST_ARCH}-linux-musl/bin/python3.13`. If not, run
-   `./benchmark/dynamic-build.sh`. Without it, you only get static vs
-   system-python, which is a confounded comparison (different Python
-   versions).
-
-### Running
+The `reference` profile builds the dynamic baseline: a stock `--enable-shared`
+Python of the pinned version, compiled by this machine's own gcc against shared
+copies of the same pinned dependencies. Same source at the same version, so
+nothing but linkage and libc can explain a gap.
 
 ```sh
-docker compose exec -T spython sh -c 'cd /workspace && ./benchmark/run.sh'
+./staticpy build --profile reference
+./staticpy bench --interp static --interp reference --baseline reference
 ```
 
-What happens:
+Nothing is benchmarked unless it is named. `--interp` takes `static` (this
+machine's pynative artifact), `reference` (the baseline above), `system`
+(whatever `python3` resolves to) or an explicit `label=/path/to/python`;
+`--baseline` fixes the denominator of every ratio, because with auto-discovery
+adding an arm could silently change what everything was measured against.
 
-- Architecture is detected from `uname -m`; Python version from `make
-  print-PYTHONV`. Nothing is hard-coded.
-- The script writes a fresh report to
-  `benchmark/reports/<YYYY-MM-DDThhmmZ>_<arch>.md`, owned by the host UID
-  (the script `chown`s back so you can edit it).
-- The report includes (a) an Environment block (CPU model, core count,
-  cache hierarchy, kernel), (b) interpreter metadata (path, version,
-  linkage, on-disk size), (c) CPU micro-benchmark table with per-row and
-  geomean `X / static` ratios, (d) startup-probe table with the same shape,
-  and (e) an empty `## Analysis` placeholder at the bottom.
-- The full report is also echoed to stdout for ad-hoc inspection.
+`bench` runs pyperformance by default and installs it into a venv per arm.
+`--with-ensurepip=no` does not remove pip's *source*: the ensurepip module and
+its bundled wheel stay in the stdlib, so `-m venv` seeds a working pip. What a
+static interpreter genuinely cannot do is dlopen a C extension, so a benchmark
+whose requirement ships one fails at import and is named in `skipped.json`,
+along with anything whose dependencies would not install -- a geometric mean
+over a silently narrowed set is worse than no number at all. `--suite micro`
+selects the built-in stdlib-only loops plus a spawn-latency probe, which is the
+offline answer and a quick check, but reporting its geomean as though it
+described a workload overstates whatever the interpreter is good at.
 
-### Writing the analysis (this is your job)
+Results land in `dist/bench/<UTC-stamp>-<arch>/`, never overwritten: alongside
+the report are the raw pyperf JSON, a manifest recording each binary's sha256
+and linkage, and `timeline.jsonl` -- one record per measurement with its wall
+time, load average and the busy fraction of the pinned core's SMT sibling,
+which is what lets a suspicious number be audited months later.
 
-**Always** open the new file under `benchmark/reports/` and replace the
-italic placeholder under `## Analysis` with prose. The previous report in
-that directory is the natural diff target. A good analysis:
+Check the per-arm failure counts in `timeline.jsonl` before trusting a geomean.
+A run once rendered a perfectly plausible report while 43 of 45 measurements on
+one arm had failed.
 
-1. **Names the change.** "First run after `OPENSSL` 3.5.0 -> 3.5.6 and
-   `gcc` 9.4 -> 15.1.0". If you didn't change anything and it's a re-run,
-   say so and call out any drift bigger than ~3% as suspicious.
-2. **Calls out what moved meaningfully** -- per-row deltas of more than a
-   few percent vs the previous report. Don't editorialize 1.17x -> 1.18x;
-   *do* editorialize 0.92x -> 0.99x or 1.10x -> 1.13x.
-3. **Tests hypotheses against the numbers.** If the README claims
-   "regressions come from older libraries", and you just matched libraries
-   and the regressions are still there, *say that the hypothesis was
-   falsified* and propose the next one. Don't preserve a comfortable story.
-4. **Leaves a concrete next step.** A one-line `perf stat` invocation or
-   an extra benchmark you'd run beats a vague "should investigate".
-
-See `benchmark/reports/2026-05-17T1818Z_x86_64.md` for a worked example.
-
-### Also update `benchmark/reports/README.md`
-
-`benchmark/reports/README.md` is the short-attention-span cliffs-notes
-across **all** reports -- TL;DR + "what wins / what's mixed" ranges +
-reports index + open experiments. **It goes stale the moment a new
-report lands.** After writing your per-report `## Analysis`, do this:
-
-- Bump the "Last updated" date and the run-count line at the top.
-- If your new run pushes either bound of a range column under
-  "What wins" or "What is mixed or wrong", widen the range.
-- Add a row to the "Reports index" table (host + 1-line distinguishing
-  fact).
-- If a TL;DR bullet became more or less true, edit it. If an item in
-  "What is missing" got answered, strike it and turn the answer into a
-  TL;DR bullet.
-- If you found a new cross-cutting pattern (a row that's consistently
-  weird, a knob that consistently moves the geomean), add it.
-
-The cliffs-notes README has its own checklist at the bottom mirroring
-this; both should agree.
-
-### When to re-run
-
-- After bumping any version in the Makefile, or after a toolchain re-publish.
-- After touching `configure-wrapper.sh`, `python/Setup`, or any other thing
-  in `python/` that the runtime build picks up.
-- After rebuilding the dynamic baseline (`benchmark/dynamic-build.sh`).
-- *Not* in normal source edits that don't reach the binary.
+Benchmark natively only. Under qemu you are measuring qemu, and the overhead
+is not uniform across workloads, so the numbers are comparable to nothing --
+not to native, and not to each other. `staticpy bench` refuses a `--target`
+other than the build machine's own triple for exactly this reason.
 
 ## Tmux discipline for long jobs
 
@@ -259,8 +187,7 @@ fail loudly and the log will still claim `EXIT_CODE=0`.
 LOG=$PWD/build.log
 tmux new-session -d -s build "bash -c '\
   set -o pipefail; \
-  docker compose exec -T spython \
-    sh -lc \"cd /workspace && make python3 -j\\\$(nproc)\" \
+  ./staticpy build --target all --verify core --pack --workers 2 -j 8 \
   2>&1 | tee $LOG; \
   echo EXIT_CODE=\${PIPESTATUS[0]} | tee -a $LOG'"
 ```
@@ -271,10 +198,9 @@ tail; check for `EXIT_CODE=0` **and** grep `'Error [0-9]\|FAILED'` to
 catch failure messages, since past `EXIT_CODE=0` lines on broken builds
 have been observed when the launcher pattern wasn't pipestatus-aware.
 
-For all-arch interpreter builds use `parallel-pythons.pl` rather than
-hand-rolling parallel `make` calls; it owns the worker pool and
-per-platform logging itself, and it expects to be invoked from inside a
-single tmux session.
+`./staticpy status` answers what exists, what is stale and what is building
+right now, from any shell, without touching the tmux session. Prefer it to
+reading a log for progress.
 
 ## Comment style
 
@@ -290,28 +216,40 @@ Don't write overly verbose comments.
 - Avoid baking specific numbers (gcc 9.4, 32 cores, -j32) into prose
   unless the number is the *point* of the comment.
 - Three to five lines is usually the right length. If you find yourself
-  writing a paragraph, the explanation probably belongs in `ai/` (see
-  below) and the comment can just point there.
+  writing a paragraph, the explanation probably belongs in the
+  `staticpy-traps` skill (see below) and the comment can just point there.
 
-## Reports under `ai/`
+## Findings go in the `staticpy-traps` skill
 
 Anything you discover that is more than a one-line comment's worth of
 explanation -- a real bug in an upstream component, a non-obvious
 interaction between flags, the actual root cause of a failure mode that
-took you more than fifteen minutes to corner -- writes up as a markdown
-report under `ai/`. Examples already there:
+took you more than fifteen minutes to corner -- belongs in
+`.agents/skills/staticpy-traps/`, which is the one place a future agent
+is guaranteed to read before debugging.
 
-- `ai/MUSL_REPORT.md` -- musl `fma` losing negative zero on underflow,
-  and the two safety nets that should have caught it.
+Small enough to state in a paragraph: add it to `SKILL.md` as an entry in
+the matching section, phrased symptom-first so it is findable by what you
+would have searched for.
 
-Format follows that example: title, one-paragraph summary, minimal
+Bigger than that -- it needs a reproducer, a disassembly, before/after
+numbers, or layers of root cause -- it becomes a new file under
+`.agents/skills/staticpy-traps/references/`, plus the short `SKILL.md`
+entry that links to it at the point where the problem bites. The three
+already there are the format: title, one-paragraph summary, minimal
 reproducer (code or command), each layer of root cause as its own
 section, and a "what we ended up doing" / "what we'd want upstream" at
 the end.
 
-When you write a report, link it from the relevant code with a one-line
-comment like `# See ai/<NAME>.md.`, *not* by inlining the explanation
-into the source.
+- `references/MUSL_REPORT.md` -- musl `fma` losing negative zero on
+  underflow, and the two safety nets that should have caught it.
+- `references/MIPS64_FFI_REPORT.md` -- libffi closures returning the high
+  half of the return slot for narrow integers on big-endian mips.
+
+Either way, link it from the relevant code with a one-line comment, *not*
+by inlining the explanation into the source. A long finding left in a
+commit message or a scratch file is a finding nobody reads before hitting
+the same wall.
 
 ## Commits
 
@@ -319,17 +257,27 @@ Don't commit unless the user explicitly asks. Even then:
 
 - Read `git status` and `git diff` first, summarise what you'd commit, then
   ask for the green light before running `git add` / `git commit`.
-- The `hashes/` files matter -- if you bumped a version, the matching
-  `hashes/*.sha256` must be in the same commit. The Makefile will refuse to
-  build otherwise.
-- New benchmark reports under `benchmark/reports/` are tracked; commit them
-  alongside the source change that motivated re-running.
+- A version bump moves the version and the sha256 in the same edit of
+  `config/sources.toml`. A pin without its matching checksum is not a
+  half-done commit, it is a build that fetches an unverified tarball.
+- `config/sources.toml` and `config/patches/` are deliberately excluded from
+  the `--config` overlay -- a file lying around must not be able to redefine a
+  pinned checksum -- so a build reads only the copy embedded in the binary.
+  `config/` is a symlink to `src/staticpy/internal/config/defaults/`, the tree
+  `go:embed` compiles in, so editing it and running `./staticpy` rebuilds
+  around the change. Building with plain `go build` skips that rebuild and
+  leaves you on whatever was embedded last.
+- A diff that only one architecture needs goes in
+  `[source.<pkg>.target_patches]` keyed by triple, not in `patches`. `patches`
+  is hashed into the shared srctree, so a fix for one target there invalidates
+  every target's deps and every interpreter; a target patch is applied to the
+  staged copy and reaches that one target's key. Check it with
+  `staticpy --json build --dry-run --target ...` before and after.
 
 ## What "done" looks like for common tasks
 
 | task | done when |
 |---|---|
-| version bump | Makefile edited, `make update-hashes` run, `hashes/` refreshed, x86_64 static build green, sanity imports clean (`ssl, zlib, sqlite3, ctypes, _lzma, _hashlib`), benchmark re-run with analysis written, `benchmark/reports/README.md` updated |
-| toolchain change (re-publish from gccfactory) | `make toolchain` fetches it, `./test-portability/proof.sh` is green, x86_64 static build green, sanity imports clean, and the banner from the new binary mentions the expected gcc version (`python3 -c 'import sys; print(sys.version)'`) |
-| benchmark code change | report renders, analysis explains what the new metric is measuring and why the baseline numbers stayed put (or didn't), `benchmark/reports/README.md` updated |
-| cross-arch interpreter fan-out | `parallel-pythons.pl` exits clean, every arch in `supported.txt` has `python-static-<platform>/bin/python<PYTHONV>`, and at least one non-x86_64 arch benchmarked |
+| version bump | `config/sources.toml` edited with the new version and sha256, x86_64 static build green, `staticpy verify --level core` clean |
+| toolchain change (re-publish from gccfactory) | the shim fetches it into `dist/toolchains/`, x86_64 static build green, sanity imports clean, and the banner from the new binary mentions the expected gcc version (`python3 -c 'import sys; print(sys.version)'`) |
+| cross-arch interpreter fan-out | `staticpy status --target all` reports 0 stale and 0 missing, every target has a verify artifact with `failed=0`, every packed tarball's sha256 checks out, and at least one non-x86_64 arch benchmarked |

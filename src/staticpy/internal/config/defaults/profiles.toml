@@ -1,0 +1,136 @@
+# Flag sets. A profile carries no -I/-L paths: those are absolute and belong to
+# the job, not the profile.
+#
+# Scopes ([profile.X.python], [profile.X.deps], [profile.X.deps.<pkg>],
+# [profile.X.pyhost]) layer on top of the profile-wide values, so a change
+# confined to one scope only rebuilds what that scope reaches.
+
+[profile.default]
+cflags = [
+  "-O3",
+  # Hand-rolled LTO rather than CPython's --with-lto: --with-lto also wraps the
+  # PGO-instrument bootstrap link in -fno-lto, which then cannot read slim LTO
+  # bitcode out of our static sub-dep archives (libsqlite3.a et al). Driving it
+  # from the flags puts the plugin on every link, so slim archives work and we
+  # never have to build fat sub-deps.
+  "-flto=auto",
+  "-flto-partition=none",
+  "-fuse-linker-plugin",
+  # --gc-sections can only drop what the compiler split up first.
+  "-ffunction-sections",
+  "-fdata-sections",
+  "-no-pie",
+  "-pipe",
+  # Third-party sources at -O3 produce warnings we are not going to fix, and
+  # several of these trees still build with -Werror by default.
+  "-Wno-error",
+  "-w",
+]
+ldflags = [
+  # ctypes' static symbol table resolves against the interpreter's own dynamic
+  # symbols, so they have to survive the link.
+  "-Wl,--export-dynamic",
+  "-static",
+  "--static",
+  "-no-pie",
+  "-flto=auto",
+  "-flto-partition=none",
+  "-fuse-linker-plugin",
+  "-Wl,--gc-sections",
+  "-Wl,-O1",
+  "-Wl,--as-needed",
+]
+# -s is not listed above: it is what strip means, and the recipe adds it.
+strip = true
+debug_symbols = false
+# PGO trains by running the interpreter it just built, so it is only possible
+# when the build host can execute the target.
+pgo = "native-only"
+# -x test_re: musl has no non-C byte-level case folding, so the locale tests in
+#   test_re fail. Alpine's apk build skips the same module.
+# -i test_fma_zero_result: musl's fma fast path gets an IEEE-754 negative-zero
+#   case wrong. CPython gates this test with @skipIf(linked_to_musl()), but that
+#   probe shells out to ldd, which exits non-zero on a fully static -no-pie
+#   binary, so the skip never fires.
+#   See .agents/skills/staticpy-traps/references/MUSL_REPORT.md.
+# -i test_type_check_in_subinterp: the test re-loads _testcapi from its own
+#   .so under a second name inside a subinterpreter. Every extension here is a
+#   builtin, so find_spec().origin is "built-in" and there is no file to load.
+#   profile-run-stamp has no `|| true`, so one impossible test aborts the build.
+profile_task = "-m test --pgo -x test_re -i test_fma_zero_result -i test_type_check_in_subinterp"
+# --disable-test-modules governs both the _test* builtins and whether Lib/test
+# is installed, so turning it off also removes the suite the verifier runs.
+# Shipping them costs startup time and size; not shipping them means no
+# interpreter we publish can be tested at core or full level, on qemu or on
+# real hardware. The suite wins.
+test_modules = true
+modules = "full"
+
+# LTO on the CPython tree is where the build time goes and where the compiler
+# bugs show up. Dropping it there keeps the dependency artifacts intact, so
+# switching to this profile does not rebuild openssl.
+[profile.nolto]
+inherit = "default"
+
+[profile.nolto.python]
+cflags_remove = ["-flto=auto", "-flto-partition=none", "-fuse-linker-plugin"]
+ldflags_remove = ["-flto=auto", "-flto-partition=none", "-fuse-linker-plugin"]
+
+[profile.nopgo]
+inherit = "default"
+pgo = "off"
+
+[profile.debug]
+inherit = "default"
+strip = false
+debug_symbols = true
+cflags_add = ["-g"]
+
+# The host interpreter that cross builds need in order to run CPython's own
+# build steps. It is a means, not an output: nothing about it ships, so it
+# trades every optimisation for the shortest path to a runnable python.
+[profile.bootstrap]
+inherit = "default"
+pgo = "off"
+modules = "minimal"
+# The build python never runs the suite, and building the _test* modules in
+# breaks the bootstrap outright: Programs/_freeze_module links getpath_noop.o
+# rather than getpath.o, while _testinternalcapi.c references
+# _Py_Get_Getpath_CodeObject, which only the real one defines.
+test_modules = false
+cflags_remove = ["-flto=auto", "-flto-partition=none", "-fuse-linker-plugin"]
+ldflags_remove = ["-flto=auto", "-flto-partition=none", "-fuse-linker-plugin"]
+
+# mimalloc is compiled without LTO on purpose. Its malloc must win over musl's
+# weak definition at link time, and as LTO bitcode that resolution happens
+# inside the plugin, where the override does not reliably take.
+[profile.default.deps.mimalloc]
+cflags_remove = ["-flto=auto", "-flto-partition=none", "-fuse-linker-plugin"]
+
+# The dynamic reference interpreter: stock CPython, as close to python.org's
+# release build as this machine can produce, linked against shared copies of
+# the same pinned dependency versions the static build uses so that version
+# skew can never explain a gap between them.
+#
+# It deliberately does not inherit "default": that profile's ldflags are
+# -static and -no-pie, and a reference build that quietly picked one of them up
+# would stop being the thing it exists to be compared against.
+[profile.reference]
+toolchain = "host"
+cflags = ["-O3", "-fPIC", "-pipe", "-Wno-error", "-w"]
+# LTO is left to CPython's own --with-lto here rather than driven from the
+# flags: the reason the static build hand-rolls it -- slim LTO bitcode inside
+# static sub-dep archives -- does not arise when every dependency is a .so.
+ldflags = []
+strip = false
+debug_symbols = false
+pgo = "native-only"
+# The exclusions are a superset on purpose: over-excluding costs a little
+# profile coverage, while under-excluding aborts the build outright, and
+# profile-run-stamp has no `|| true`. test_re and test_fma_zero_result are the
+# musl failures, harmless to name on a glibc host and needed on a musl one.
+# test_generators is this build's own: SignalAndYieldFromTest is signal-timing
+# sensitive and failed the training run under gcc 16 / glibc 2.43.
+profile_task = "-m test --pgo -x test_re -x test_generators -i test_fma_zero_result -i test_type_check_in_subinterp"
+test_modules = true
+modules = "full"

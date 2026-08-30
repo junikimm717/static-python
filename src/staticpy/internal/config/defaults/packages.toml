@@ -1,0 +1,284 @@
+# Native dependencies, one artifact each.
+#
+# Only the arguments that are a decision live here. --prefix, --exec-prefix and
+# --host are injected by the recipe because they are absolute paths or derived
+# from the target, and anything absolute in this file would leak into the job
+# key and make the cache machine-specific.
+
+[package.openssl]
+name = "openssl"
+build = "openssl"
+platform_map = "openssl"
+configure = [
+  "no-shared", "no-dso",
+  # no-asm: the perlasm generators do not cover every triple in targets.toml,
+  # and a mixed asm/C build is the classic source of "works on x86_64 only".
+  "no-asm",
+  # no-dso rules out engines anyway; saying so keeps Configure from probing.
+  "no-engine",
+  "no-tests", "no-apps",
+  "no-ssl3", "no-comp", "no-idea", "no-rc5", "no-ec2m", "no-weak-ssl-ciphers",
+]
+# libssl.a/libcrypto.a land in lib or lib64 depending on the platform config,
+# so only the header is a stable artifact path.
+provides = ["include/openssl/ssl.h"]
+
+[package.libffi]
+name = "libffi"
+configure = ["--enable-static", "--disable-shared"]
+provides = ["lib/libffi.a"]
+
+[package.xz]
+name = "xz"
+configure = ["--enable-static", "--disable-shared"]
+provides = ["lib/liblzma.a"]
+
+[package.zlib]
+name = "zlib"
+# zlib's configure is hand-rolled: it rejects --host outright and picks up the
+# cross prefix from $CHOST instead, which the recipe exports.
+configure = [
+  "--static",
+  # Works around s390x VX detection in zlib 1.3.2, where crc32_vx.c is compiled
+  # without -mzarch/-march=z13. No-op everywhere else.
+  "--disable-crcvx",
+]
+provides = ["lib/libz.a"]
+
+[package.ncurses]
+name = "ncurses"
+configure = [
+  "--enable-static", "--disable-shared", "--without-shared",
+  # No C++ binding: it would drag a static libstdc++ into the interpreter.
+  "--without-cxx", "--without-cxx-binding",
+  "--without-ada", "--without-manpages", "--without-tests",
+  # The tools are host binaries we cannot run when cross-compiling; install
+  # borrows the host's tic via TIC_PATH instead.
+  "--without-progs",
+  # readline links against termcap names.
+  "--enable-termcap",
+]
+provides = ["lib/libncursesw.a"]
+
+[package.readline]
+name = "readline"
+needs = ["ncurses"]
+configure = [
+  "--enable-static", "--disable-shared",
+  "--with-curses",
+  "--disable-install-examples",
+]
+provides = ["lib/libreadline.a", "lib/libhistory.a"]
+
+[package.sqlite]
+name = "sqlite"
+# The sqlite shell links readline; configure probes for it before we get a say.
+needs = ["readline"]
+configure = ["--enable-static", "--disable-shared"]
+provides = ["lib/libsqlite3.a"]
+
+# sqlite compiles mkkeywordhash and jimsh and then runs them mid-build, so they
+# have to be built for the machine doing the building. B.cc defaults to $(CC),
+# which here targets musl and produces something a glibc host cannot execute.
+make_vars = ["B.cc=@BUILD_CC@"]
+
+[package.bzip2]
+name = "bzip2"
+# No configure script at all; the Makefile edits in sources.toml make the
+# stock one honour CC/AR/CFLAGS/PREFIX from the environment.
+build = "make"
+provides = ["lib/libbz2.a"]
+
+# libuuid is compiled straight from util-linux's sources rather than through
+# util-linux's build system. Building the real thing needs meson, ninja, flex
+# and bison on the host to produce one small library CPython uses for exactly
+# three symbols; compiling the files directly removes all four host
+# requirements and the cross.ini / -Dfeature=disabled dance with them.
+[package.libuuid]
+name = "libuuid"
+source = "util-linux"
+build = "sources"
+libname = "uuid"
+sources = [
+  "libuuid/src/clear.c",
+  "libuuid/src/compare.c",
+  "libuuid/src/copy.c",
+  "libuuid/src/gen_uuid.c",
+  "libuuid/src/isnull.c",
+  "libuuid/src/pack.c",
+  "libuuid/src/parse.c",
+  "libuuid/src/predefined.c",
+  "libuuid/src/unpack.c",
+  "libuuid/src/unparse.c",
+  "libuuid/src/uuid_time.c",
+  # gen_uuid.c calls ul_random_get_bytes, UL_MD5* and UL_SHA1*, which live in
+  # util-linux's lib/ rather than libuuid/. libuuid/src/test_uuid.c is the one
+  # file in that directory left out: it is a test program with a main().
+  "lib/randutils.c",
+  "lib/md5.c",
+  "lib/sha1.c",
+]
+cflags = [
+  "-Iinclude",
+  "-Ilibuuid/src",
+  # util-linux normally generates config.h; these are the probes that actually
+  # change code on linux/musl. HAVE_NET_IF_DL_H, HAVE_SYS_SOCKIO_H and
+  # HAVE_SA_LEN are BSD-only and stay undefined; HAVE_UUIDD stays undefined
+  # because a static interpreter has no uuidd socket to talk to.
+  "-DHAVE_STDLIB_H=1",
+  "-DHAVE_UNISTD_H=1",
+  "-DHAVE_SYS_FILE_H=1",
+  "-DHAVE_SYS_IOCTL_H=1",
+  "-DHAVE_SYS_SOCKET_H=1",
+  "-DHAVE_SYS_SYSCALL_H=1",
+  "-DHAVE_SYS_TIME_H=1",
+  "-DHAVE_SYS_UN_H=1",
+  "-DHAVE_NET_IF_H=1",
+  "-DHAVE_NETINET_IN_H=1",
+  "-DHAVE_GETRANDOM=1",
+  "-DHAVE_JRAND48=1",
+  "-DHAVE_LIBPTHREAD=1",
+  # musl has all of these; without them c.h emits its own conflicting fallback
+  # for reallocarray and #errors out of xusleep().
+  "-DHAVE_REALLOCARRAY=1",
+  "-DHAVE_NANOSLEEP=1",
+  "-DHAVE_USLEEP=1",
+  "-DHAVE_ERR_H=1",
+  "-DHAVE_SYS_SYSMACROS_H=1",
+  "-DHAVE_TLS=1",
+  "-DHAVE_LOFF_T=1",
+  "-DHAVE_STRUCT_STAT_ST_MTIM_TV_NSEC=1",
+  "-DHAVE_PROGRAM_INVOCATION_SHORT_NAME=1",
+  # musl only declares program_invocation_short_name under _GNU_SOURCE, which
+  # util-linux's own configure sets via AC_USE_SYSTEM_EXTENSIONS.
+  "-D_GNU_SOURCE=1",
+  # uuidP.h concatenates this with "/lib/libuuid/clock.txt", so it is the
+  # localstatedir itself, not the lib directory under it.
+  "-D_PATH_LOCALSTATEDIR=\"/var\"",
+]
+# CPython does `#include <uuid.h>`, so the header is installed one level down
+# and the profile adds -I<prefix>/include/uuid.
+headers = ["libuuid/src/uuid.h"]
+provides = ["lib/libuuid.a", "include/uuid/uuid.h"]
+
+# musl's mallocng returns every allocation above 131052 bytes straight to the
+# kernel and caches nothing, so workloads that cycle mid-sized buffers pay an
+# mmap/munmap pair per operation. Replacing it is possible because musl defines
+# malloc weakly: a strong definition keeps libc.a's member from ever being
+# pulled. See the staticpy-traps skill for the measurements.
+#
+# src/static.c includes every other translation unit, so the whole allocator is
+# one object and there is no archive for the linker to be selective about.
+[package.mimalloc]
+name = "mimalloc"
+build = "sources"
+libname = "mimalloc"
+sources = ["src/static.c"]
+cflags = ["-Iinclude", "-DMI_MALLOC_OVERRIDE=1", "-DNDEBUG"]
+headers = ["include/mimalloc.h"]
+provides = ["lib/libmimalloc.a", "lib/mimalloc.o"]
+# Collapsed into one object and stripped down to the allocator's public entry
+# points. CPython bundles its own mimalloc in obmalloc.o, so leaving the
+# internals global is a duplicate-symbol link failure waiting to happen.
+object = "lib/mimalloc.o"
+keep_globals = [
+  "malloc",
+  "calloc",
+  "realloc",
+  "free",
+  "cfree",
+  "aligned_alloc",
+  "memalign",
+  "posix_memalign",
+  "__posix_memalign",
+  "valloc",
+  "pvalloc",
+  "vfree",
+  "malloc_usable_size",
+  "malloc_size",
+  "malloc_good_size",
+  "reallocarray",
+  "reallocarr",
+  "reallocf",
+  "strdup",
+  "strndup",
+  "__libc_malloc",
+  "__libc_calloc",
+  "__libc_realloc",
+  "__libc_free",
+  "__libc_cfree",
+  "__libc_memalign",
+  "__libc_valloc",
+  "__libc_pvalloc",
+]
+
+# Shared-library variants, for host-built profiles. Only the profiles named
+# here are affected, so every other profile's key is untouched by this block.
+#
+# bzip2 and libuuid are absent on purpose, and need nothing: both recipe shapes
+# produce an archive, and the reference profile compiles with -fPIC, so a PIC
+# archive links into a shared extension module exactly as a .so would.
+
+[package.openssl.profile.reference]
+configure = [
+  "shared", "no-dso", "no-asm", "no-engine",
+  "no-tests", "no-apps",
+  "no-ssl3", "no-comp", "no-idea", "no-rc5", "no-ec2m", "no-weak-ssl-ciphers",
+]
+
+[package.libffi.profile.reference]
+configure = ["--disable-static", "--enable-shared"]
+# libffi installs into lib64 whatever --libdir says: that is its own
+# toolexeclibdir convention, and its .pc file agrees.
+provides = ["lib64/libffi.so"]
+
+[package.xz.profile.reference]
+configure = ["--disable-static", "--enable-shared"]
+provides = ["lib/liblzma.so"]
+
+[package.zlib.profile.reference]
+# zlib builds both by default; --static is what suppresses the shared one.
+configure = ["--disable-crcvx"]
+provides = ["lib/libz.so"]
+
+[package.ncurses.profile.reference]
+configure = [
+  "--with-shared", "--without-normal", "--enable-widec",
+  "--without-cxx", "--without-cxx-binding",
+  "--without-ada", "--without-manpages", "--without-tests",
+  "--without-progs",
+  "--enable-termcap",
+  # No database is installed either way -- the recipe neutralises tic with
+  # TIC_PATH=true -- so the terminfo path ncurses bakes in from --prefix points
+  # at nothing. In an archive that string is still LTO bitcode and the sysroot
+  # composer cannot see it; in a real .so it is a dependency prefix inside a
+  # binary, and the composer refuses to rewrite it. Saying so removes the
+  # string. No --with-fallbacks: that is the only thing that would need tic and
+  # infocmp off the host PATH, and termcap remains as the runtime path.
+  "--disable-database",
+]
+provides = ["lib/libncursesw.so"]
+
+[package.readline.profile.reference]
+configure = [
+  "--disable-static", "--enable-shared",
+  "--with-curses",
+  "--disable-install-examples",
+]
+provides = ["lib/libreadline.so", "lib/libhistory.so"]
+# --with-curses sets what the *static* link needs and leaves SHLIB_LIBS empty,
+# so libreadline.so is linked against libc alone and its six termcap symbols
+# stay undefined. CPython then links its readline module with -lreadline only,
+# the module fails to import, make deletes it, and sharedinstall dies on the
+# missing file. Fixing it here rather than at the module is what makes the
+# library honest about what it needs.
+make_vars = ["SHLIB_LIBS=-lncursesw"]
+
+[package.sqlite.profile.reference]
+configure = ["--disable-static", "--enable-shared"]
+provides = ["lib/libsqlite3.so"]
+
+# mimalloc exists to beat musl's allocator at static link time. A reference
+# build carrying it would not be the stock interpreter it exists to measure.
+[package.mimalloc.profile.reference]
+skip = true

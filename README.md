@@ -1,8 +1,8 @@
-# Python with Static + Cross + LTO
+# Python with Static + Cross + LTO (Rewritten in Go)
 
 Building a (mostly) functional cross-compiled python interpreter with zero
 shared libraries and full link-time optimization (-O3 -flto). We gain up to
-**20% geomean speedup** on benchmarks over dynamically linked python (!!)
+**20% geomean speedup** on pyperf over dynamically linked python on glibc (!!)
 
 **Warning:** this project is exclusively as a hobby. For basically all intents
 and purposes, you should use your standard dynamically linked python
@@ -17,7 +17,7 @@ studying for finals again. The LLM's are way better now, so I developed some
 additional profiling infrastructure and let opus iron out some latent bugs.
 
 Python ABI (Application Binary Interface) support through `ctypes` is mostly
-there plus or minus epsilon (No deprecated ABI's are included). The Makefile
+there plus or minus epsilon (No deprecated ABI's are included). The build
 injects some monkey-patched code into the Python source tree to make all of this
 work^^.
 
@@ -43,106 +43,74 @@ docker compose up -d
 ./dev.sh
 ```
 
-Alternatively, make sure you have all of the following packages on your system
-(mostly just common build tools).
+That container also registers qemu in binfmt, which is why it runs privileged.
 
-- **meson, ninja, flex, bison** (for libuuid)
-- **ncurses** (stupid terminfo things)
-- **unzip**
-- **perl** with **FindBin.pm** (apparently on some distros you need to install
-  perl-core?)
-- cURL, tar, make, rsync
+Otherwise, `./staticpy doctor` says what your machine is missing. It is a short
+list -- go, perl, patch, busybox, cURL, tar, and a qemu-user for whichever
+target you want to verify.
+
+## The build system
+
+`src/staticpy` is a Go build system with a content-addressed job graph:
+rebuilding with identical inputs is a no-op, and changing one configure flag
+rebuilds exactly what depends on it. `./staticpy` is a shim around it that
+rebuilds the binary when the sources move and fetches the toolchain a build
+needs.
+
+```sh
+./staticpy doctor   # what this machine has and is missing
+./staticpy help     # or `help <command>` for the details
+```
+
+`./staticpy help` is the real documentation and is kept honest;
+[`AGENTS.md`](AGENTS.md) has the design, the toolchain story and the workflows.
 
 ## Building Native
 
 ```sh
 # Build python. The toolchain is downloaded, not built here.
-make
+./staticpy build
 # run your statically linked python3!
-./python-static-$(uname -m)/bin/python3
+./dist/artifacts/pynative_default_$(./staticpy print host)/bin/python3
 ```
+
+Add `--pack` and the result is also written as a relocatable tarball under
+`dist/out/<profile>/<triple>/`, next to its sha256.
+
+The compilers come from [gccfactory](https://github.com/junikimm717/gccfactory),
+which builds the whole host x target matrix of GCC + musl and publishes one
+relocatable tarball per cell; the shim fetches the one it needs.
 
 ## Cross Compiling
 
 ```sh
-# First, compile a native python interpreter (assuming on x86_64 system).
-make
-# Next, cross-compile to aarch64.
-make ARCH=aarch64
-# ...or to riscv64.
-make ARCH=riscv64
+# Cross-compile to aarch64, verify it under qemu, and pack the tarball.
+./staticpy build --target aarch64-linux-musl --verify core --pack
+
+# ...or every target at once.
+./staticpy build --target all --verify core --pack
 ```
 
 Cross-compiling is now officially supported from x86_64 and aarch64! This
 took soooo long to do, and it doesn't seem like that I will be able to support
 all the architectures I initially wanted to :/
 
-As seen above, if you are cross compiling, **You MUST build the native
-interpreter first**. Cross-compiled python interpreters can't be run on the
-system, so you'll need a native python to install all your libraries correctly.
+`--verify` runs the thing under qemu before it is allowed to become an
+artifact: `smoke` is import probes, `core` is a curated subset of CPython's
+suite, `full` is all of it.
 
-The resulting output should be findable in
-`./python-static-$(ARCH)-linux-$(MUSLABI)`, where `$(ARCH)` is the architecture
-that you chose (defaults to native architecture if blank). If you are on some
-weird architecture, you might want to additionally specify ABI type through
-`$(MUSLABI)`. You can check out different musl ABI types at
-[musl.cc](https://musl.cc/)
+Supported architectures are one row each in `config/targets.toml`;
+`./staticpy print targets-all` lists them. (I assume if you are actually trying
+to run this project, you for sure know what you are doing 😇)
 
-The toolchains themselves are not built here. They come from
-[gccfactory](https://github.com/junikimm717/gccfactory), which builds the whole
-host x target matrix of GCC + musl toolchains and publishes one relocatable
-tarball per cell to
-[dev.mit.junic.kim](https://dev.mit.junic.kim/cross/); `make` fetches the one
-it needs. Every binary in them is static-musl, so a tarball drops onto any
-Linux rootfs -- glibc, near-empty, whatever -- and just works. `test-portability/`
-proves exactly that, in a Debian image with no compiler in it.
-
-You can also view supported architectures in the `supported.txt` file. (I assume
-if you are actually trying to run this project, you for sure know what you are
-doing 😇)
-
-## Benchmarking (AI-Assisted)
-
-A small benchmark harness in `benchmark/` exists to put numbers on the
-"is `-O3 -flto` + static linking actually worth anything?" question.
-Always native-vs-native. Run it from inside the dev container:
+## Benchmarking
 
 ```sh
-# (one-off) build a stock dynamic Python of the same version, using the
-# container's gcc and apk-installed openssl-dev/zlib-dev/sqlite-dev/...
-./benchmark/dynamic-build.sh
-
-# run the comparison; report lands in benchmark/reports/ and is echoed
-# to stdout
-./benchmark/run.sh
+# a stock --enable-shared build of the same pinned source, by this machine's gcc
+./staticpy build --profile reference
+./staticpy bench --interp static --interp reference --baseline reference
 ```
 
-The runner compares whichever of these interpreters resolve to an executable:
-
-- `python-static-$(uname -m)-linux-musl/bin/python$(PYTHONV)` (this repo, required)
-- `python-dynamic-$(uname -m)-linux-musl/bin/python$(PYTHONV)` (above, optional)
-- `/usr/bin/python3` (the container's system python, optional)
-
-It runs a CPU-bound interpreter micro-benchmark suite (`benchmark/microbench.py`)
-plus an external startup / first-import probe (`benchmark/measure_startup.py`).
-Each report is timestamped + arch-tagged under `benchmark/reports/` (e.g.
-`2026-05-17T1818Z_x86_64.md`) so the run history is reviewable, and includes
-an Environment block (CPU model, core count, cache hierarchy, kernel) so a
-random row of numbers can't get mistaken for a different machine. The report
-shows per-row `X / static` ratios and a final geometric-mean row per
-non-static interpreter. Each path is overridable via `STATIC=` / `DYNAMIC=` /
-`SYSTEM=`. Architecture comes from `uname -m`; the Python version comes from
-`make print-PYTHON` -- nothing is hard-coded.
-
-The script appends an empty `## Analysis` section to every report; the agent
-or human running the benchmark is expected to fill it in with what moved and
-why. See [`AGENTS.md`](AGENTS.md) for the full workflow.
-
-For the short summary across all runs to date (what
-consistently wins, what's regressed, what we still don't know), see
-[`benchmark/reports/README.md`](./benchmark/reports/README.md). The
-individual per-run reports live alongside it in
-[`benchmark/reports/`](./benchmark/reports/).
-
-benchmark/reports is wholly managed by LLM. The only exception is the data at the top of each timestamped report.
-The interpretation the LLM gives is not guaranteed to be correct.
+That runs pyperformance -- what speed.python.org publishes against -- and
+writes a markdown report plus the raw pyperf JSON to `dist/bench/`.
+`--suite micro` runs a stdlib-only loop set instead, which needs no network.

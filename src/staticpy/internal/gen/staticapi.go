@@ -1,0 +1,297 @@
+// Package gen produces the source files staticpy injects into a CPython tree
+// but cannot ship as fixed assets: the stable-ABI symbol table and
+// Modules/Setup.local.
+package gen
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
+
+	_ "embed"
+
+	"github.com/junikimm717/static-python/src/staticpy/internal/assets"
+	"github.com/junikimm717/static-python/src/staticpy/internal/core"
+)
+
+// generatorVersion invalidates every symbols.c ever generated. Bump it when the
+// emitted C changes shape, not when CPython changes.
+const generatorVersion = "2"
+
+//go:embed files/dump_stable_abi.py
+var dumpStableABI []byte
+
+// StaticAPI generates Modules/staticapi/symbols.{c,h} from the CPython tree's
+// own Misc/stable_abi.toml. The result is architecture-free: feature-gated
+// entries become #ifdefs rather than being filtered here, so one artifact
+// serves every target.
+type StaticAPI struct {
+	srctree core.Job
+	pyhost  core.Job
+	version string
+
+	// ManifestSHA, when set, pins the sha256 of Misc/stable_abi.toml. The
+	// srctree is a dep, so its key already covers that file; setting this makes
+	// the dependency explicit in our own key and is verified during Build.
+	ManifestSHA string
+}
+
+func NewStaticAPI(srctree, pyhost core.Job, cpythonVersion string) *StaticAPI {
+	return &StaticAPI{srctree: srctree, pyhost: pyhost, version: cpythonVersion}
+}
+
+func (j *StaticAPI) Name() string { return "staticapi" }
+
+func (j *StaticAPI) Slug() string { return "staticapi:" + j.version }
+
+func (j *StaticAPI) Deps() []core.Job { return []core.Job{j.srctree, j.pyhost} }
+
+func (j *StaticAPI) KeyInputs() map[string]string {
+	return map[string]string{
+		"generator_version": generatorVersion,
+		"driver_sha256":     sha256Bytes(dumpStableABI),
+		"symbols_h_sha256":  assets.Hash("staticapi/symbols.h"),
+		"stable_abi_sha256": j.ManifestSHA,
+	}
+}
+
+func (j *StaticAPI) ArtifactDir(e *core.Env) string {
+	return e.Path(core.DirArtifact, "staticapi", j.version)
+}
+
+func (j *StaticAPI) Build(ctx context.Context, e *core.Env, r *core.Runner, work, stage string) error {
+	src := j.srctree.ArtifactDir(e)
+	manifest := filepath.Join(src, "Misc", "stable_abi.toml")
+	sum, err := sha256File(manifest)
+	if err != nil {
+		return fmt.Errorf("staticapi: %w", err)
+	}
+	if j.ManifestSHA != "" && j.ManifestSHA != sum {
+		return fmt.Errorf("staticapi: %s is %s, expected %s", manifest, sum, j.ManifestSHA)
+	}
+
+	py, err := pyhostPython(j.pyhost.ArtifactDir(e))
+	if err != nil {
+		return err
+	}
+
+	r.Step("dump stable ABI manifest")
+	driver := filepath.Join(work, "dump_stable_abi.py")
+	if err := os.WriteFile(driver, dumpStableABI, 0o644); err != nil {
+		return err
+	}
+	out, err := r.Output(ctx, core.Cmd{
+		Dir:  work,
+		Args: []string{py, driver, src},
+		Name: "staticapi-dump",
+		// The srctree artifact is shared and must stay byte-identical; loading
+		// stable_abi.py from it would otherwise drop a __pycache__ inside.
+		EnvAdd: map[string]string{"PYTHONDONTWRITEBYTECODE": "1"},
+	})
+	if err != nil {
+		return fmt.Errorf("staticapi: dump stable_abi.toml: %w", err)
+	}
+
+	items, err := parseDump(out)
+	if err != nil {
+		return fmt.Errorf("staticapi: %w", err)
+	}
+
+	r.Step("emit symbols.c")
+	c, err := renderSymbols(items, j.version, sum)
+	if err != nil {
+		return fmt.Errorf("staticapi: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(stage, "symbols.c"), c, 0o644); err != nil {
+		return err
+	}
+	return assets.WriteTo(stage, "staticapi/symbols.h")
+}
+
+// abiItem is one entry of the dump the driver script produces.
+type abiItem struct {
+	Name    string `json:"name"`
+	Kind    string `json:"kind"`
+	AbiOnly bool   `json:"abi_only"`
+	Ifdef   string `json:"ifdef"`
+	// Declared reports whether the name appears in a header Python.h actually
+	// reaches, following the include graph rather than globbing Include/. Both
+	// halves matter: abi_only does not imply undeclared (a synthetic extern for
+	// one that is declared conflicts), and being in Include/ does not imply
+	// declared (marshal.h is never included).
+	Declared bool `json:"declared"`
+}
+
+var cIdent = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+
+func parseDump(out string) ([]abiItem, error) {
+	var doc struct {
+		Items []abiItem `json:"items"`
+	}
+	if err := json.Unmarshal([]byte(out), &doc); err != nil {
+		return nil, fmt.Errorf("parse driver output: %w", err)
+	}
+	if len(doc.Items) == 0 {
+		return nil, fmt.Errorf("stable ABI dump is empty")
+	}
+	for _, it := range doc.Items {
+		if !cIdent.MatchString(it.Name) {
+			return nil, fmt.Errorf("not a C identifier: %q", it.Name)
+		}
+		if it.Ifdef != "" && !cIdent.MatchString(it.Ifdef) {
+			return nil, fmt.Errorf("%s: not a macro name: %q", it.Name, it.Ifdef)
+		}
+		if it.Kind != "function" && it.Kind != "data" {
+			return nil, fmt.Errorf("%s: unexpected kind %q", it.Name, it.Kind)
+		}
+	}
+	return doc.Items, nil
+}
+
+const symbolsPreamble = `/* Generated by staticpy from Misc/stable_abi.toml. Do not edit.
+ *
+ * This table is also the liveness anchor for the C API: taking &name for every
+ * stable-ABI symbol is the only thing that stops -Wl,--gc-sections from reaping
+ * the half of libpython nothing in the binary happens to call. Trimming it
+ * loses symbols, not just lookups.
+ */
+`
+
+func renderSymbols(items []abiItem, version, manifestSHA string) ([]byte, error) {
+	var funcs, data []abiItem
+	for _, it := range items {
+		if it.Kind == "function" {
+			funcs = append(funcs, it)
+		} else {
+			data = append(data, it)
+		}
+	}
+	// bsearch needs strcmp order, which is byte order, not upstream's
+	// case-insensitive sort.
+	byName := func(s []abiItem) { sort.Slice(s, func(a, b int) bool { return s[a].Name < s[b].Name }) }
+	byName(funcs)
+	byName(data)
+
+	var b bytes.Buffer
+	b.WriteString(symbolsPreamble)
+	fmt.Fprintf(&b, "/* CPython %s, stable_abi.toml sha256 %s */\n\n", version, manifestSHA)
+	b.WriteString(`#include "Python.h"` + "\n")
+	b.WriteString(`#include "symbols.h"` + "\n")
+	b.WriteString("#include <stdint.h>\n\n")
+	b.WriteString("/* Through uintptr_t so a const or function pointer needs no cast diagnostic. */\n")
+	b.WriteString("#define EXPORT_FUNC(name) {#name, (void *)(uintptr_t)&name},\n")
+	b.WriteString("#define EXPORT_DATA(name) {#name, (void *)(uintptr_t)&name},\n\n")
+
+	writeExterns(&b, funcs, data)
+
+	writeTable(&b, "static_functions", funcs, "EXPORT_FUNC")
+	writeTable(&b, "static_data", data, "EXPORT_DATA")
+	return b.Bytes(), nil
+}
+
+// Only for entries no header reachable from Python.h declares: Windows emits a
+// linker pragma and needs none of this, while we take an address, which needs a
+// declaration. The signature is a fiction, safe only because the address is all
+// that is ever used.
+func writeExterns(b *bytes.Buffer, funcs, data []abiItem) {
+	var undeclared []abiItem
+	for _, it := range append(append([]abiItem{}, funcs...), data...) {
+		// Reachability alone decides this, not abi_only: PyMarshal_* is ordinary
+		// public API declared in marshal.h, which Python.h does not include, so
+		// it needs a declaration here exactly as an abi_only entry does.
+		if !it.Declared {
+			undeclared = append(undeclared, it)
+		}
+	}
+	if len(undeclared) == 0 {
+		return
+	}
+	sort.Slice(undeclared, func(a, c int) bool {
+		if undeclared[a].Ifdef != undeclared[c].Ifdef {
+			return undeclared[a].Ifdef < undeclared[c].Ifdef
+		}
+		return undeclared[a].Name < undeclared[c].Name
+	})
+	fmt.Fprintf(b, "/* %d stable-ABI entries are declared in no public header. */\n", len(undeclared))
+	guard := ""
+	for _, it := range undeclared {
+		if it.Ifdef != guard {
+			if guard != "" {
+				b.WriteString("#endif\n")
+			}
+			guard = it.Ifdef
+			if guard != "" {
+				fmt.Fprintf(b, "#ifdef %s\n", guard)
+			}
+		}
+		if it.Kind == "function" {
+			fmt.Fprintf(b, "extern void %s(void);\n", it.Name)
+		} else {
+			fmt.Fprintf(b, "extern char %s[];\n", it.Name)
+		}
+	}
+	if guard != "" {
+		b.WriteString("#endif\n")
+	}
+	b.WriteString("\n")
+}
+
+// writeTable guards entries one by one rather than hoisting them into a block:
+// the table has to stay sorted however the feature macros resolve, or bsearch
+// silently misses symbols on some targets.
+func writeTable(b *bytes.Buffer, name string, items []abiItem, macro string) {
+	fmt.Fprintf(b, "ExportedSymbol %s[] = {\n", name)
+	for _, it := range items {
+		if it.Ifdef != "" {
+			fmt.Fprintf(b, "#ifdef %s\n", it.Ifdef)
+		}
+		fmt.Fprintf(b, "    %s(%s)\n", macro, it.Name)
+		if it.Ifdef != "" {
+			b.WriteString("#endif\n")
+		}
+	}
+	b.WriteString("    {NULL, NULL}\n};\n")
+	fmt.Fprintf(b, "const size_t %s_count = sizeof(%s) / sizeof(%s[0]) - 1;\n\n", name, name, name)
+}
+
+func pyhostPython(dir string) (string, error) {
+	cands := []string{"bin/python3", "bin/python", "python3", "python"}
+	for _, c := range cands {
+		p := filepath.Join(dir, filepath.FromSlash(c))
+		if fi, err := os.Stat(p); err == nil && !fi.IsDir() && fi.Mode()&0o111 != 0 {
+			return p, nil
+		}
+	}
+	if m, _ := filepath.Glob(filepath.Join(dir, "bin", "python3.*")); len(m) > 0 {
+		sort.Strings(m)
+		return m[0], nil
+	}
+	return "", fmt.Errorf("staticapi: no interpreter in pyhost artifact %s (tried %s)", dir, strings.Join(cands, ", "))
+}
+
+func sha256Bytes(b []byte) string {
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:])
+}
+
+func sha256File(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
