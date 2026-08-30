@@ -186,29 +186,38 @@ func (l *Launcher) Run(ctx context.Context, r *core.Runner, name, dir, prog stri
 
 	switch {
 	case err == nil:
-		return res, nil
 	case errors.Is(runCtx.Err(), context.DeadlineExceeded):
 		res.TimedOut = true
 		res.ExitCode = -1
-		return res, nil
 	case errors.Is(ctx.Err(), context.Canceled):
 		return res, ctx.Err()
-	}
-	var ee *exec.ExitError
-	if errors.As(err, &ee) {
+	default:
+		var ee *exec.ExitError
+		if !errors.As(err, &ee) {
+			return res, fmt.Errorf("%s: cannot execute %s: %w", name, ShJoin(argv), err)
+		}
 		res.ExitCode = ee.ExitCode()
-		return res, nil
 	}
-	return res, fmt.Errorf("%s: cannot execute %s: %w", name, ShJoin(argv), err)
+	if r != nil {
+		r.RecordRun(name, dir, argv, l.overlay(), res.Stdout, res.Stderr, res.ExitCode, start, res.Dur)
+	}
+	return res, nil
 }
 
 func (l *Launcher) environ() []string {
-	env := os.Environ()
+	return append(os.Environ(), l.overlay()...)
+}
+
+// overlay is the launcher's own variables, sorted: what a reader needs to
+// reproduce the run by hand, as opposed to whatever the build machine happened
+// to export.
+func (l *Launcher) overlay() []string {
 	keys := make([]string, 0, len(l.Env))
 	for k := range l.Env {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
+	env := make([]string, 0, len(keys))
 	for _, k := range keys {
 		env = append(env, k+"="+l.Env[k])
 	}

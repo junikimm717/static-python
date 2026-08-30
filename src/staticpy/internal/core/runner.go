@@ -473,3 +473,40 @@ func (l *lineWriter) Write(p []byte) (int, error) {
 	}
 	return len(p), nil
 }
+
+// RecordRun files the same evidence Run leaves for a command the Runner did
+// not execute itself: verification runs the target under an emulator with
+// stdout and stderr kept apart and a non-zero exit treated as data rather than
+// a build failure, neither of which Run can express. Without it a verify job
+// left nothing behind but its step markers, so a suite failure was
+// undiagnosable the moment the process exited.
+func (r *Runner) RecordRun(name, dir string, argv, explicit []string, stdout, stderr string, code int, start time.Time, dur time.Duration) string {
+	if len(argv) == 0 {
+		return ""
+	}
+	r.mu.Lock()
+	r.n++
+	n := r.n
+	step := r.step
+	r.mu.Unlock()
+
+	logName := fmt.Sprintf("%03d-%s.log", n, sanitize(name))
+	logPath := filepath.Join(r.dir, logName)
+	f, err := os.Create(logPath)
+	if err != nil {
+		r.log.Warn("cannot record command output", "cmd", name, "err", err)
+		return ""
+	}
+	defer f.Close()
+
+	c := Cmd{Name: name, Args: argv, Dir: dir}
+	writeHeader(f, r.slug, step, name, c, explicit, start)
+	r.appendScript(n, logName, name, c, explicit)
+	io.WriteString(f, stdout)
+	if stderr != "" {
+		io.WriteString(f, "\n# ----- stderr -----\n"+stderr)
+	}
+	fmt.Fprintf(f, "\n# exit: %d\n# duration: %s\n# finished: %s\n",
+		code, dur.Round(time.Millisecond), time.Now().UTC().Format(time.RFC3339))
+	return logPath
+}

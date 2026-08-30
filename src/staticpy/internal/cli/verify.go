@@ -125,6 +125,15 @@ func printVerifyReports(e *core.Env, nodes []core.PlanNode) bool {
 		if n.Job.Name() != "verify" {
 			continue
 		}
+		// A report describes the binary its artifact was built from, and the
+		// artifact survives a failed rebuild. Printing one that no longer
+		// matches its key announces a pass for a binary that is gone, right
+		// underneath the error saying the job failed.
+		if !n.Valid {
+			fmt.Fprintf(os.Stderr, "%s %s: the report on disk is from an earlier build, so it is not shown\n",
+				yellow("warning:"), n.Job.Slug())
+			continue
+		}
 		path := filepath.Join(n.Job.ArtifactDir(e), ensure.ReportName)
 		rep, err := readVerifyReport(path)
 		if err != nil {
