@@ -299,6 +299,29 @@ correct.
 workloads, so the numbers are comparable to nothing — not to native, and not to
 each other.
 
+**A hung forked child is libatomic, not qemu.** `test_threading` fails as
+*env changed* on arm-musleabi and riscv32 with four children "still running
+after 300.5 seconds". The test is `ThreadJoinOnShutdown.test_reinit_tls_after_fork`,
+which forks 16 children from 16 threads. Where a target has no native 64-bit
+atomic instruction gcc routes `__atomic_*` through libatomic, which serialises
+on a static lock table that nothing reinitialises across `fork`; a child forked
+while another thread held one of those locks hangs on its first atomic.
+
+Three things make this worth reading before you reach for an expectation entry.
+It is **not the emulator** — a 30-line C program with four threads doing
+`__atomic_fetch_add` on a `uint64` and sixteen forking threads hangs the same
+way, so it would hang on real hardware. It is **not the allocator**, though it
+looks like one: the naive fork-from-thread repro passes, and only allocator
+*contention* opens the window. And it **tracks `libatomic = true` in
+targets.toml exactly** — arm-musleabi, riscv32 and i386 hang, arm-musleabihf
+and aarch64 do not. i386 hangs in C but passes the suite, because CPython never
+reaches the locked path there; it is a latent hazard rather than a failure.
+
+The load average in regrtest's own progress line is what rules load in or out
+before you go looking (`load avg: 0.54` here). An identical-looking i386
+`test_threading` failure hours earlier *was* load — a machine in OOM thrash —
+and recording that one would have permanently masked a passing test.
+
 **A toolchain that works on your box proves nothing about a foreign rootfs.**
 The requirement is that a tarball drops onto *any* Linux rootfs — glibc,
 near-empty, whatever — and compiles through `-flto -fuse-linker-plugin

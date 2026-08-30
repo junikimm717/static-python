@@ -137,3 +137,38 @@ intermediates and rounds the two calls differently, leaving 2.22e-16. \
 Building this target with -msse2 -mfpmath=sse would fix it by raising the \
 minimum CPU, which is an ABI decision rather than a test-suite one.\
 """
+
+# ------------------------------------------ libatomic locks across fork --
+#
+# Where a target has no native 64-bit atomic instruction, gcc routes
+# __atomic_* through libatomic, which serialises on a static lock table.
+# Nothing registers a pthread_atfork handler for it, so a fork() issued from
+# one thread while another holds one of those locks leaves the child holding a
+# lock whose owner does not exist in it, and the child hangs on its first
+# atomic. This is the target's ABI, not the emulator: a 30-line C program with
+# four threads doing __atomic_fetch_add on a uint64 and sixteen forking threads
+# hangs the same way, and does so on the targets that link libatomic
+# (arm-musleabi, riscv32, i386) while arm-musleabihf and aarch64, which have
+# the instruction, pass. i386 is not listed below because CPython does not
+# reach the locked path there.
+#
+# Raising arm-musleabi to armv7 would give it LDREXD and fix it, the same
+# ABI-versus-test-suite call as the sinh entry above. rv32 has no 64-bit
+# atomic to raise to.
+
+[[expect.arm-linux-musleabi.ignore]]
+test = "*ThreadJoinOnShutdown.test_reinit_tls_after_fork*"
+why = """
+Forks 16 children from 16 threads; some hang in libatomic's lock table, which \
+is not reinitialised across fork, and the parent's wait_process gives up after \
+300s. The interpreter is fine -- 24 of 26 core test files pass and the same \
+fork pattern without allocator contention is clean.\
+"""
+
+[[expect.riscv32-linux-musl.ignore]]
+test = "*ThreadJoinOnShutdown.test_reinit_tls_after_fork*"
+why = """
+Same libatomic fork deadlock as arm-musleabi. rv32 has no 64-bit atomic \
+instruction, so there is no baseline to raise to: this one cannot be fixed \
+from the build.\
+"""
