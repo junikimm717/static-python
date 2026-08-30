@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -544,6 +545,9 @@ func defaultParallelism(workers, jobs int) (int, int) {
 		if cpus < workers {
 			workers = cpus
 		}
+		if m := memWorkers(); m > 0 && m < workers {
+			workers = m
+		}
 		if workers < 1 {
 			workers = 1
 		}
@@ -555,6 +559,38 @@ func defaultParallelism(workers, jobs int) (int, int) {
 		}
 	}
 	return workers, jobs
+}
+
+// linkPeakGB is what one interpreter link needs resident at its peak.
+// -flto-partition=none hands the assembler a single .s for the whole binary,
+// which measured 4.9GB on top of lto1's 1.9GB.
+const linkPeakGB = 8
+
+// memWorkers caps concurrency by RAM, returning 0 when it cannot be read.
+// Sizing by cores alone is what let 24 cores ask for four concurrent links on a
+// 30GB machine, where ~24GB of assembler and lto1 drove the OOM killer into the
+// desktop instead. MemTotal rather than MemAvailable: the cap is a property of
+// the machine, not of whatever happens to be open when the build starts.
+func memWorkers() int {
+	b, err := os.ReadFile("/proc/meminfo")
+	if err != nil {
+		return 0
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if !strings.HasPrefix(line, "MemTotal:") {
+			continue
+		}
+		f := strings.Fields(line)
+		if len(f) < 2 {
+			return 0
+		}
+		kb, err := strconv.Atoi(f[1])
+		if err != nil {
+			return 0
+		}
+		return kb / (linkPeakGB * 1024 * 1024)
+	}
+	return 0
 }
 
 // runLog decides whether this invocation opens a dist/logs/runs/<stamp> stream:

@@ -271,10 +271,11 @@ func buildEnv(e *Env, c Cmd) (env []string, explicit []string, err error) {
 		return env, explicit, nil
 	}
 	env = os.Environ()
-	// -flto-partition=none hands the assembler one .s per binary, ~600MB on a
-	// full interpreter. The default TMPDIR is often a RAM-backed tmpfs, where
-	// two concurrent links are enough to exhaust it and fail the build with
-	// "Quota exceeded"; dist/ is on real disk by construction.
+	// -flto-partition=none hands the assembler one .s per binary: ~5GB resident
+	// and as much on disk for a full interpreter. The default TMPDIR is often a
+	// RAM-backed tmpfs, where two concurrent links are enough to exhaust it and
+	// fail the build with "Quota exceeded"; dist/ is on real disk by
+	// construction. The resident half is capped by memWorkers, not here.
 	if _, set := c.EnvAdd["TMPDIR"]; !set {
 		tmp := e.Path(DirTmp)
 		if err := os.MkdirAll(tmp, 0o755); err != nil {
