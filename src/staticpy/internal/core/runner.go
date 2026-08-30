@@ -206,6 +206,12 @@ func (r *Runner) run(ctx context.Context, c Cmd, capture bool) (string, error) {
 		// is discarded anyway.
 		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 	}
+	// A grandchild that left the group -- the suite double-forks, and qemu's
+	// children come back reparented to init -- survives that kill still holding
+	// the write end of these pipes, and Wait blocks on the copy goroutine
+	// forever. Three orphaned qemu-riscv32 processes hung a cancelled verify
+	// indefinitely at load 0.11. WaitDelay closes the pipes and gives up.
+	cmd.WaitDelay = 10 * time.Second
 
 	r.log.Debug("exec", "step", step, "cmd", ShellQuote(c.Args), "dir", c.Dir, "log", logPath)
 	runErr := cmd.Run()
