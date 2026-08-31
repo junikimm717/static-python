@@ -109,8 +109,13 @@ to run this project, you for sure know what you are doing 😇)
 # a stock --enable-shared build of the same pinned source, by this machine's gcc
 ./staticpy build --profile reference
 ./staticpy bench --interp static --interp reference --baseline reference
+
+# eight-arm LTO × allocator × static/dynamic sweep; baseline defaults to reference
+./staticpy bench --interp ablation
 ```
 
 That runs pyperformance -- what speed.python.org publishes against -- and
-writes a markdown report plus the raw pyperf JSON to `dist/bench/`.
+writes a session directory under `dist/bench/<UTC-stamp>-<arch>/` containing
+`report.md`, `report.html`, `manifest.json` (protocol and pins), `env.json`
+(kernel, cpu, memory, affinity), and the raw pyperf JSON.
 `--suite micro` runs a stdlib-only loop set instead, which needs no network.

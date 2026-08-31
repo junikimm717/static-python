@@ -130,11 +130,11 @@ type PackageVariant struct {
 	Configure []string `toml:"configure"`
 	Provides  []string `toml:"provides"`
 	MakeVars  []string `toml:"make_vars"`
-	// Drops the package from this profile entirely. mimalloc is the case:
-	// it exists to beat musl's allocator at static link time, and a reference
-	// build that shipped it would no longer be the stock interpreter it exists
-	// to be measured against.
-	Skip bool `toml:"skip"`
+	// Drops the package from this profile. mimalloc is the case: it exists to
+	// beat musl's allocator at static link, and a reference build that shipped
+	// it would not be the stock interpreter it is measured against. A pointer
+	// so a child can un-skip; a bool can only set true in the inherit walk.
+	Skip *bool `toml:"skip"`
 }
 
 // Scopes layer on top of the profile-wide values, so a change confined to one
@@ -153,6 +153,10 @@ type Profile struct {
 
 	Strip *bool `toml:"strip"`
 	Debug *bool `toml:"debug_symbols"`
+	// Host-built LTO is CPython's --with-lto, not the flag lists the static
+	// build uses. Unset leaves the recipe default so existing profile keys
+	// do not move.
+	LTO *bool `toml:"lto"`
 	// PGO is "off", "native-only", or "on".
 	PGO         string `toml:"pgo"`
 	ProfileTask string `toml:"profile_task"`
@@ -184,6 +188,8 @@ type Resolved struct {
 
 	Strip       bool
 	Debug       bool
+	LTO         bool
+	LTOSet      bool
 	PGO         string
 	ProfileTask string
 	TestModules bool
@@ -252,9 +258,18 @@ type Config struct {
 	Bundles    map[string]Bundle     `toml:"bundle"`
 	PyPackages map[string]PyPackage  `toml:"pkg"`
 	Expect     map[string]TestExpect `toml:"expect"`
+	Bench      BenchConfig           `toml:"bench"`
 
 	// Origin records, per file, where the winning copy came from: "embedded" or
 	// an absolute path. It feeds Manifest.Provenance so a build assembled from
 	// an overlay is distinguishable from one that was not.
 	Origin map[string]string `toml:"-"`
+}
+
+// Pins and the ablation lineup. A forgotten arm is a silent hole in every
+// report, which is why validation demands exactly these eight names.
+type BenchConfig struct {
+	Pyperformance string   `toml:"pyperformance"`
+	Pyperf        string   `toml:"pyperf"`
+	Ablation      []string `toml:"ablation"`
 }

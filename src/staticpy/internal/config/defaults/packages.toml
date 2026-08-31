@@ -282,3 +282,15 @@ provides = ["lib/libsqlite3.so"]
 # build carrying it would not be the stock interpreter it exists to measure.
 [package.mimalloc.profile.reference]
 skip = true
+
+[package.mimalloc.profile.nomimalloc]
+skip = true
+
+[package.mimalloc.profile.nolto-nomimalloc]
+skip = true
+
+[package.mimalloc.profile.reference-mimalloc]
+skip = false
+
+[package.mimalloc.profile.reference-nolto-mimalloc]
+skip = false

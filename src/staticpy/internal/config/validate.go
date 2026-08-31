@@ -24,6 +24,7 @@ func (c *Config) Validate() error {
 		c.validateProfiles,
 		c.validatePyPackages,
 		c.validateBundles,
+		c.validateBench,
 	} {
 		if err := check(); err != nil {
 			return err
@@ -151,7 +152,7 @@ func (c *Config) validatePackages() error {
 				return fmt.Errorf("%s: [package.%s.profile.%s] names no profile (have %s)",
 					where, key, prof, keysOf(c.Profiles))
 			}
-			if v.Configure == nil && v.Provides == nil && v.MakeVars == nil && !v.Skip {
+			if v.Configure == nil && v.Provides == nil && v.MakeVars == nil && v.Skip == nil {
 				return fmt.Errorf("%s: [package.%s.profile.%s] overrides nothing; drop it, or set configure, provides, make_vars or skip",
 					where, key, prof)
 			}
@@ -282,6 +283,41 @@ func (c *Config) validateBundles() error {
 	}
 	if err := c.validateExpect(); err != nil {
 		return err
+	}
+	return nil
+}
+
+// The eight-way (static, dynamic) × (lto, no-lto) × (mimalloc, libc malloc)
+// matrix, in the order bench.toml lists them. A forgotten name is a silent
+// hole in every report.
+var requiredAblation = []string{
+	"reference",
+	"reference-nolto",
+	"reference-mimalloc",
+	"reference-nolto-mimalloc",
+	"default",
+	"nolto",
+	"nomimalloc",
+	"nolto-nomimalloc",
+}
+
+func (c *Config) validateBench() error {
+	if c.Bench.Pyperformance == "" || c.Bench.Pyperf == "" {
+		return fmt.Errorf("bench: pyperformance and pyperf pins are required")
+	}
+	if len(c.Bench.Ablation) != len(requiredAblation) {
+		return fmt.Errorf("bench: ablation must be exactly the %d named profiles in listed order, got %d (%s)",
+			len(requiredAblation), len(c.Bench.Ablation), strings.Join(c.Bench.Ablation, ", "))
+	}
+	for i, name := range c.Bench.Ablation {
+		if _, ok := c.Profiles[name]; !ok {
+			return fmt.Errorf("bench: ablation names %q, which is not a profile (have %s)",
+				name, keysOf(c.Profiles))
+		}
+		if name != requiredAblation[i] {
+			return fmt.Errorf("bench: ablation[%d] = %q, want %q; the eight-way matrix is fixed so a forgotten arm fails CI",
+				i, name, requiredAblation[i])
+		}
 	}
 	return nil
 }

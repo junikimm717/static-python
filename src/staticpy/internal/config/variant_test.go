@@ -86,6 +86,8 @@ func TestValidateRejectsVariantOnUnknownProfile(t *testing.T) {
 	}
 }
 
+func boolPtr(v bool) *bool { return &v }
+
 func TestValidateRejectsEmptyVariant(t *testing.T) {
 	c := base()
 	p := c.Packages["libffi"]
@@ -93,6 +95,67 @@ func TestValidateRejectsEmptyVariant(t *testing.T) {
 	c.Packages["libffi"] = p
 	if err := c.validatePackages(); err == nil {
 		t.Fatal("a variant overriding nothing was accepted")
+	}
+}
+
+func TestValidateAcceptsUnskipOnly(t *testing.T) {
+	c := base()
+	p := c.Packages["libffi"]
+	p.Variants = map[string]PackageVariant{"reference": {Skip: boolPtr(false)}}
+	c.Packages["libffi"] = p
+	if err := c.validatePackages(); err != nil {
+		t.Fatalf("skip=false is an override, got %v", err)
+	}
+}
+
+func TestPackageSkippedWalk(t *testing.T) {
+	tests := []struct {
+		name     string
+		variants map[string]PackageVariant
+		profile  string
+		want     bool
+	}{
+		{
+			name:     "parent skip true",
+			variants: map[string]PackageVariant{"reference": {Skip: boolPtr(true)}},
+			profile:  "reference",
+			want:     true,
+		},
+		{
+			name: "child un-skips",
+			variants: map[string]PackageVariant{
+				"reference": {Skip: boolPtr(true)},
+				"refchild":  {Skip: boolPtr(false)},
+			},
+			profile: "refchild",
+			want:    false,
+		},
+		{
+			name:     "child inherits skip",
+			variants: map[string]PackageVariant{"reference": {Skip: boolPtr(true)}},
+			profile:  "refchild",
+			want:     true,
+		},
+		{
+			name:    "no variant is not skipped",
+			profile: "default",
+			want:    false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := base()
+			p := c.Packages["libffi"]
+			p.Variants = tt.variants
+			c.Packages["libffi"] = p
+			got, err := c.PackageSkipped("libffi", tt.profile)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != tt.want {
+				t.Errorf("PackageSkipped(%q) = %v, want %v", tt.profile, got, tt.want)
+			}
+		})
 	}
 }
 

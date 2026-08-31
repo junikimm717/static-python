@@ -1,0 +1,13 @@
+[bench]
+pyperformance = "1.14.0"
+pyperf = "2.10.0"
+ablation = [
+  "reference",
+  "reference-nolto",
+  "reference-mimalloc",
+  "reference-nolto-mimalloc",
+  "default",
+  "nolto",
+  "nomimalloc",
+  "nolto-nomimalloc",
+]

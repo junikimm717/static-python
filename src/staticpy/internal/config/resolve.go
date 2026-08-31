@@ -140,6 +140,10 @@ func apply(r *Resolved, p Profile, where string) error {
 	if p.Debug != nil {
 		r.Debug = *p.Debug
 	}
+	if p.LTO != nil {
+		r.LTO = *p.LTO
+		r.LTOSet = true
+	}
 	if p.TestModules != nil {
 		r.TestModules = *p.TestModules
 	}
@@ -205,6 +209,9 @@ func (r Resolved) keyInputs() map[string]string {
 	in["test_modules"] = strconv.FormatBool(r.TestModules)
 	in["modules"] = r.Modules
 	in["bundle"] = r.Bundle
+	if r.LTOSet {
+		in["lto"] = strconv.FormatBool(r.LTO)
+	}
 	return in
 }
 
@@ -246,8 +253,8 @@ func (c *Config) packageFor(name, profileName string) (Package, bool, error) {
 		if v.MakeVars != nil {
 			pkg.MakeVars = append([]string(nil), v.MakeVars...)
 		}
-		if v.Skip {
-			skip = true
+		if v.Skip != nil {
+			skip = *v.Skip
 		}
 	}
 	// Leaving the table on the returned package would put every other profile's

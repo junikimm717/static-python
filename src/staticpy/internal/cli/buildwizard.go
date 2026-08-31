@@ -168,12 +168,17 @@ func targetMenu(g *Global, cfg *config.Config, host string) (tui.Menu, error) {
 // What a profile is for lives in profiles.toml comments, which nobody can read
 // mid-prompt. A profile only an overlay knows about gets no note, not a guess.
 var profileNotes = map[string]string{
-	"default":   "recommended",
-	"debug":     "unstripped, with -g",
-	"nolto":     "no LTO on the CPython tree, so it builds much faster",
-	"nopgo":     "no profile-guided optimization",
-	"bootstrap": "internal: the minimal host python that cross builds run",
-	"reference": "dynamic baseline the benchmarks compare against",
+	"default":                  "recommended",
+	"debug":                    "unstripped, with -g",
+	"nolto":                    "no LTO on the CPython tree, so it builds much faster",
+	"nopgo":                    "no profile-guided optimization",
+	"bootstrap":                "internal: the minimal host python that cross builds run",
+	"reference":                "dynamic baseline the benchmarks compare against",
+	"nomimalloc":               "LTO, musl malloc instead of mimalloc",
+	"nolto-nomimalloc":         "no LTO, musl malloc",
+	"reference-nolto":          "dynamic baseline without --with-lto",
+	"reference-mimalloc":       "dynamic baseline with mimalloc.o linked in",
+	"reference-nolto-mimalloc": "dynamic baseline, no LTO, mimalloc.o linked in",
 }
 
 func profileMenu(cfg *config.Config, def string) tui.Menu {

@@ -106,6 +106,26 @@ func (s *Session) WriteJSON(name string, v any) error {
 	return os.WriteFile(filepath.Join(s.Dir, name), append(b, '\n'), 0o644)
 }
 
+// Manifest is the session accounting file. Protocol and pins live here so a
+// later import can refuse stale numbers without re-reading the report.
+func Manifest(stamp, baseline string, pins Pins, ids []Identity, skipped []string) map[string]any {
+	pins = pins.withDefaults()
+	if skipped == nil {
+		skipped = []string{}
+	}
+	if ids == nil {
+		ids = []Identity{}
+	}
+	return map[string]any{
+		"stamp":        stamp,
+		"baseline":     baseline,
+		"protocol":     Protocol,
+		"suite":        map[string]string{"pyperformance": pins.Pyperformance, "pyperf": pins.Pyperf},
+		"interpreters": ids,
+		"skipped":      skipped,
+	}
+}
+
 // Identity is everything needed to know which binary produced a column.
 type Identity struct {
 	Label   string `json:"label"`

@@ -134,3 +134,22 @@ pgo = "native-only"
 profile_task = "-m test --pgo -x test_re -x test_generators -i test_fma_zero_result -i test_type_check_in_subinterp"
 test_modules = true
 modules = "full"
+
+# Allocator ablation: mimalloc is skipped in packages.toml, flags unchanged.
+[profile.nomimalloc]
+inherit = "default"
+
+[profile.nolto-nomimalloc]
+inherit = "nolto"
+
+# Host-built LTO is CPython's --with-lto (see Profile.LTO), not the flag lists.
+[profile.reference-nolto]
+inherit = "reference"
+lto = false
+
+# Un-skips mimalloc in packages.toml; openssl/libffi stay the reference shared variants.
+[profile.reference-mimalloc]
+inherit = "reference"
+
+[profile.reference-nolto-mimalloc]
+inherit = "reference-nolto"

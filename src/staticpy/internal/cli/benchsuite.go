@@ -16,13 +16,17 @@ import (
 // runPyperfSuite drives the pyperformance suite across the selected arms and
 // writes a session directory that can be re-read long after the run.
 func runPyperfSuite(e *core.Env, order []string, paths map[string]string,
-	baseline, suiteRoot, pyperfHint string, useVenv bool, noPin bool, cpu int, timeout time.Duration, offline bool) error {
+	baseline, suiteRoot, pyperfHint string, useVenv bool, noPin bool, cpu int, timeout time.Duration, offline bool, pins bench.Pins) error {
 
 	var skipped []string
 	pin, topo, err := choosePin(noPin, cpu)
 	if err != nil {
 		return err
 	}
+
+	machine := bench.ReadMachine()
+	machine.Topology = describeTopo(topo)
+	machine.Affinity = pin.Describe()
 
 	sess, err := bench.NewSession(e.Dist, runtime.GOARCH, time.Now())
 	if err != nil {
@@ -83,7 +87,7 @@ func runPyperfSuite(e *core.Env, order []string, paths map[string]string,
 		for _, label := range order {
 			all = append(all, venvs[label])
 		}
-		if suiteRoot, err = bench.Bootstrap(ctx, runner, all, offline); err != nil {
+		if suiteRoot, err = bench.Bootstrap(ctx, runner, all, offline, pins); err != nil {
 			return err
 		}
 	}
@@ -129,17 +133,14 @@ func runPyperfSuite(e *core.Env, order []string, paths map[string]string,
 	// what a run killed halfway still leaves behind; the late one is the only
 	// place a runtime failure can appear, since it is not known until then.
 	writeAccounting := func() error {
-		if err := sess.WriteJSON("manifest.json", map[string]any{
-			"stamp": sess.Stamp, "baseline": baseline, "suite_root": suiteRoot,
-			"venv": useVenv, "interpreters": ids, "skipped": skipped,
-		}); err != nil {
+		man := bench.Manifest(sess.Stamp, baseline, pins, ids, skipped)
+		man["suite_root"] = suiteRoot
+		man["venv"] = useVenv
+		man["benchmarks_found"] = len(suite.Cases)
+		if err := sess.WriteJSON("manifest.json", man); err != nil {
 			return err
 		}
-		if err := sess.WriteJSON("env.json", map[string]any{
-			"topology": describeTopo(topo), "affinity": pin.Describe(),
-			"benchmarks_found": len(suite.Cases), "benchmarks_skipped": len(skipped),
-			"machine": gatherBenchEnv(),
-		}); err != nil {
+		if err := sess.WriteJSON("env.json", machine); err != nil {
 			return err
 		}
 		// Always written, empty list included: an absent skipped.json would
@@ -169,11 +170,26 @@ func runPyperfSuite(e *core.Env, order []string, paths map[string]string,
 	rows, geo := bench.Compare(res, baseline, order)
 	if err := sess.WriteJSON("report.json", map[string]any{
 		"baseline": baseline, "rows": rows, "geomean_vs_baseline": geo,
+		"protocol": bench.Protocol,
 	}); err != nil {
 		return err
 	}
-	md := renderSuiteReport(baseline, order, rows, geo, pin, topo)
+	rep := bench.SuiteReport{
+		Baseline:   baseline,
+		Order:      order,
+		Rows:       rows,
+		Geomean:    geo,
+		Machine:    machine,
+		Protocol:   bench.Protocol,
+		Pins:       pins,
+		Identities: ids,
+		Skipped:    len(skipped),
+	}
+	md := rep.Markdown()
 	if err := os.WriteFile(filepath.Join(sess.Dir, "report.md"), []byte(md), 0o644); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(sess.Dir, "report.html"), []byte(rep.HTML()), 0o644); err != nil {
 		return err
 	}
 	fmt.Print(md)
@@ -210,41 +226,4 @@ func describeTopo(t *bench.Topology) string {
 		return "unknown"
 	}
 	return t.Describe()
-}
-
-func renderSuiteReport(baseline string, order []string, rows []bench.Row,
-	geo map[string]float64, pin bench.Pin, topo *bench.Topology) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "# pyperformance comparison\n\n")
-	fmt.Fprintf(&b, "- baseline: %s\n- %s\n- %s\n- rows: %d\n\n",
-		baseline, describeTopo(topo), pin.Describe(), len(rows))
-
-	fmt.Fprintf(&b, "| benchmark |")
-	for _, a := range order {
-		fmt.Fprintf(&b, " %s |", a)
-	}
-	fmt.Fprintf(&b, "\n|---|")
-	for range order {
-		fmt.Fprintf(&b, "---:|")
-	}
-	b.WriteString("\n")
-	for _, r := range rows {
-		fmt.Fprintf(&b, "| %s |", r.Benchmark)
-		for _, a := range order {
-			if v, ok := r.Ratio[a]; ok {
-				fmt.Fprintf(&b, " %.2fx |", v)
-			} else {
-				b.WriteString(" - |")
-			}
-		}
-		b.WriteString("\n")
-	}
-	b.WriteString("\nGeomean vs baseline (>1 is faster):\n\n")
-	for _, a := range order {
-		if a == baseline {
-			continue
-		}
-		fmt.Fprintf(&b, "- %s: %.3fx\n", a, geo[a])
-	}
-	return b.String()
 }

@@ -39,6 +39,13 @@ func Deps(cfg *config.Config, assets fs.FS, t config.Target, profile string) ([]
 		memo: map[string]*depJob{}, onStack: map[string]bool{}}
 	var out []core.Job
 	for _, name := range sortedKeys(cfg.Packages) {
+		skip, err := cfg.PackageSkipped(name, profile)
+		if err != nil {
+			return nil, err
+		}
+		if skip {
+			continue
+		}
 		j, err := b.job(name)
 		if err != nil {
 			return nil, err

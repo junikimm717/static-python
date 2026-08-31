@@ -183,6 +183,9 @@ func mergeFile(dst *Config, data, origin string, allowSources bool) error {
 	mergeInto(dst.Bundles, src.Bundles)
 	mergeInto(dst.PyPackages, src.PyPackages)
 	mergeInto(dst.Expect, src.Expect)
+	if src.Bench.Pyperformance != "" {
+		dst.Bench = src.Bench
+	}
 	return nil
 }
 

@@ -96,6 +96,12 @@ func PyRef(cfg *config.Config, assets fs.FS, target config.Target, profile strin
 	return j, nil
 }
 
+// Unset means the recipe default (pass --with-lto), so existing reference keys
+// do not move. Static builds ignore this: their LTO is the flag lists.
+func withLTO(res config.Resolved) bool {
+	return !res.LTOSet || res.LTO
+}
+
 // The major.minor CPython installs its binary and libdir under.
 func pyABI(version string) string {
 	parts := strings.SplitN(version, ".", 3)
@@ -264,7 +270,17 @@ func (j *pyRef) cpython(ctx context.Context, e *core.Env, r *core.Runner, work, 
 	if j.res.PGO != "off" {
 		args = append(args, "--enable-optimizations")
 	}
-	args = append(args, "--with-lto")
+	if withLTO(j.res) {
+		args = append(args, "--with-lto")
+	}
+	// Same LIBS= path as pynative; see staticpy-traps for the glibc interposition.
+	objs, oerr := sysrootObjects(shadowRootfs)
+	if oerr != nil {
+		return oerr
+	}
+	if len(objs) > 0 {
+		args = append(args, "LIBS="+strings.Join(objs, " "))
+	}
 
 	// LDFLAGS finds the libraries now, LDFLAGS_NODIST records where they will
 	// be. lib64 as well as lib because libffi installs there whatever --libdir

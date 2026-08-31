@@ -175,6 +175,21 @@ which is why it has stood. `ffi_call` and 64-bit returns are both fine, which is
 what narrows it. Fixed by a `target_patches` entry for `mips64-linux-musl`
 alone; full write-up and reproducer in `references/MIPS64_FFI_REPORT.md`.
 
+**`nomimalloc` still linking mimalloc.** Sysroot used to compose every package
+regardless of `skip`, so `lib/mimalloc.o` still reached pynative's `LIBS=` and
+the static allocator axis was a no-op. Skip is filtered in Sysroot and Deps;
+`depBuilder.job` does not filter, so a `Needs` edge that names a skipped
+package still fails instead of vanishing.
+
+**`reference-mimalloc` still using glibc malloc.** Un-skipping mimalloc on a
+host-built profile does nothing unless the `.o` is on the python link line.
+musl's malloc is weak, so a strong `mimalloc.o` in `LIBS=` wins; glibc's malloc
+is a strong symbol in libc.so and the override is ELF interposition of a malloc
+defined in the executable — the same `LIBS=` path pynative already uses, not a
+shared libmimalloc. Symptom: `ldd` shows no mimalloc (there is none) and
+allocations match glibc; check that python-configure's argv contains
+`LIBS=.../mimalloc.o`.
+
 **Localise before `ld -r`, never after.** mimalloc ships as one relocatable
 object with everything but the allocator's entry points made local. Doing that
 with `objcopy --keep-global-symbols` *after* the relocatable link builds a
