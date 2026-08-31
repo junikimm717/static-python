@@ -116,6 +116,6 @@ to run this project, you for sure know what you are doing 😇)
 
 That runs pyperformance -- what speed.python.org publishes against -- and
 writes a session directory under `dist/bench/<UTC-stamp>-<arch>/` containing
-`report.md`, `report.html`, `manifest.json` (protocol and pins), `env.json`
-(kernel, cpu, memory, affinity), and the raw pyperf JSON.
+`report.md`, `report.html`, `manifest.json` (protocol, pins, host fingerprint), `env.json`
+(kernel, cpu, memory, affinity, full fingerprint), and the raw pyperf JSON.
 `--suite micro` runs a stdlib-only loop set instead, which needs no network.

@@ -65,6 +65,25 @@ func EnvMarkdown(m Machine, protocol int, pins Pins) string {
 	if m.Container {
 		b.WriteString("- container: yes\n")
 	}
+	if m.Fingerprint != nil {
+		fp := m.Fingerprint
+		if fp.SHA256 != "" {
+			fmt.Fprintf(&b, "- fingerprint: %s\n", fp.SHA256)
+		}
+		if fp.CPU.Microcode != "" {
+			fmt.Fprintf(&b, "- microcode: %s\n", fp.CPU.Microcode)
+		}
+		if fp.SMT.Control != "" || fp.SMT.Active != "" {
+			fmt.Fprintf(&b, "- smt: active=%s control=%s threads_per_core=%d\n",
+				dash(fp.SMT.Active), dash(fp.SMT.Control), fp.SMT.ThreadsPerCore)
+		}
+		if s := vulnSummary(fp.Vulnerabilities); s != "" {
+			fmt.Fprintf(&b, "- vulnerabilities: %s (see env.json)\n", s)
+		}
+		if fp.Kernel.Clocksource != "" {
+			fmt.Fprintf(&b, "- clocksource: %s\n", fp.Kernel.Clocksource)
+		}
+	}
 	return b.String()
 }
 
@@ -204,6 +223,25 @@ func (r SuiteReport) envHTML() string {
 	}
 	if m.Container {
 		b.WriteString(row("container", "yes"))
+	}
+	if m.Fingerprint != nil {
+		fp := m.Fingerprint
+		if fp.SHA256 != "" {
+			b.WriteString(row("fingerprint", fp.SHA256))
+		}
+		if fp.CPU.Microcode != "" {
+			b.WriteString(row("microcode", fp.CPU.Microcode))
+		}
+		if fp.SMT.Control != "" || fp.SMT.Active != "" {
+			b.WriteString(row("smt", fmt.Sprintf("active=%s control=%s threads_per_core=%d",
+				dash(fp.SMT.Active), dash(fp.SMT.Control), fp.SMT.ThreadsPerCore)))
+		}
+		if s := vulnSummary(fp.Vulnerabilities); s != "" {
+			b.WriteString(row("vulnerabilities", s))
+		}
+		if fp.Kernel.Clocksource != "" {
+			b.WriteString(row("clocksource", fp.Kernel.Clocksource))
+		}
 	}
 	b.WriteString(row("baseline", r.Baseline))
 	b.WriteString("</dl>\n")

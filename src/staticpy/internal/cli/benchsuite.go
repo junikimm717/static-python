@@ -25,8 +25,11 @@ func runPyperfSuite(e *core.Env, order []string, paths map[string]string,
 	}
 
 	machine := bench.ReadMachine()
-	machine.Topology = describeTopo(topo)
-	machine.Affinity = pin.Describe()
+	topoDesc := ""
+	if topo != nil {
+		topoDesc = describeTopo(topo)
+	}
+	machine.SetRunPlacement(pin.Describe(), topoDesc)
 
 	sess, err := bench.NewSession(e.Dist, runtime.GOARCH, time.Now())
 	if err != nil {
@@ -137,6 +140,7 @@ func runPyperfSuite(e *core.Env, order []string, paths map[string]string,
 		man["suite_root"] = suiteRoot
 		man["venv"] = useVenv
 		man["benchmarks_found"] = len(suite.Cases)
+		machine.AttachToManifest(man)
 		if err := sess.WriteJSON("manifest.json", man); err != nil {
 			return err
 		}

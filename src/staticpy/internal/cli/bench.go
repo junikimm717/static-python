@@ -90,7 +90,7 @@ SUITES
   deduplicated: a measurement is not a pure function of its inputs. The session
   holds report.md, report.html (geomean bars, ratio table, env, identities),
   the unaggregated pyperf JSON, a manifest with protocol and pins plus each
-  binary's sha256, env.json (kernel, cpu, memory, affinity), and
+  binary's sha256, env.json (kernel, cpu, memory, affinity, fingerprint), and
   timeline.jsonl -- one record per measurement with its wall time, load
   average and the busy fraction of the pinned core's SMT sibling, which is
   what lets a suspicious number be audited months later.
@@ -299,17 +299,20 @@ func runBench(g *Global, args []string) error {
 	}
 
 	env := bench.ReadMachine()
-	env.Affinity = pin.Describe()
+	topoDesc := ""
 	if topo != nil {
-		env.Topology = topo.Describe()
+		topoDesc = topo.Describe()
 	}
+	env.SetRunPlacement(pin.Describe(), topoDesc)
 	arch := cfg.Targets[host].Arch
 	sess, err := bench.NewSession(g.Dist, runtime.GOARCH, time.Now())
 	if err != nil {
 		return err
 	}
 	defer sess.Close()
-	if err := sess.WriteJSON("manifest.json", bench.Manifest(sess.Stamp, baseline, pins, nil, nil)); err != nil {
+	man := bench.Manifest(sess.Stamp, baseline, pins, nil, nil)
+	env.AttachToManifest(man)
+	if err := sess.WriteJSON("manifest.json", man); err != nil {
 		return err
 	}
 	if err := sess.WriteJSON("env.json", env); err != nil {

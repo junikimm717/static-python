@@ -102,3 +102,13 @@ func TestRenderHTMLContainsChartAndArms(t *testing.T) {
 		t.Fatalf("markdown env block too thin:\n%s", md)
 	}
 }
+
+func TestManifestGainsFingerprintWhenAttached(t *testing.T) {
+	m := Machine{Fingerprint: &Fingerprint{CPU: CPUInfo{ModelName: "x"}}}
+	m.Fingerprint.seal()
+	man := Manifest("s", "reference", Pins{}, nil, nil)
+	m.AttachToManifest(man)
+	if man["fingerprint_sha256"] != m.Fingerprint.SHA256 || man["fingerprint"] == nil {
+		t.Fatalf("manifest = %#v", man)
+	}
+}
