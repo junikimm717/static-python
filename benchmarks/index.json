@@ -5,7 +5,7 @@
       "id": "20000101T000000Z-x86_64",
       "stamp": "20000101T000000Z",
       "arch": "x86_64",
-      "protocol": 1,
+      "protocol": 2,
       "baseline": "reference",
       "arms": [
         "reference",
@@ -25,7 +25,8 @@
         "memory_bytes": 0
       },
       "stale_protocol": false,
-      "fixture": true
+      "fixture": true,
+      "git_revision": "0000000000000000000000000000000000000000"
     }
   ]
 }

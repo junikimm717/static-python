@@ -9,5 +9,5 @@
     }
   ],
   "geomean_vs_baseline": {"default": 1.2},
-  "protocol": 1
+  "protocol": 2
 }

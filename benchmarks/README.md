@@ -16,10 +16,15 @@ generated from these files by `./manage_benchmarks.py site`.
 
 Import copies `manifest.json`, `env.json`, `report.json`, `report.md`,
 `report.html`, `skipped.json`, and `timeline.jsonl` if present. The
-manifest includes a host `fingerprint` (cpu, microcode, smt, kernel
-cmdline, vulnerabilities, memory, …) and `fingerprint_sha256`. It does not
-copy `venv/`, `raw/`, or `logs/`. The destination name is the session
-directory's basename (`<stamp>-<arch>/`).
+manifest includes a host `fingerprint` and `fingerprint_sha256` (identity
+only: cpu, microcode, smt, kernel cmdline, vulnerabilities, total RAM, …).
+Load, current MHz, free RAM, and this run's pin are recorded under
+`fingerprint.telemetry` and are not hashed. The manifest also records the
+`git_revision` of the `staticpy` executable that produced the session, and
+each interpreter as `{label, binary_sha256, artifact_key, factors,
+packages}` — a profile name like `default` is not a stable description of
+the binary. It does not copy `venv/`, `raw/`, or `logs/`. The destination
+name is the session directory's basename (`<stamp>-<arch>/`).
 
 `--force` overwrites an existing id. Import refuses a `protocol` other than
 the current contract unless `--allow-stale-protocol` is passed.
@@ -35,7 +40,7 @@ the current contract unless `--allow-stale-protocol` is passed.
 
 `protocol` is the session schema and measurement contract, defined as
 `CURRENT_PROTOCOL` in `manage_benchmarks.py` and `bench.Protocol` in
-`src/staticpy/internal/bench/protocol.go`. It is currently **1**. A bump
+`src/staticpy/internal/bench/protocol.go`. It is currently **2**. A bump
 means previously recorded numbers cannot be compared to new ones (wrong
 reduction, silently dropped arms, a contaminated pin). A pyperformance pin
 bump is a suite change, not a protocol bump.

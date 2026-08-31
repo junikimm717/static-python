@@ -5,6 +5,7 @@ temp tree so they never mutate benchmarks/.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -59,6 +60,10 @@ class ImportTests(unittest.TestCase):
         index = json.loads((self.root / "benchmarks" / "index.json").read_text(encoding="utf-8"))
         ids = [r["id"] for r in index["runs"]]
         self.assertIn(FIXTURE_ID, ids)
+        entry = next(r for r in index["runs"] if r["id"] == FIXTURE_ID)
+        self.assertEqual(entry["protocol"], mb.CURRENT_PROTOCOL)
+        self.assertEqual(entry["git_revision"], "0000000000000000000000000000000000000000")
+        self.assertFalse(entry["stale_protocol"])
 
     def test_import_refuses_duplicate_without_force(self):
         mb.import_session(self.root, self.session)
@@ -71,6 +76,19 @@ class ImportTests(unittest.TestCase):
     def test_import_refuses_protocol_zero(self):
         manifest = json.loads((self.session / "manifest.json").read_text(encoding="utf-8"))
         manifest["protocol"] = 0
+        (self.session / "manifest.json").write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
+        with self.assertRaises(mb.ManagerError) as ctx:
+            mb.import_session(self.root, self.session)
+        self.assertIn("protocol", str(ctx.exception))
+        dest = mb.import_session(self.root, self.session, allow_stale=True)
+        self.assertTrue((dest / "manifest.json").is_file())
+
+    def test_import_refuses_previous_protocol(self):
+        manifest = json.loads((self.session / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["protocol"], mb.CURRENT_PROTOCOL)
+        manifest["protocol"] = mb.CURRENT_PROTOCOL - 1
         (self.session / "manifest.json").write_text(
             json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
         )
@@ -128,6 +146,21 @@ class VerifyTests(unittest.TestCase):
         with self.assertRaises(mb.ManagerError):
             mb.verify_runs(self.root)
 
+    def test_committed_fixture_matches_current_protocol(self):
+        run = mb.load_run(FIXTURE, fixture=True)
+        self.assertEqual(run["protocol"], mb.CURRENT_PROTOCOL)
+        self.assertFalse(run["stale_protocol"])
+        n = mb.verify_runs(ROOT)
+        self.assertGreaterEqual(n, 1)
+
+    def test_protocol_matches_go(self):
+        text = (ROOT / "src" / "staticpy" / "internal" / "bench" / "protocol.go").read_text(
+            encoding="utf-8"
+        )
+        m = re.search(r"const Protocol = (\d+)", text)
+        self.assertIsNotNone(m)
+        self.assertEqual(int(m.group(1)), mb.CURRENT_PROTOCOL)
+
 
 class SiteTests(unittest.TestCase):
     def test_site_contains_fixture_id_and_heading(self):
@@ -142,6 +175,12 @@ class SiteTests(unittest.TestCase):
         page = (out / "run" / FIXTURE_ID / "index.html").read_text(encoding="utf-8")
         self.assertIn("fingerprint", page)
         self.assertIn("spectre_v2", page)
+        self.assertIn("telemetry", page)
+        self.assertIn("git_revision", page)
+        self.assertIn("binary_sha256", page)
+        self.assertIn("whole-graph", page)
+        self.assertIn("mimalloc", page)
+        self.assertIn("pyperformance==1.14.0", page)
 
 
 class HelpTests(unittest.TestCase):

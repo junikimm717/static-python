@@ -17,7 +17,7 @@ import sys
 from pathlib import Path
 
 # Must match src/staticpy/internal/bench/protocol.go.
-CURRENT_PROTOCOL = 1
+CURRENT_PROTOCOL = 2
 INDEX_VERSION = 1
 
 ALLOWED_FILES = (
@@ -242,7 +242,7 @@ def scan_runs(root: Path) -> list[dict]:
 
 
 def index_entry(run: dict) -> dict:
-    return {
+    entry = {
         "id": run["id"],
         "stamp": run["stamp"],
         "arch": run["arch"],
@@ -256,6 +256,10 @@ def index_entry(run: dict) -> dict:
         "stale_protocol": run["stale_protocol"],
         "fixture": run["fixture"],
     }
+    rev = (run.get("_manifest") or {}).get("git_revision")
+    if isinstance(rev, str) and rev:
+        entry["git_revision"] = rev
+    return entry
 
 
 def refresh_index(root: Path) -> dict:
@@ -517,8 +521,9 @@ def _env_dl(env: dict) -> str:
         "kernel", "cpu_model", "logical_cores", "memory", "memory_bytes",
         "memory_available", "cache_l1d", "topology", "affinity", "container",
     ]
+    fp = env.get("fingerprint") if isinstance(env.get("fingerprint"), dict) else None
     parts = ['<dl class="env">\n']
-    seen = set()
+    seen = {"fingerprint"}
     for k in keys:
         if k in env:
             parts.append(f"<dt>{_esc(k)}</dt><dd>{_format_env_value(env[k])}</dd>\n")
@@ -527,7 +532,74 @@ def _env_dl(env: dict) -> str:
         if k not in seen:
             parts.append(f"<dt>{_esc(k)}</dt><dd>{_format_env_value(v)}</dd>\n")
     parts.append("</dl>\n")
+    if fp is not None:
+        parts.append(_fingerprint_html(fp))
     return "".join(parts)
+
+
+def _fingerprint_html(fp: dict) -> str:
+    ident = dict(fp)
+    tel = ident.pop("telemetry", None)
+    parts = [
+        "<h3>Fingerprint (identity)</h3>\n",
+        "<p>Hashed into <code>fingerprint_sha256</code>. Load, current MHz, "
+        "free RAM, and this run's pin live under telemetry and are not in "
+        "the digest.</p>\n",
+        f'<div class="env"><pre>{_esc(json.dumps(ident, indent=2, sort_keys=True))}</pre></div>\n',
+    ]
+    if tel is not None:
+        parts.append("<h3>Telemetry</h3>\n")
+        parts.append(
+            "<p>Point-in-time host snapshot. Recorded for audit, not hashed.</p>\n"
+        )
+        parts.append(
+            f'<div class="env"><pre>{_esc(json.dumps(tel, indent=2, sort_keys=True))}</pre></div>\n'
+        )
+    return "".join(parts)
+
+
+def _interpreters_html(manifest: dict) -> str:
+    interps = manifest.get("interpreters")
+    if not isinstance(interps, list) or not interps:
+        return ""
+    parts = [
+        "<h2>Interpreters</h2>\n",
+        "<p>Profile names are not a stable description of the binary; "
+        "factors and the content-addressed artifact key are.</p>\n",
+        "<table>\n<thead><tr>"
+        "<th>label</th><th>binary_sha256</th><th>artifact_key</th>"
+        "<th>linkage</th><th>libc</th><th>lto</th><th>allocator</th>"
+        "<th>pgo</th><th>toolchain</th><th>packages</th>"
+        "</tr></thead>\n<tbody>\n",
+    ]
+    for item in interps:
+        if not isinstance(item, dict):
+            continue
+        factors = item.get("factors") if isinstance(item.get("factors"), dict) else {}
+        pkgs = item.get("packages") if isinstance(item.get("packages"), dict) else {}
+        pkg_s = ", ".join(f"{k}=={v}" for k, v in sorted(pkgs.items())) if pkgs else ""
+        parts.append(
+            "<tr>"
+            f'<td>{_esc(item.get("label", ""))}</td>'
+            f'<td><code>{_esc(_short_sha(item.get("binary_sha256") or item.get("sha256")))}</code></td>'
+            f'<td><code>{_esc(_short_sha(item.get("artifact_key")))}</code></td>'
+            f'<td>{_esc(factors.get("linkage", item.get("linkage", "")))}</td>'
+            f'<td>{_esc(factors.get("libc", ""))}</td>'
+            f'<td>{_esc(factors.get("lto", ""))}</td>'
+            f'<td>{_esc(factors.get("allocator", ""))}</td>'
+            f'<td>{_esc(factors.get("pgo", ""))}</td>'
+            f'<td>{_esc(factors.get("toolchain", ""))}</td>'
+            f'<td>{_esc(pkg_s)}</td>'
+            "</tr>\n"
+        )
+    parts.append("</tbody></table>\n")
+    return "".join(parts)
+
+
+def _short_sha(v) -> str:
+    if not isinstance(v, str) or not v:
+        return ""
+    return v[:12] if len(v) > 12 else v
 
 
 def _format_env_value(v) -> str:
@@ -608,11 +680,20 @@ def write_site(root: Path, out: Path) -> Path:
                 f'<p class="stale">stale protocol {r["protocol"]} '
                 f"(current is {CURRENT_PROTOCOL})</p>\n"
             )
+        rev = (r.get("_manifest") or {}).get("git_revision")
+        git = ""
+        if isinstance(rev, str) and rev:
+            git = (
+                f'<p>git_revision of the <code>staticpy</code> executable: '
+                f'<code>{_esc(rev)}</code></p>\n'
+            )
         page = [
             '<nav><a href="../../index.html">all runs</a></nav>\n',
             banner,
             stale,
             f'<h1>{_esc(r["id"])}</h1>\n',
+            git,
+            _interpreters_html(r.get("_manifest") or {}),
             "<h2>Machine</h2>\n",
             _env_dl(r.get("_env") or {}),
             inner,
