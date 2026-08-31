@@ -239,8 +239,9 @@ func unrunnable(g *Global, cfg *config.Config) []string {
 
 func packMenu(g *Global) tui.Menu {
 	return tui.Menu{
-		Title:   "Also pack a distributable tarball?",
-		Help:    "The tarball is relocatable and lands in dist/out/" + g.Profile + "/<triple>/.",
+		Title: "Also pack a distributable tarball?",
+		Help: "The tarball is relocatable and lands in dist/out/" + g.Profile + "/<triple>/.\n" +
+			"A host-built (reference) tarball still needs a compatible glibc to run.",
 		Headers: []string{"pack", "result"},
 		Flag:    "--pack",
 		Default: "no",

@@ -116,31 +116,25 @@ func TestReferenceKeepsDefaultLTOAndSkipsMimalloc(t *testing.T) {
 	}
 }
 
-func TestLTOUnsetIsOmittedFromKey(t *testing.T) {
+func TestLTOIsAlwaysHashed(t *testing.T) {
 	c := loadEmbedded(t)
 	for _, profile := range []string{"default", "reference"} {
 		r, err := c.Resolve(profile, ScopePython)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if r.LTOSet {
-			t.Errorf("%s: LTOSet true; hashing lto would move existing keys", profile)
+		if got := r.KeyInputs()["lto"]; got != "true" {
+			t.Errorf("%s python keyInputs lto = %q, want true", profile, got)
 		}
-		if _, ok := r.KeyInputs()["lto"]; ok {
-			t.Errorf("%s python keyInputs includes lto, which would move existing keys", profile)
-		}
-		if _, ok := r.KeyInputs()["lto_mode"]; ok {
-			t.Errorf("%s python keyInputs includes lto_mode, which would move existing keys", profile)
+		if got := r.KeyInputs()["lto_mode"]; got != LTOModeWholeGraph {
+			t.Errorf("%s python keyInputs lto_mode = %q, want %s", profile, got, LTOModeWholeGraph)
 		}
 		deps, err := c.Resolve(profile, ScopeDeps)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, ok := deps.KeyInputs()["lto"]; ok {
-			t.Errorf("%s deps keyInputs includes lto", profile)
-		}
-		if _, ok := deps.KeyInputs()["lto_mode"]; ok {
-			t.Errorf("%s deps keyInputs includes lto_mode, which would move existing keys", profile)
+		if got := deps.KeyInputs()["lto_mode"]; got != LTOModeWholeGraph {
+			t.Errorf("%s deps keyInputs lto_mode = %q, want %s", profile, got, LTOModeWholeGraph)
 		}
 	}
 	r, err := c.Resolve("reference-nolto", ScopePython)
@@ -232,5 +226,5 @@ func TestValidateRejectsLTOModeOnHostBuilt(t *testing.T) {
 
 // Mirrors recipe.withLTO so the config tests do not import recipe.
 func withLTOForTest(r Resolved) bool {
-	return !r.LTOSet || r.LTO
+	return r.EffectiveLTO()
 }

@@ -11,7 +11,7 @@ var (
 	editActions  = map[string]bool{"insert_after": true, "insert_before": true, "replace_line": true, "delete_line": true}
 	targetStatus = map[string]bool{"proven": true, "experimental": true}
 	pgoModes     = map[string]bool{"off": true, "native-only": true, "on": true}
-	ltoModes     = map[string]bool{LTOModePerDep: true}
+	ltoModes     = map[string]bool{LTOModePerDep: true, LTOModeWholeGraph: true}
 	moduleSets   = map[string]bool{"minimal": true, "full": true}
 )
 

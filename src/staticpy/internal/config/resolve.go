@@ -204,11 +204,14 @@ func (r Resolved) keyInputs() map[string]string {
 		"strip":    strconv.FormatBool(r.Strip),
 		"debug":    strconv.FormatBool(r.Debug),
 	}
-	// Hashed on deps too: per-dep LTO rewrites the archive after install, and
-	// two profiles that share cflags must not share that artifact.
-	if r.LTOMode != "" {
-		in["lto_mode"] = r.LTOMode
+	// Always hashed, including the default: omitting it to keep old keys
+	// stable is how a later explicit whole-graph would silently share a
+	// per-dep archive.
+	mode := r.LTOMode
+	if mode == "" {
+		mode = LTOModeWholeGraph
 	}
+	in["lto_mode"] = mode
 	if r.Scope == ScopeDeps || strings.HasPrefix(r.Scope, ScopeDeps+".") {
 		return in
 	}
@@ -217,9 +220,7 @@ func (r Resolved) keyInputs() map[string]string {
 	in["test_modules"] = strconv.FormatBool(r.TestModules)
 	in["modules"] = r.Modules
 	in["bundle"] = r.Bundle
-	if r.LTOSet {
-		in["lto"] = strconv.FormatBool(r.LTO)
-	}
+	in["lto"] = strconv.FormatBool(r.EffectiveLTO())
 	return in
 }
 

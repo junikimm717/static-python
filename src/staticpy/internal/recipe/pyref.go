@@ -30,6 +30,12 @@ import (
 //
 // The cost is that changing one library rebuilds the whole baseline. Nothing
 // depends on a measuring stick, so nothing else pays for that.
+//
+// After install, every ELF RUNPATH is rewritten to $ORIGIN-relative so the
+// rootfs can be copied. The configure-time --prefix stays the published
+// path: that is what make and libtool need while the artifact does not
+// exist yet. Shrinking the string in .dynstr is safe because $ORIGIN/../lib
+// is shorter than dist/artifacts/pyref_.../rootfs/lib.
 func PyRef(cfg *config.Config, assets fs.FS, target config.Target, profile string) (core.Job, error) {
 	res, err := resolveScope(cfg, profile, config.ScopePython)
 	if err != nil {
@@ -96,10 +102,10 @@ func PyRef(cfg *config.Config, assets fs.FS, target config.Target, profile strin
 	return j, nil
 }
 
-// Unset means the recipe default (pass --with-lto), so existing reference keys
-// do not move. Static builds ignore this: their LTO is the flag lists.
+// Unset means the recipe default (pass --with-lto). Static builds ignore
+// this: their LTO is the flag lists.
 func withLTO(res config.Resolved) bool {
-	return !res.LTOSet || res.LTO
+	return res.EffectiveLTO()
 }
 
 // The major.minor CPython installs its binary and libdir under.
@@ -217,6 +223,11 @@ func (j *pyRef) Build(ctx context.Context, e *core.Env, r *core.Runner, work, st
 		return err
 	}
 
+	r.Step("rewriting RUNPATH to $ORIGIN")
+	if err := rewriteRootfsRpaths(shadowRootfs); err != nil {
+		return err
+	}
+
 	// One move, after everything is installed: the artifact is published by a
 	// single rename, so it is never observable half-built.
 	dst := filepath.Join(stage, "rootfs")
@@ -282,9 +293,9 @@ func (j *pyRef) cpython(ctx context.Context, e *core.Env, r *core.Runner, work, 
 		args = append(args, "LIBS="+strings.Join(objs, " "))
 	}
 
-	// LDFLAGS finds the libraries now, LDFLAGS_NODIST records where they will
-	// be. lib64 as well as lib because libffi installs there whatever --libdir
-	// says, and OpenSSL's platform configs disagree about which they use.
+	// LDFLAGS finds the libraries now, LDFLAGS_NODIST records the published
+	// prefix so the in-tree `make` binary has an rpath. After install that
+	// string is rewritten to $ORIGIN; see rewriteRootfsRpaths.
 	extra := map[string]string{
 		"LDFLAGS_NODIST": "-Wl,-rpath," + rootfs + "/lib:" + rootfs + "/lib64",
 		// CPython imports every extension module it builds to check it, and an
@@ -369,13 +380,11 @@ func (j *pyRef) assertModules(ctx context.Context, r *core.Runner, rootfs string
 		// Cleared rather than inherited: a PYTHONPATH from the caller's shell
 		// could satisfy an import the interpreter itself cannot.
 		//
-		// LD_LIBRARY_PATH is the exception, and only here: the interpreter's
-		// RPATH names the published artifact, which does not exist until this
-		// job's stage is renamed into place. Without it the probe cannot even
-		// load libpython and every module looks missing.
+		// No LD_LIBRARY_PATH: RUNPATH is $ORIGIN-relative after the rewrite,
+		// so a missing rewrite would load the host's libssl and look green.
 		EnvAdd: map[string]string{
 			"PYTHONNOUSERSITE": "1", "PYTHONHOME": "", "PYTHONPATH": "",
-			"LD_LIBRARY_PATH": filepath.Join(rootfs, "lib") + ":" + filepath.Join(rootfs, "lib64"),
+			"LD_LIBRARY_PATH": "",
 		},
 	})
 	if err == nil {

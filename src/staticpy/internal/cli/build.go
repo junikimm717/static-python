@@ -48,7 +48,9 @@ FLAGS
                     core   the curated subset: the language core plus every
                            extension module staticpy links in by hand
                     full   CPython's whole test suite
-  --pack          also produce the distributable tarball for each target
+  --pack          also produce the distributable tarball for each target.
+                    Host-built trees are $ORIGIN-relocatable; they still
+                    need a compatible glibc on the machine that unpacks them.
   --bundle NAME   Python packages to compile in, from bundles.toml. Overrides
                   whatever the profile selects; a static interpreter cannot
                   dlopen an extension, so this is the only way one gets in.

@@ -35,7 +35,10 @@ import (
 // 2: dependencies may publish a merged relocatable object, and the interpreter
 // links every object a sysroot carries.
 // 3: that object is localised before it is merged, not after.
-const Version = 3
+// 4: host-built trees rewrite RUNPATH to $ORIGIN after install, so the
+//
+//	rootfs can be copied; pack includes those trees.
+const Version = 4
 
 type PlanOptions struct {
 	Profile string
@@ -81,9 +84,6 @@ func Plan(cfg *config.Config, assets fs.FS, o PlanOptions) ([]core.Job, error) {
 			if final, err = Verify(cfg, assets, t, o.Profile, o.Verify, interp); err != nil {
 				return nil, err
 			}
-		}
-		if o.Pack && interp.Name() == "pyref" {
-			return nil, fmt.Errorf("recipe: a host-built interpreter links against this machine's libc and is reproducible nowhere else, so there is nothing to pack")
 		}
 		if o.Pack {
 			if final, err = Pack(cfg, t, o.Profile, interp, final); err != nil {

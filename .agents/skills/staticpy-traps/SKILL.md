@@ -89,6 +89,13 @@ slim-LTO archive does not even contain the string as contiguous bytes, so the
 sysroot composer's scan cannot see it. `strings libncursesw.a` returning nothing
 is that, not absence.
 
+After install, pyref rewrites every ELF RUNPATH to `$ORIGIN`-relative (in-place
+shrink of the baked prefix string). That is what makes the rootfs copyable.
+Do not byte-replace OPENSSLDIR: changing its length corrupts `.rodata`. ncurses
+on `reference` is `--disable-database` so there is no terminfo path to rewrite.
+`$ORIGIN` is resolved from `/proc/self/exe`, so a venv symlink still finds
+libpython in the original tree.
+
 **`ld` will not use `-L` to resolve a shared library's own `NEEDED` entries.**
 It uses `-rpath-link`, then the library's `RUNPATH`. In a rootfs build that
 RUNPATH is the published path, which does not exist while the build runs, so
@@ -122,9 +129,11 @@ rather than shipping the static interpreter's ctypes in a dynamic one.
 **Countermeasure for all of the above:** `pyref` imports every module that
 exists only because a dependency was built, *including the Python-level
 wrappers* — `ctypes` fails while `_ctypes` imports cleanly, and checking only
-the extension is how that reached a published artifact. The check runs before
-the artifact is renamed into place, so it needs `LD_LIBRARY_PATH` to load
-libpython at all.
+the extension is how that reached a published artifact. The check runs against
+the staged tree whose RUNPATH is already `$ORIGIN`-relative, so it must **not**
+set `LD_LIBRARY_PATH`: that would hide a failed rewrite by loading the host's
+libraries. `make` still needs `LD_LIBRARY_PATH`, because the in-tree binary's
+rpath still names the unpublished prefix.
 
 ## configure cannot run a test program
 

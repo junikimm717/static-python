@@ -154,8 +154,7 @@ type Profile struct {
 	Strip *bool `toml:"strip"`
 	Debug *bool `toml:"debug_symbols"`
 	// Host-built LTO is CPython's --with-lto, not the flag lists the static
-	// build uses. Unset leaves the recipe default so existing profile keys
-	// do not move.
+	// build uses. Unset means on (the recipe default).
 	LTO *bool `toml:"lto"`
 	// LTOMode selects how LTO IR is consumed. Empty is whole-program at the
 	// python link (slim archives, one WHOPR). "per-dep" runs LTO on each
@@ -205,6 +204,14 @@ type Resolved struct {
 }
 
 func (r Resolved) HostBuilt() bool { return r.Toolchain == ToolchainHost }
+
+// EffectiveLTO is what the recipe will pass: unset is on, because that is
+// CPython's --with-lto default for a host-built profile.
+func (r Resolved) EffectiveLTO() bool { return !r.LTOSet || r.LTO }
+
+// LTOModeWholeGraph is slim IR in every archive and one WHOPR at the python
+// link. Empty in the file means this.
+const LTOModeWholeGraph = "whole-graph"
 
 // LTO each static archive to native code after install, rather than leaving
 // slim IR for the python link to WHOPR over.

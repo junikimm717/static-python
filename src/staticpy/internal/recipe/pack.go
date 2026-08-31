@@ -90,7 +90,7 @@ func (j *pack) archiveName() string {
 }
 
 func (j *pack) Build(ctx context.Context, e *core.Env, r *core.Runner, work, stage string) error {
-	prefix := j.interp.ArtifactDir(e)
+	prefix := packContentRoot(j.interp, e)
 	archive := filepath.Join(stage, j.archiveName())
 
 	r.Step("packing " + j.archiveName())
@@ -100,6 +100,22 @@ func (j *pack) Build(ctx context.Context, e *core.Env, r *core.Runner, work, sta
 	}
 	line := fmt.Sprintf("%s  %s\n", sum, j.archiveName())
 	return os.WriteFile(archive+".sha256", []byte(line), 0o644)
+}
+
+// pyref publishes a rootfs/ wrapper around the prefix; pack the prefix, so
+// unpacking looks like the static tarball (bin/, lib/) rather than an extra
+// directory that only the content-addressed store needs.
+func packContentRoot(interp core.Job, e *core.Env) string {
+	dir := interp.ArtifactDir(e)
+	if sub := filepath.Join(dir, "rootfs"); isDir(sub) {
+		return sub
+	}
+	return dir
+}
+
+func isDir(path string) bool {
+	st, err := os.Stat(path)
+	return err == nil && st.IsDir()
 }
 
 // writeTarGz produces a byte-reproducible archive: entries in sorted path
