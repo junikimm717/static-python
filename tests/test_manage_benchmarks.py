@@ -139,6 +139,9 @@ class SiteTests(unittest.TestCase):
         self.assertIn("Fixture / demo", index)
         self.assertTrue((out / "run" / FIXTURE_ID / "index.html").is_file())
         self.assertTrue((out / "data" / "index.json").is_file())
+        page = (out / "run" / FIXTURE_ID / "index.html").read_text(encoding="utf-8")
+        self.assertIn("fingerprint", page)
+        self.assertIn("spectre_v2", page)
 
 
 class HelpTests(unittest.TestCase):

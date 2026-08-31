@@ -9,5 +9,12 @@
   ],
   "skipped": [],
   "suite_root": "/nonexistent/FIXTURE",
-  "venv": true
+  "venv": true,
+  "fingerprint_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "fingerprint": {
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "cpu": {"model_name": "FIXTURE CPU (synthetic demo, not a measured score)", "microcode": "0x0"},
+    "smt": {"control": "notsupported"},
+    "vulnerabilities": {"spectre_v2": "FIXTURE: not a real mitigation status"}
+  }
 }

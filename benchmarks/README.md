@@ -15,7 +15,9 @@ generated from these files by `./manage_benchmarks.py site`.
 ```
 
 Import copies `manifest.json`, `env.json`, `report.json`, `report.md`,
-`report.html`, `skipped.json`, and `timeline.jsonl` if present. It does not
+`report.html`, `skipped.json`, and `timeline.jsonl` if present. The
+manifest includes a host `fingerprint` (cpu, microcode, smt, kernel
+cmdline, vulnerabilities, memory, …) and `fingerprint_sha256`. It does not
 copy `venv/`, `raw/`, or `logs/`. The destination name is the session
 directory's basename (`<stamp>-<arch>/`).
 

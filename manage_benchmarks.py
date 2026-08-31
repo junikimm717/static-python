@@ -464,6 +464,7 @@ table{border-collapse:collapse;width:100%;margin:1rem 0}
 th,td{border:1px solid #cbd5e0;padding:.35rem .6rem;text-align:right}
 th:first-child,td:first-child{text-align:left}
 .env{background:#f7fafc;padding:.75rem 1rem;border-radius:6px}
+.env pre{white-space:pre-wrap;font-size:.85rem;overflow:auto;margin:.25rem 0}
 .banner{background:#fefcbf;border:1px solid #d69e2e;padding:.75rem 1rem;border-radius:6px;margin:1rem 0}
 .empty{background:#edf2f7;padding:.75rem 1rem;border-radius:6px}
 .stale{color:#c05621;font-weight:600}
@@ -520,13 +521,19 @@ def _env_dl(env: dict) -> str:
     seen = set()
     for k in keys:
         if k in env:
-            parts.append(f"<dt>{_esc(k)}</dt><dd>{_esc(env[k])}</dd>\n")
+            parts.append(f"<dt>{_esc(k)}</dt><dd>{_format_env_value(env[k])}</dd>\n")
             seen.add(k)
     for k, v in env.items():
         if k not in seen:
-            parts.append(f"<dt>{_esc(k)}</dt><dd>{_esc(v)}</dd>\n")
+            parts.append(f"<dt>{_esc(k)}</dt><dd>{_format_env_value(v)}</dd>\n")
     parts.append("</dl>\n")
     return "".join(parts)
+
+
+def _format_env_value(v) -> str:
+    if isinstance(v, (dict, list)):
+        return "<pre>" + _esc(json.dumps(v, indent=2, sort_keys=True)) + "</pre>"
+    return _esc(v)
 
 
 def write_site(root: Path, out: Path) -> Path:
