@@ -287,37 +287,9 @@ func (c *Config) validateBundles() error {
 	return nil
 }
 
-// The eight-way (static, dynamic) × (lto, no-lto) × (mimalloc, libc malloc)
-// matrix, in the order bench.toml lists them. A forgotten name is a silent
-// hole in every report.
-var requiredAblation = []string{
-	"reference",
-	"reference-nolto",
-	"reference-mimalloc",
-	"reference-nolto-mimalloc",
-	"default",
-	"nolto",
-	"nomimalloc",
-	"nolto-nomimalloc",
-}
-
 func (c *Config) validateBench() error {
 	if c.Bench.Pyperformance == "" || c.Bench.Pyperf == "" {
 		return fmt.Errorf("bench: pyperformance and pyperf pins are required")
-	}
-	if len(c.Bench.Ablation) != len(requiredAblation) {
-		return fmt.Errorf("bench: ablation must be exactly the %d named profiles in listed order, got %d (%s)",
-			len(requiredAblation), len(c.Bench.Ablation), strings.Join(c.Bench.Ablation, ", "))
-	}
-	for i, name := range c.Bench.Ablation {
-		if _, ok := c.Profiles[name]; !ok {
-			return fmt.Errorf("bench: ablation names %q, which is not a profile (have %s)",
-				name, keysOf(c.Profiles))
-		}
-		if name != requiredAblation[i] {
-			return fmt.Errorf("bench: ablation[%d] = %q, want %q; the eight-way matrix is fixed so a forgotten arm fails CI",
-				i, name, requiredAblation[i])
-		}
 	}
 	return nil
 }

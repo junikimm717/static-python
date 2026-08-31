@@ -266,10 +266,9 @@ type Config struct {
 	Origin map[string]string `toml:"-"`
 }
 
-// Pins and the ablation lineup. A forgotten arm is a silent hole in every
-// report, which is why validation demands exactly these eight names.
+// Pins for the pyperformance suite. The lineup is whatever --interp names;
+// there is no baked-in matrix, because the comparison set keeps changing.
 type BenchConfig struct {
-	Pyperformance string   `toml:"pyperformance"`
-	Pyperf        string   `toml:"pyperf"`
-	Ablation      []string `toml:"ablation"`
+	Pyperformance string `toml:"pyperformance"`
+	Pyperf        string `toml:"pyperf"`
 }

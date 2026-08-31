@@ -8,36 +8,16 @@ const (
 	DefaultPyperf        = "2.10.0"
 )
 
-// DefaultAblation is --interp ablation's expansion when cfg.Bench.Ablation
-// is empty. Order matches bench.toml so a hardcoded lineup and a
-// config-backed one produce the same columns.
-var DefaultAblation = []string{
-	"reference",
-	"reference-nolto",
-	"reference-mimalloc",
-	"reference-nolto-mimalloc",
-	"default",
-	"nolto",
-	"nomimalloc",
-	"nolto-nomimalloc",
-}
-
-// AblationSentinel is the --interp value that expands after config load.
-// Set cannot expand it: the flag parser has no config.
-const AblationSentinel = "ablation"
-
 // Pins are the suite versions recorded on every session manifest.
 type Pins struct {
-	Pyperformance string   `json:"pyperformance"`
-	Pyperf        string   `json:"pyperf"`
-	Ablation      []string `json:"ablation,omitempty"`
+	Pyperformance string `json:"pyperformance"`
+	Pyperf        string `json:"pyperf"`
 }
 
 func DefaultPins() Pins {
 	return Pins{
 		Pyperformance: DefaultPyperformance,
 		Pyperf:        DefaultPyperf,
-		Ablation:      append([]string(nil), DefaultAblation...),
 	}
 }
 
@@ -47,9 +27,6 @@ func (p Pins) withDefaults() Pins {
 	}
 	if p.Pyperf == "" {
 		p.Pyperf = DefaultPyperf
-	}
-	if len(p.Ablation) == 0 {
-		p.Ablation = append([]string(nil), DefaultAblation...)
 	}
 	return p
 }
@@ -69,29 +46,4 @@ func PyperformanceSpecs(pyperformance, pyperf string) []string {
 func PipInstallArgs(pins Pins) []string {
 	return append([]string{"install", "--quiet", "--no-deps"},
 		PyperformanceSpecs(pins.Pyperformance, pins.Pyperf)...)
-}
-
-// ExpandInterps replaces the ablation sentinel with the named lineup, in
-// listed order. Other labels pass through. Duplicates are dropped so
-// `--interp ablation --interp reference` does not measure reference twice.
-func ExpandInterps(labels, ablation []string) []string {
-	if len(ablation) == 0 {
-		ablation = DefaultAblation
-	}
-	seen := map[string]bool{}
-	out := make([]string, 0, len(labels))
-	for _, l := range labels {
-		names := []string{l}
-		if l == AblationSentinel {
-			names = ablation
-		}
-		for _, n := range names {
-			if n == "" || seen[n] {
-				continue
-			}
-			seen[n] = true
-			out = append(out, n)
-		}
-	}
-	return out
 }

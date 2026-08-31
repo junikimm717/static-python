@@ -110,8 +110,8 @@ to run this project, you for sure know what you are doing 😇)
 ./staticpy build --profile reference
 ./staticpy bench --interp static --interp reference --baseline reference
 
-# eight-arm LTO × allocator × static/dynamic sweep; baseline defaults to reference
-./staticpy bench --interp ablation
+# name every arm; there is no bundled lineup
+./staticpy bench --interp reference --interp default --interp nomimalloc
 ```
 
 That runs pyperformance -- what speed.python.org publishes against -- and

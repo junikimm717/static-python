@@ -56,15 +56,14 @@ LINEUP
     --interp reference          the dynamic interpreter, from
                                 ` + "`staticpy build --profile reference`" + `
     --interp system             python3 from PATH
-    --interp ablation           the eight LTO × allocator × static/dynamic
-                                profiles, in bench.toml order
     --interp PROFILE            any other profile's built interpreter
+                                (nomimalloc, nolto, reference-nolto, ...)
     --interp LABEL=/path/to/py  any other binary
-  --baseline LABEL fixes the denominator of every ratio. When the lineup
-  contains reference and --baseline is omitted, reference is the baseline;
-  otherwise the first --interp wins. Naming it matters: with auto-discovery,
-  adding an interpreter could silently change which one everything was
-  measured against.
+  Name each arm. There is no bundled lineup: the comparison set is whatever
+  --interp flags you pass, in that order. --baseline LABEL fixes the
+  denominator of every ratio. When the lineup contains reference and
+  --baseline is omitted, reference is the baseline; otherwise the first
+  --interp wins.
 
   Each arm runs inside its own venv, so the arms differ only in the
   interpreter. Without one, a system python drags in distro site-packages --
@@ -144,7 +143,7 @@ func runBench(g *Global, args []string) error {
 	var only []string
 	fs.Var(listFlag{&only}, "only", "restrict to these labels, comma-separated or repeated")
 	var interpOverrides []interpEntry
-	fs.Var(interpFlag{&interpOverrides}, "interp", "well-known name (static, reference, system, ablation), a profile, or <label>=<path>; repeatable")
+	fs.Var(interpFlag{&interpOverrides}, "interp", "well-known name (static, reference, system), a profile, or <label>=<path>; repeatable")
 	out := fs.String("out", "", "also write the markdown report here (session dir is still used)")
 	suite := fs.String("suite", "pyperformance", "which benchmarks to run: \"pyperformance\" (installed into each venv) or \"micro\" (the built-in stdlib-only suite)")
 	suiteRoot := fs.String("pyperformance", "", "use pyperformance's benchmarks from this directory instead of installing them")
@@ -196,8 +195,6 @@ func runBench(g *Global, args []string) error {
 		}
 		overrides[e.Label] = e.Path
 	}
-	overrideOrder = bench.ExpandInterps(overrideOrder, pins.Ablation)
-
 	var order []string
 	paths := map[string]string{}
 	add := func(label, path string) {
@@ -215,7 +212,6 @@ func runBench(g *Global, args []string) error {
 			"  --interp static                the artifact for %s\n"+
 			"  --interp reference             the dynamic reference build\n"+
 			"  --interp system                python3 from PATH\n"+
-			"  --interp ablation              the eight LTO/allocator profiles\n"+
 			"  --interp PROFILE               any other profile's interpreter\n"+
 			"  --interp LABEL=/path/to/python any other binary", host)
 	}
@@ -345,19 +341,12 @@ func pinsOf(cfg *config.Config) bench.Pins {
 	p := bench.Pins{
 		Pyperformance: cfg.Bench.Pyperformance,
 		Pyperf:        cfg.Bench.Pyperf,
-		Ablation:      append([]string(nil), cfg.Bench.Ablation...),
 	}
-	if p.Pyperformance == "" || p.Pyperf == "" || len(p.Ablation) == 0 {
-		d := bench.DefaultPins()
-		if p.Pyperformance == "" {
-			p.Pyperformance = d.Pyperformance
-		}
-		if p.Pyperf == "" {
-			p.Pyperf = d.Pyperf
-		}
-		if len(p.Ablation) == 0 {
-			p.Ablation = d.Ablation
-		}
+	if p.Pyperformance == "" {
+		p.Pyperformance = bench.DefaultPyperformance
+	}
+	if p.Pyperf == "" {
+		p.Pyperf = bench.DefaultPyperf
 	}
 	return p
 }
@@ -464,7 +453,7 @@ func (f interpFlag) String() string {
 	return strings.Join(parts, ",")
 }
 
-// A bare name is a well-known interp, a profile, or the ablation sentinel.
+// A bare name is a well-known interp or a profile.
 // Profiles are validated after config load; Set has none.
 func (f interpFlag) Set(v string) error {
 	label, path, ok := strings.Cut(v, "=")
@@ -487,7 +476,7 @@ func (f interpFlag) Set(v string) error {
 }
 
 // Names that resolve without a path, plus every profile.
-var wellKnownInterps = []string{"static", "reference", "system", "ablation"}
+var wellKnownInterps = []string{"static", "reference", "system"}
 
 func pickBaseline(order []string, flag string) (string, error) {
 	if flag != "" {
@@ -935,8 +924,6 @@ func resolveKnownInterp(g *Global, cfg *config.Config, label, abi string, build 
 			return "", fmt.Errorf("--interp system: no python3 on PATH")
 		}
 		return p, nil
-	case bench.AblationSentinel:
-		return "", fmt.Errorf("--interp ablation: internal error: sentinel was not expanded")
 	}
 	if cfg != nil {
 		if _, ok := cfg.Profiles[label]; ok {

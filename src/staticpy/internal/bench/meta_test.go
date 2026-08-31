@@ -38,32 +38,6 @@ func TestManifestRecordsProtocol(t *testing.T) {
 	}
 }
 
-func TestExpandInterpsAblation(t *testing.T) {
-	got := ExpandInterps([]string{AblationSentinel}, nil)
-	if len(got) != len(DefaultAblation) {
-		t.Fatalf("got %d names, want %d: %v", len(got), len(DefaultAblation), got)
-	}
-	for i, want := range DefaultAblation {
-		if got[i] != want {
-			t.Fatalf("got[%d] = %q, want %q", i, got[i], want)
-		}
-	}
-	// A second reference must not duplicate a column.
-	got = ExpandInterps([]string{AblationSentinel, "reference", "static"}, nil)
-	if got[len(got)-1] != "static" {
-		t.Fatalf("static should remain after ablation: %v", got)
-	}
-	nRef := 0
-	for _, n := range got {
-		if n == "reference" {
-			nRef++
-		}
-	}
-	if nRef != 1 {
-		t.Fatalf("reference appeared %d times in %v", nRef, got)
-	}
-}
-
 func TestMachineJSONIncludesMemory(t *testing.T) {
 	m := Machine{Kernel: "Linux", CPUModel: "cpu", MemoryBytes: 4096, MemoryAvailableBytes: 1024}
 	b, err := json.Marshal(m)

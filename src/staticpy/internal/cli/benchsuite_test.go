@@ -8,15 +8,15 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/config"
 )
 
-func TestInterpFlagAcceptsAblationAndProfiles(t *testing.T) {
+func TestInterpFlagAcceptsProfileNames(t *testing.T) {
 	var entries []interpEntry
 	f := interpFlag{&entries}
-	for _, name := range []string{"ablation", "static", "nomimalloc", "reference-nolto"} {
+	for _, name := range []string{"static", "nomimalloc", "reference-nolto"} {
 		if err := f.Set(name); err != nil {
 			t.Fatalf("Set(%q): %v", name, err)
 		}
 	}
-	if len(entries) != 4 || entries[0].Label != "ablation" {
+	if len(entries) != 3 || entries[1].Label != "nomimalloc" {
 		t.Fatalf("entries = %+v", entries)
 	}
 }
@@ -40,14 +40,10 @@ func TestPinsOfUsesConfigBench(t *testing.T) {
 	cfg := &config.Config{Bench: config.BenchConfig{
 		Pyperformance: "1.14.0",
 		Pyperf:        "2.10.0",
-		Ablation:      []string{"reference", "default"},
 	}}
 	p := pinsOf(cfg)
 	if p.Pyperformance != "1.14.0" || p.Pyperf != "2.10.0" {
 		t.Fatalf("pins = %+v", p)
-	}
-	if len(p.Ablation) != 2 || p.Ablation[0] != "reference" {
-		t.Fatalf("ablation = %v", p.Ablation)
 	}
 }
 

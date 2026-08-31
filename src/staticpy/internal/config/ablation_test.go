@@ -146,18 +146,10 @@ func TestLTOUnsetIsOmittedFromKey(t *testing.T) {
 	}
 }
 
-func TestAblationListIsExactlyTheEight(t *testing.T) {
+func TestBenchPinsArePresent(t *testing.T) {
 	c := loadEmbedded(t)
-	if !slices.Equal(c.Bench.Ablation, requiredAblation) {
-		t.Errorf("bench.ablation = %v, want %v", c.Bench.Ablation, requiredAblation)
-	}
 	if c.Bench.Pyperformance == "" || c.Bench.Pyperf == "" {
 		t.Errorf("bench pins empty: pyperformance=%q pyperf=%q", c.Bench.Pyperformance, c.Bench.Pyperf)
-	}
-	for _, name := range c.Bench.Ablation {
-		if _, ok := c.Profiles[name]; !ok {
-			t.Errorf("ablation names %q, which is not a profile", name)
-		}
 	}
 }
 
