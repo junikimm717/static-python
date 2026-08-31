@@ -1,0 +1,31 @@
+{
+  "index_version": 1,
+  "runs": [
+    {
+      "id": "20000101T000000Z-x86_64",
+      "stamp": "20000101T000000Z",
+      "arch": "x86_64",
+      "protocol": 1,
+      "baseline": "reference",
+      "arms": [
+        "reference",
+        "default"
+      ],
+      "geomean_vs_baseline": {
+        "default": 1.2
+      },
+      "skipped": 0,
+      "suite": {
+        "pyperformance": "1.14.0",
+        "pyperf": "2.10.0"
+      },
+      "machine": {
+        "kernel": "Linux 0.0.0-FIXTURE",
+        "cpu_model": "FIXTURE CPU (synthetic demo, not a measured score)",
+        "memory_bytes": 0
+      },
+      "stale_protocol": false,
+      "fixture": true
+    }
+  ]
+}

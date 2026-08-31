@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FIXTURE / demo — not a published score</title>
+<style>
+body{font:14px/1.45 system-ui,sans-serif;max-width:960px;margin:2rem auto;padding:0 1rem;color:#1a202c}
+.banner{background:#fefcbf;border:1px solid #d69e2e;padding:.75rem 1rem;border-radius:6px}
+table{border-collapse:collapse;width:100%;margin:1rem 0}
+th,td{border:1px solid #cbd5e0;padding:.35rem .6rem;text-align:right}
+th:first-child,td:first-child{text-align:left}
+</style>
+</head>
+<body>
+<div class="banner"><p><strong>FIXTURE / demo.</strong> Synthetic data, not a published score. cpu_model contains FIXTURE; stamp is 20000101T000000Z.</p></div>
+<h1>pyperformance comparison (fixture)</h1>
+<p>baseline: reference · protocol 1 · pyperformance 1.14.0 · pyperf 2.10.0</p>
+<h2>Geomean vs reference</h2>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 70" width="500" height="70" role="img" aria-label="fixture geomean">
+<rect width="500" height="70" fill="#fff"/>
+<text x="120" y="28" text-anchor="end" font-size="13" fill="#1a202c">reference</text>
+<rect x="128" y="12" width="200" height="22" fill="#4a5568" rx="3"/>
+<text x="336" y="28" font-size="12" fill="#1a202c">1.000x</text>
+<text x="120" y="58" text-anchor="end" font-size="13" fill="#1a202c">default</text>
+<rect x="128" y="42" width="240" height="22" fill="#2b6cb0" rx="3"/>
+<text x="376" y="58" font-size="12" fill="#1a202c">1.200x</text>
+</svg>
+<h2>Per-benchmark ratio vs reference</h2>
+<table>
+<thead><tr><th>benchmark</th><th>reference</th><th>default</th></tr></thead>
+<tbody>
+<tr><td>bm_x</td><td>1.00x</td><td>1.20x</td></tr>
+</tbody>
+</table>
+</body>
+</html>

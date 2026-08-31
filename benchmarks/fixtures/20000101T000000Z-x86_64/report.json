@@ -1,0 +1,13 @@
+{
+  "baseline": "reference",
+  "rows": [
+    {
+      "benchmark": "bm_x",
+      "min_s": {"reference": 1.0, "default": 0.833},
+      "spread": {"reference": 0.0, "default": 0.0},
+      "ratio_vs_baseline": {"reference": 1.0, "default": 1.2}
+    }
+  ],
+  "geomean_vs_baseline": {"default": 1.2},
+  "protocol": 1
+}
