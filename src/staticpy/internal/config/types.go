@@ -157,6 +157,11 @@ type Profile struct {
 	// build uses. Unset leaves the recipe default so existing profile keys
 	// do not move.
 	LTO *bool `toml:"lto"`
+	// LTOMode selects how LTO IR is consumed. Empty is whole-program at the
+	// python link (slim archives, one WHOPR). "per-dep" runs LTO on each
+	// library to native code first, so CPython cannot inline across that
+	// boundary.
+	LTOMode string `toml:"lto_mode"`
 	// PGO is "off", "native-only", or "on".
 	PGO         string `toml:"pgo"`
 	ProfileTask string `toml:"profile_task"`
@@ -190,6 +195,7 @@ type Resolved struct {
 	Debug       bool
 	LTO         bool
 	LTOSet      bool
+	LTOMode     string
 	PGO         string
 	ProfileTask string
 	TestModules bool
@@ -199,6 +205,10 @@ type Resolved struct {
 }
 
 func (r Resolved) HostBuilt() bool { return r.Toolchain == ToolchainHost }
+
+// LTO each static archive to native code after install, rather than leaving
+// slim IR for the python link to WHOPR over.
+const LTOModePerDep = "per-dep"
 
 // It must contain no absolute path and no value that varies between runs.
 func (r Resolved) KeyInputs() map[string]string { return r.keyInputs() }

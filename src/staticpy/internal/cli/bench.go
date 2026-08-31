@@ -57,7 +57,7 @@ LINEUP
                                 ` + "`staticpy build --profile reference`" + `
     --interp system             python3 from PATH
     --interp PROFILE            any other profile's built interpreter
-                                (nomimalloc, nolto, reference-nolto, ...)
+                                (nomimalloc, nolto, seplto, reference-nolto, ...)
     --interp LABEL=/path/to/py  any other binary
   Name each arm. There is no bundled lineup: the comparison set is whatever
   --interp flags you pass, in that order. --baseline LABEL fixes the

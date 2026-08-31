@@ -11,6 +11,7 @@ var (
 	editActions  = map[string]bool{"insert_after": true, "insert_before": true, "replace_line": true, "delete_line": true}
 	targetStatus = map[string]bool{"proven": true, "experimental": true}
 	pgoModes     = map[string]bool{"off": true, "native-only": true, "on": true}
+	ltoModes     = map[string]bool{LTOModePerDep: true}
 	moduleSets   = map[string]bool{"minimal": true, "full": true}
 )
 
@@ -208,8 +209,12 @@ func (c *Config) validateProfiles() error {
 	for _, name := range names {
 		scopes := append([]string{ScopeDeps, ScopePython, ScopePyhost}, depScopes(sortedKeys(c.Profiles[name].Scopes))...)
 		for _, s := range scopes {
-			if _, err := c.Resolve(name, s); err != nil {
+			r, err := c.Resolve(name, s)
+			if err != nil {
 				return err
+			}
+			if s == ScopeDeps && r.LTOMode != "" && r.HostBuilt() {
+				return fmt.Errorf("profile %q: lto_mode is for static archives; this profile is host-built", name)
 			}
 		}
 	}
@@ -229,6 +234,9 @@ func depScopes(scopes []string) []string {
 func (c *Config) checkProfileValues(p Profile, where string) error {
 	if p.PGO != "" && !pgoModes[p.PGO] {
 		return fmt.Errorf("%s: pgo %q, want %s", where, p.PGO, keysOf(pgoModes))
+	}
+	if p.LTOMode != "" && !ltoModes[p.LTOMode] {
+		return fmt.Errorf("%s: lto_mode %q, want %s", where, p.LTOMode, keysOf(ltoModes))
 	}
 	if p.Modules != "" && !moduleSets[p.Modules] {
 		return fmt.Errorf("%s: modules %q, want %s", where, p.Modules, keysOf(moduleSets))

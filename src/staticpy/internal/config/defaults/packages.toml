@@ -289,6 +289,9 @@ skip = true
 [package.mimalloc.profile.nolto-nomimalloc]
 skip = true
 
+[package.mimalloc.profile.seplto-nomimalloc]
+skip = true
+
 [package.mimalloc.profile.reference-mimalloc]
 skip = false
 

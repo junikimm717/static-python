@@ -127,6 +127,9 @@ func runConfigShow(g *Global, args []string) error {
 		t.add("ldflags", strings.Join(r.LDFlags, " "))
 		t.add("strip", fmt.Sprint(r.Strip))
 		t.add("debug_symbols", fmt.Sprint(r.Debug))
+		if r.LTOMode != "" {
+			t.add("lto_mode", r.LTOMode)
+		}
 		t.add("pgo", r.PGO)
 		t.add("profile_task", r.ProfileTask)
 		t.add("test_modules", fmt.Sprint(r.TestModules))

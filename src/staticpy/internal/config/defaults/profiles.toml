@@ -153,3 +153,15 @@ inherit = "reference"
 
 [profile.reference-nolto-mimalloc]
 inherit = "reference-nolto"
+
+# LTO each library to native code, then LTO CPython among its own objects.
+# default leaves slim IR in every archive and one WHOPR at the python link,
+# so openssl can inline into the interpreter and vice versa. Closing that
+# boundary is a relocatable LTO link of each .a after install; python flags
+# stay the default LTO set.
+[profile.seplto]
+inherit = "default"
+lto_mode = "per-dep"
+
+[profile.seplto-nomimalloc]
+inherit = "seplto"

@@ -306,6 +306,9 @@ func (j *depJob) Build(ctx context.Context, e *core.Env, r *core.Runner, work, s
 	if err != nil {
 		return err
 	}
+	if err := j.materializeArchives(ctx, r, te, stage, work); err != nil {
+		return err
+	}
 	return j.assertProvides(stage)
 }
 

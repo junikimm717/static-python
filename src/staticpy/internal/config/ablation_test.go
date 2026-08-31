@@ -129,12 +129,18 @@ func TestLTOUnsetIsOmittedFromKey(t *testing.T) {
 		if _, ok := r.KeyInputs()["lto"]; ok {
 			t.Errorf("%s python keyInputs includes lto, which would move existing keys", profile)
 		}
+		if _, ok := r.KeyInputs()["lto_mode"]; ok {
+			t.Errorf("%s python keyInputs includes lto_mode, which would move existing keys", profile)
+		}
 		deps, err := c.Resolve(profile, ScopeDeps)
 		if err != nil {
 			t.Fatal(err)
 		}
 		if _, ok := deps.KeyInputs()["lto"]; ok {
 			t.Errorf("%s deps keyInputs includes lto", profile)
+		}
+		if _, ok := deps.KeyInputs()["lto_mode"]; ok {
+			t.Errorf("%s deps keyInputs includes lto_mode, which would move existing keys", profile)
 		}
 	}
 	r, err := c.Resolve("reference-nolto", ScopePython)
@@ -150,6 +156,77 @@ func TestBenchPinsArePresent(t *testing.T) {
 	c := loadEmbedded(t)
 	if c.Bench.Pyperformance == "" || c.Bench.Pyperf == "" {
 		t.Errorf("bench pins empty: pyperformance=%q pyperf=%q", c.Bench.Pyperformance, c.Bench.Pyperf)
+	}
+}
+
+func TestSepltoKeepsPythonLTOAndHashesModeOnDeps(t *testing.T) {
+	c := loadEmbedded(t)
+	py, err := c.Resolve("seplto", ScopePython)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasFlag(py.CFlags, "-flto=auto") {
+		t.Errorf("seplto python cflags missing -flto=auto: %v", py.CFlags)
+	}
+	if py.LTOMode != LTOModePerDep {
+		t.Errorf("seplto python LTOMode = %q, want %s", py.LTOMode, LTOModePerDep)
+	}
+	def, err := c.Resolve("default", ScopePython)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(py.CFlags, " ") != strings.Join(def.CFlags, " ") {
+		t.Errorf("seplto python cflags diverged from default:\n  seplto %v\n  default %v", py.CFlags, def.CFlags)
+	}
+
+	deps, err := c.Resolve("seplto", ScopeDeps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := deps.KeyInputs()["lto_mode"]; got != LTOModePerDep {
+		t.Errorf("seplto deps keyInputs lto_mode = %q, want %s", got, LTOModePerDep)
+	}
+	mi, err := c.Resolve("seplto", ScopeDeps+".mimalloc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hasFlag(mi.CFlags, "-flto=auto") {
+		t.Errorf("seplto mimalloc still has -flto=auto: %v", mi.CFlags)
+	}
+
+	skip, err := c.PackageSkipped("mimalloc", "seplto")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if skip {
+		t.Error("seplto: mimalloc should not be skipped")
+	}
+	skip, err = c.PackageSkipped("mimalloc", "seplto-nomimalloc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !skip {
+		t.Error("seplto-nomimalloc: mimalloc should be skipped")
+	}
+}
+
+func TestValidateRejectsUnknownLTOMode(t *testing.T) {
+	c := loadEmbedded(t)
+	p := c.Profiles["default"]
+	p.LTOMode = "wpa"
+	c.Profiles["default"] = p
+	if err := c.Validate(); err == nil {
+		t.Fatal("want error for unknown lto_mode")
+	}
+}
+
+func TestValidateRejectsLTOModeOnHostBuilt(t *testing.T) {
+	c := loadEmbedded(t)
+	p := c.Profiles["reference"]
+	p.LTOMode = LTOModePerDep
+	c.Profiles["reference"] = p
+	if err := c.Validate(); err == nil {
+		t.Fatal("want error for lto_mode on a host-built profile")
 	}
 }
 

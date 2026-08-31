@@ -98,6 +98,15 @@ func TestSysrootOmitsSkippedMimalloc(t *testing.T) {
 	if !containsName(def, "mimalloc") {
 		t.Errorf("default sysroot packages missing mimalloc: %v", def)
 	}
+
+	sep := sysrootPackages(t, cfg, "seplto")
+	if !containsName(sep, "mimalloc") {
+		t.Errorf("seplto sysroot packages missing mimalloc: %v", sep)
+	}
+	sepNo := sysrootPackages(t, cfg, "seplto-nomimalloc")
+	if containsName(sepNo, "mimalloc") {
+		t.Errorf("seplto-nomimalloc sysroot packages include mimalloc: %v", sepNo)
+	}
 }
 
 func TestDepsOmitsSkippedMimalloc(t *testing.T) {

@@ -176,6 +176,8 @@ var profileNotes = map[string]string{
 	"reference":                "dynamic baseline the benchmarks compare against",
 	"nomimalloc":               "LTO, musl malloc instead of mimalloc",
 	"nolto-nomimalloc":         "no LTO, musl malloc",
+	"seplto":                   "LTO each library on its own, then LTO CPython",
+	"seplto-nomimalloc":        "per-library LTO, musl malloc",
 	"reference-nolto":          "dynamic baseline without --with-lto",
 	"reference-mimalloc":       "dynamic baseline with mimalloc.o linked in",
 	"reference-nolto-mimalloc": "dynamic baseline, no LTO, mimalloc.o linked in",

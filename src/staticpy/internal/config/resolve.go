@@ -144,6 +144,9 @@ func apply(r *Resolved, p Profile, where string) error {
 		r.LTO = *p.LTO
 		r.LTOSet = true
 	}
+	if p.LTOMode != "" {
+		r.LTOMode = p.LTOMode
+	}
 	if p.TestModules != nil {
 		r.TestModules = *p.TestModules
 	}
@@ -200,6 +203,11 @@ func (r Resolved) keyInputs() map[string]string {
 		"ldflags":  strings.Join(r.LDFlags, " "),
 		"strip":    strconv.FormatBool(r.Strip),
 		"debug":    strconv.FormatBool(r.Debug),
+	}
+	// Hashed on deps too: per-dep LTO rewrites the archive after install, and
+	// two profiles that share cflags must not share that artifact.
+	if r.LTOMode != "" {
+		in["lto_mode"] = r.LTOMode
 	}
 	if r.Scope == ScopeDeps || strings.HasPrefix(r.Scope, ScopeDeps+".") {
 		return in
