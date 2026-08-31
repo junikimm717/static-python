@@ -10,7 +10,7 @@ generated from these files by `./manage_benchmarks.py site`.
 ## How a run gets here
 
 ```sh
-./staticpy bench --interp ablation
+./staticpy bench --interp reference --interp default
 ./manage_benchmarks.py import dist/bench/<stamp>-<arch>
 ```
 
