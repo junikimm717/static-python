@@ -17,9 +17,12 @@ import (
 // Fingerprint is every host property that can move a number. It is written
 // onto manifest.json (and nested in env.json) so a later comparison can tell
 // "same machine" from "same cpu_model string".
+//
+// SHA256 covers the identity fields only. Snapshots that change while the
+// machine sits idle (load, current frequency, free RAM, this run's pin)
+// live under Telemetry and are excluded from the digest.
 type Fingerprint struct {
 	SHA256          string            `json:"sha256,omitempty"`
-	CapturedUTC     string            `json:"captured_utc,omitempty"`
 	CPU             CPUInfo           `json:"cpu"`
 	SMT             SMTInfo           `json:"smt"`
 	Caches          []CacheInfo       `json:"caches,omitempty"`
@@ -33,6 +36,32 @@ type Fingerprint struct {
 	Virtualization  VirtInfo          `json:"virtualization"`
 	Isolation       IsolationInfo     `json:"isolation"`
 	Collector       CollectorInfo     `json:"collector"`
+	Telemetry       *Telemetry        `json:"telemetry,omitempty"`
+}
+
+// Telemetry is a point-in-time snapshot of the host, recorded so a
+// suspicious number can be audited, but not hashed: two runs on the same
+// silicon must compare equal even if load and current MHz moved.
+type Telemetry struct {
+	CapturedUTC          string `json:"captured_utc,omitempty"`
+	CPUMHz               string `json:"cpu_mhz,omitempty"`
+	MemoryAvailable      string `json:"memory_available,omitempty"`
+	MemoryAvailableBytes int64  `json:"memory_available_bytes,omitempty"`
+	MemoryFreeBytes      int64  `json:"memory_free_bytes,omitempty"`
+	BuffersBytes         int64  `json:"buffers_bytes,omitempty"`
+	CachedBytes          int64  `json:"cached_bytes,omitempty"`
+	SwapFreeBytes        int64  `json:"swap_free_bytes,omitempty"`
+	DirtyBytes           int64  `json:"dirty_bytes,omitempty"`
+	AnonPagesBytes       int64  `json:"anon_pages_bytes,omitempty"`
+	ShmemBytes           int64  `json:"shmem_bytes,omitempty"`
+	CurKHz               string `json:"cur_khz,omitempty"`
+	Affinity             string `json:"affinity,omitempty"`
+	Topology             string `json:"topology,omitempty"`
+	Loadavg1             string `json:"loadavg_1m,omitempty"`
+	Loadavg5             string `json:"loadavg_5m,omitempty"`
+	Loadavg15            string `json:"loadavg_15m,omitempty"`
+	RunnableEntities     string `json:"runnable,omitempty"`
+	GOMAXPROCS           int    `json:"gomaxprocs,omitempty"`
 }
 
 type CPUInfo struct {
@@ -44,7 +73,6 @@ type CPUInfo struct {
 	Stepping       string   `json:"stepping,omitempty"`
 	Microcode      string   `json:"microcode,omitempty"`
 	MicrocodeSysfs string   `json:"microcode_sysfs,omitempty"`
-	MHz            string   `json:"mhz,omitempty"`
 	CacheSize      string   `json:"cpuinfo_cache_size,omitempty"`
 	PhysicalID     string   `json:"physical_id,omitempty"`
 	Siblings       string   `json:"siblings,omitempty"`
@@ -97,16 +125,7 @@ type CacheInfo struct {
 type MemDetail struct {
 	TotalBytes     int64  `json:"total_bytes,omitempty"`
 	Total          string `json:"total,omitempty"`
-	AvailableBytes int64  `json:"available_bytes,omitempty"`
-	Available      string `json:"available,omitempty"`
-	FreeBytes      int64  `json:"free_bytes,omitempty"`
-	BuffersBytes   int64  `json:"buffers_bytes,omitempty"`
-	CachedBytes    int64  `json:"cached_bytes,omitempty"`
 	SwapTotalBytes int64  `json:"swap_total_bytes,omitempty"`
-	SwapFreeBytes  int64  `json:"swap_free_bytes,omitempty"`
-	DirtyBytes     int64  `json:"dirty_bytes,omitempty"`
-	AnonPagesBytes int64  `json:"anon_pages_bytes,omitempty"`
-	ShmemBytes     int64  `json:"shmem_bytes,omitempty"`
 	HugePages      int64  `json:"hugepages_total,omitempty"`
 	HugePageSize   int64  `json:"hugepage_size_bytes,omitempty"`
 	DirectMap4k    int64  `json:"directmap_4k_bytes,omitempty"`
@@ -150,7 +169,6 @@ type PowerInfo struct {
 	MinKHz       string `json:"min_khz,omitempty"`
 	MaxKHz       string `json:"max_khz,omitempty"`
 	BaseKHz      string `json:"base_khz,omitempty"`
-	CurKHz       string `json:"cur_khz,omitempty"`
 	Boost        string `json:"boost,omitempty"`
 	NoTurbo      string `json:"no_turbo,omitempty"`
 	IntelPstate  string `json:"intel_pstate,omitempty"`
@@ -181,26 +199,19 @@ type VirtInfo struct {
 }
 
 type IsolationInfo struct {
-	Online           string `json:"online,omitempty"`
-	Present          string `json:"present,omitempty"`
-	Possible         string `json:"possible,omitempty"`
-	Offline          string `json:"offline,omitempty"`
-	Isolated         string `json:"isolated,omitempty"`
-	NohzFull         string `json:"nohz_full,omitempty"`
-	CpusAllowed      string `json:"cpus_allowed_list,omitempty"`
-	Affinity         string `json:"affinity,omitempty"`
-	Topology         string `json:"topology,omitempty"`
-	Loadavg1         string `json:"loadavg_1m,omitempty"`
-	Loadavg5         string `json:"loadavg_5m,omitempty"`
-	Loadavg15        string `json:"loadavg_15m,omitempty"`
-	RunnableEntities string `json:"runnable,omitempty"`
+	Online      string `json:"online,omitempty"`
+	Present     string `json:"present,omitempty"`
+	Possible    string `json:"possible,omitempty"`
+	Offline     string `json:"offline,omitempty"`
+	Isolated    string `json:"isolated,omitempty"`
+	NohzFull    string `json:"nohz_full,omitempty"`
+	CpusAllowed string `json:"cpus_allowed_list,omitempty"`
 }
 
 type CollectorInfo struct {
-	GOOS       string `json:"goos,omitempty"`
-	GOARCH     string `json:"goarch,omitempty"`
-	NumCPU     int    `json:"num_cpu,omitempty"`
-	GOMAXPROCS int    `json:"gomaxprocs,omitempty"`
+	GOOS   string `json:"goos,omitempty"`
+	GOARCH string `json:"goarch,omitempty"`
+	NumCPU int    `json:"num_cpu,omitempty"`
 }
 
 func (m *Machine) SetRunPlacement(affinity, topology string) {
@@ -211,11 +222,13 @@ func (m *Machine) SetRunPlacement(affinity, topology string) {
 	if m.Fingerprint == nil {
 		return
 	}
-	m.Fingerprint.Isolation.Affinity = affinity
-	if topology != "" {
-		m.Fingerprint.Isolation.Topology = topology
+	if m.Fingerprint.Telemetry == nil {
+		m.Fingerprint.Telemetry = &Telemetry{}
 	}
-	m.Fingerprint.seal()
+	m.Fingerprint.Telemetry.Affinity = affinity
+	if topology != "" {
+		m.Fingerprint.Telemetry.Topology = topology
+	}
 }
 
 func (m Machine) AttachToManifest(man map[string]any) {
@@ -227,8 +240,11 @@ func (m Machine) AttachToManifest(man map[string]any) {
 }
 
 func (f *Fingerprint) seal() {
+	tel := f.Telemetry
+	f.Telemetry = nil
 	f.SHA256 = ""
 	b, err := json.Marshal(f)
+	f.Telemetry = tel
 	if err != nil {
 		return
 	}
@@ -237,9 +253,12 @@ func (f *Fingerprint) seal() {
 }
 
 func readFingerprint(fs procFS) *Fingerprint {
-	f := &Fingerprint{CapturedUTC: time.Now().UTC().Format(time.RFC3339)}
+	f := &Fingerprint{}
+	tel := &Telemetry{CapturedUTC: time.Now().UTC().Format(time.RFC3339)}
 	if b, err := os.ReadFile(fs.proc + "/cpuinfo"); err == nil {
-		f.CPU = parseCPUInfo(string(b))
+		cpu, mhz := parseCPUInfo(string(b))
+		f.CPU = cpu
+		tel.CPUMHz = mhz
 	}
 	cpu0 := fs.sys + "/devices/system/cpu/cpu0/"
 	f.CPU.MicrocodeSysfs = readTrim(cpu0 + "microcode/version")
@@ -260,27 +279,49 @@ func readFingerprint(fs procFS) *Fingerprint {
 	f.SMT.Active = readTrim(fs.sys + "/devices/system/cpu/smt/active")
 	f.SMT.Control = readTrim(fs.sys + "/devices/system/cpu/smt/control")
 	f.Caches = readCaches(cpu0 + "cache")
-	f.Memory = readMemDetail(fs)
+	mem, memTel := readMemDetail(fs)
+	f.Memory = mem
+	if memTel != (Telemetry{}) {
+		tel.MemoryAvailable = memTel.MemoryAvailable
+		tel.MemoryAvailableBytes = memTel.MemoryAvailableBytes
+		tel.MemoryFreeBytes = memTel.MemoryFreeBytes
+		tel.BuffersBytes = memTel.BuffersBytes
+		tel.CachedBytes = memTel.CachedBytes
+		tel.SwapFreeBytes = memTel.SwapFreeBytes
+		tel.DirtyBytes = memTel.DirtyBytes
+		tel.AnonPagesBytes = memTel.AnonPagesBytes
+		tel.ShmemBytes = memTel.ShmemBytes
+	}
 	f.NUMA = readNUMA(fs.sys + "/devices/system/node")
 	f.Kernel = readKernel(fs)
 	f.OS = readOS()
 	f.Vulnerabilities = readDirMap(fs.sys + "/devices/system/cpu/vulnerabilities")
-	f.Power = readPower(fs)
+	power, curKHz := readPower(fs)
+	f.Power = power
+	tel.CurKHz = curKHz
 	f.Platform = readPlatform(fs.sys + "/class/dmi/id")
 	f.Virtualization = readVirt(fs)
-	f.Isolation = readIsolation(fs)
+	iso, isoTel := readIsolation(fs)
+	f.Isolation = iso
+	tel.Loadavg1 = isoTel.Loadavg1
+	tel.Loadavg5 = isoTel.Loadavg5
+	tel.Loadavg15 = isoTel.Loadavg15
+	tel.RunnableEntities = isoTel.RunnableEntities
 	f.Collector = CollectorInfo{
 		GOOS: runtime.GOOS, GOARCH: runtime.GOARCH,
-		NumCPU: runtime.NumCPU(), GOMAXPROCS: runtime.GOMAXPROCS(0),
+		NumCPU: runtime.NumCPU(),
 	}
+	tel.GOMAXPROCS = runtime.GOMAXPROCS(0)
+	f.Telemetry = tel
 	f.seal()
 	return f
 }
 
-func parseCPUInfo(text string) CPUInfo {
+func parseCPUInfo(text string) (CPUInfo, string) {
 	var names []string
 	seen := map[string]bool{}
 	var first CPUInfo
+	mhz := ""
 	got := false
 	for _, block := range strings.Split(text, "\n\n") {
 		if strings.TrimSpace(block) == "" {
@@ -296,6 +337,7 @@ func parseCPUInfo(text string) CPUInfo {
 			continue
 		}
 		got = true
+		mhz = get("cpu MHz")
 		first = CPUInfo{
 			Vendor:         get("vendor_id"),
 			Family:         get("cpu family"),
@@ -303,7 +345,6 @@ func parseCPUInfo(text string) CPUInfo {
 			ModelName:      name,
 			Stepping:       get("stepping"),
 			Microcode:      get("microcode"),
-			MHz:            get("cpu MHz"),
 			CacheSize:      get("cache size"),
 			PhysicalID:     get("physical id"),
 			Siblings:       get("siblings"),
@@ -328,7 +369,7 @@ func parseCPUInfo(text string) CPUInfo {
 	}
 	first.ModelNames = names
 	first.Heterogeneous = len(names) > 1
-	return first
+	return first, mhz
 }
 
 func readCaches(dir string) []CacheInfo {
@@ -363,8 +404,9 @@ func readCaches(dir string) []CacheInfo {
 	return out
 }
 
-func readMemDetail(fs procFS) MemDetail {
+func readMemDetail(fs procFS) (MemDetail, Telemetry) {
 	m := MemDetail{PageSize: os.Getpagesize()}
+	tel := Telemetry{}
 	b, err := os.ReadFile(fs.proc + "/meminfo")
 	if err == nil {
 		vals := parseMeminfoMap(string(b))
@@ -374,15 +416,15 @@ func readMemDetail(fs procFS) MemDetail {
 			}
 		}
 		set(&m.TotalBytes, "MemTotal")
-		set(&m.AvailableBytes, "MemAvailable")
-		set(&m.FreeBytes, "MemFree")
-		set(&m.BuffersBytes, "Buffers")
-		set(&m.CachedBytes, "Cached")
+		set(&tel.MemoryAvailableBytes, "MemAvailable")
+		set(&tel.MemoryFreeBytes, "MemFree")
+		set(&tel.BuffersBytes, "Buffers")
+		set(&tel.CachedBytes, "Cached")
 		set(&m.SwapTotalBytes, "SwapTotal")
-		set(&m.SwapFreeBytes, "SwapFree")
-		set(&m.DirtyBytes, "Dirty")
-		set(&m.AnonPagesBytes, "AnonPages")
-		set(&m.ShmemBytes, "Shmem")
+		set(&tel.SwapFreeBytes, "SwapFree")
+		set(&tel.DirtyBytes, "Dirty")
+		set(&tel.AnonPagesBytes, "AnonPages")
+		set(&tel.ShmemBytes, "Shmem")
 		set(&m.HugePages, "HugePages_Total")
 		set(&m.HugePageSize, "Hugepagesize")
 		set(&m.DirectMap4k, "DirectMap4k")
@@ -391,15 +433,15 @@ func readMemDetail(fs procFS) MemDetail {
 		if m.TotalBytes > 0 {
 			m.Total = formatBytes(m.TotalBytes)
 		}
-		if m.AvailableBytes > 0 {
-			m.Available = formatBytes(m.AvailableBytes)
+		if tel.MemoryAvailableBytes > 0 {
+			tel.MemoryAvailable = formatBytes(tel.MemoryAvailableBytes)
 		}
 	}
 	m.THP = readTrim(fs.sys + "/kernel/mm/transparent_hugepage/enabled")
 	m.THPDefrag = readTrim(fs.sys + "/kernel/mm/transparent_hugepage/defrag")
 	m.Swappiness = readTrim(fs.proc + "/sys/vm/swappiness")
 	m.ASLR = readTrim(fs.proc + "/sys/kernel/randomize_va_space")
-	return m
+	return m, tel
 }
 
 func parseMeminfoMap(text string) map[string]int64 {
@@ -520,7 +562,7 @@ func readOS() OSInfo {
 	return o
 }
 
-func readPower(fs procFS) PowerInfo {
+func readPower(fs procFS) (PowerInfo, string) {
 	cpu0 := fs.sys + "/devices/system/cpu/cpu0/"
 	freq := cpu0 + "cpufreq/"
 	pstate := fs.sys + "/devices/system/cpu/intel_pstate/"
@@ -531,7 +573,6 @@ func readPower(fs procFS) PowerInfo {
 		MinKHz:       readTrim(freq + "cpuinfo_min_freq"),
 		MaxKHz:       readTrim(freq + "cpuinfo_max_freq"),
 		BaseKHz:      readTrim(freq + "base_frequency"),
-		CurKHz:       firstNonEmpty(readTrim(freq+"scaling_cur_freq"), readTrim(freq+"cpuinfo_cur_freq")),
 		Boost:        readTrim(fs.sys + "/devices/system/cpu/cpufreq/boost"),
 		NoTurbo:      readTrim(pstate + "no_turbo"),
 		IntelPstate:  readTrim(pstate + "status"),
@@ -540,7 +581,7 @@ func readPower(fs procFS) PowerInfo {
 		EPP:          readTrim(freq + "energy_performance_preference"),
 		IdleDriver:   readTrim(idle + "current_driver"),
 		IdleGovernor: firstNonEmpty(readTrim(idle+"current_governor_ro"), readTrim(idle+"current_governor")),
-	}
+	}, firstNonEmpty(readTrim(freq+"scaling_cur_freq"), readTrim(freq+"cpuinfo_cur_freq"))
 }
 
 func readPlatform(dmi string) PlatformInfo {
@@ -578,7 +619,7 @@ func readVirt(fs procFS) VirtInfo {
 	return v
 }
 
-func readIsolation(fs procFS) IsolationInfo {
+func readIsolation(fs procFS) (IsolationInfo, Telemetry) {
 	cpu := fs.sys + "/devices/system/cpu/"
 	iso := IsolationInfo{
 		Online:   readTrim(cpu + "online"),
@@ -588,19 +629,20 @@ func readIsolation(fs procFS) IsolationInfo {
 		Isolated: readTrim(cpu + "isolated"),
 		NohzFull: readTrim(cpu + "nohz_full"),
 	}
+	tel := Telemetry{}
 	if b, err := os.ReadFile(fs.proc + "/self/status"); err == nil {
 		iso.CpusAllowed = cpuinfoField(string(b), "Cpus_allowed_list")
 	}
 	if b, err := os.ReadFile(fs.proc + "/loadavg"); err == nil {
 		f := strings.Fields(string(b))
 		if len(f) >= 3 {
-			iso.Loadavg1, iso.Loadavg5, iso.Loadavg15 = f[0], f[1], f[2]
+			tel.Loadavg1, tel.Loadavg5, tel.Loadavg15 = f[0], f[1], f[2]
 		}
 		if len(f) >= 4 {
-			iso.RunnableEntities = f[3]
+			tel.RunnableEntities = f[3]
 		}
 	}
-	return iso
+	return iso, tel
 }
 
 func readDirMap(dir string) map[string]string {

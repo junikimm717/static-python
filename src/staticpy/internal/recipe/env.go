@@ -92,6 +92,57 @@ func (id ToolchainID) keyInputs() map[string]string {
 	}
 }
 
+// Factor is the compact toolchain identity a bench session records, so a
+// later reader does not have to reconstruct it from a profile name.
+func (id ToolchainID) Factor() string {
+	if id.Triple == "" && id.Key == "" && id.Probe == "" {
+		return ""
+	}
+	var parts []string
+	if id.Triple != "" {
+		parts = append(parts, id.Triple)
+	}
+	if v := id.gccMajor(); v != "" {
+		parts = append(parts, v)
+	}
+	if id.Source != "" {
+		parts = append(parts, id.Source)
+	}
+	if id.Key != "" {
+		k := id.Key
+		if len(k) > 12 {
+			k = k[:12]
+		}
+		parts = append(parts, k)
+	} else if id.Probe != "" {
+		parts = append(parts, id.Probe)
+	}
+	return strings.Join(parts, ":")
+}
+
+func (id ToolchainID) gccMajor() string {
+	ver := ""
+	if id.CC != "" {
+		if v, err := ccOutput(id.CC, "-dumpversion"); err == nil {
+			ver = v
+		}
+	}
+	if ver == "" && strings.HasPrefix(id.Probe, "gcc ") {
+		rest := strings.TrimPrefix(id.Probe, "gcc ")
+		if f := strings.Fields(rest); len(f) > 0 {
+			ver = f[0]
+		}
+	}
+	if ver == "" {
+		return ""
+	}
+	major, _, _ := strings.Cut(ver, ".")
+	if major == "" {
+		return ""
+	}
+	return "gcc" + major
+}
+
 // Provenance is empty for a toolchain that identified itself, and non-empty
 // for one we had to fingerprint. core stamps it into the manifest, so a build
 // assembled on trust never looks identical to one that was verified.

@@ -72,7 +72,9 @@ const globalHelp = `GLOBAL FLAGS (accepted before or after the command)
   -v, --verbose       mirror every command's output to the terminal as it runs.
                       Without it the output still goes to dist/logs in full.
   --json              machine-readable output, where the command has a JSON form.
-  --color WHEN        auto|always|never (default auto: colour only on a terminal).`
+  --color WHEN        auto|always|never (default auto: colour only on a terminal).
+  --git-revision SHA  commit this executable was built from. The ./staticpy shim
+                      stamps it with -X and passes the same value here.`
 
 const layoutHelp = `WHERE THINGS LAND under dist/
   artifacts/<slug>/                 published job outputs. Present means complete:

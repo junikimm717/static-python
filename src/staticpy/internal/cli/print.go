@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/junikimm717/static-python/src/staticpy/internal/buildinfo"
 	"github.com/junikimm717/static-python/src/staticpy/internal/config"
 	"github.com/junikimm717/static-python/src/staticpy/internal/recipe"
 )
@@ -30,6 +31,7 @@ KEYS
   dist              the absolute artifact root
   toolchains        the toolchain directory in use
   recipe-version    the recipe generation; every job key includes it
+  git-revision      the commit stamped into this executable (-X / --git-revision)
   version:<name>    the pinned version of one source, e.g. version:openssl
   sha256:<name>     its pinned checksum
 
@@ -42,6 +44,7 @@ func runPrint(g *Global, args []string) error {
 	if err := parse(fs, args); err != nil {
 		return finish("print", err)
 	}
+	g.applyGitRevision()
 	if fs.NArg() == 0 {
 		return usagef("need a key")
 	}
@@ -128,6 +131,9 @@ func runPrint(g *Global, args []string) error {
 		return nil
 	case "recipe-version":
 		fmt.Println(recipe.Version)
+		return nil
+	case "git-revision":
+		fmt.Println(buildinfo.GitRevision)
 		return nil
 	}
 	return usagef("unknown key %q", key)

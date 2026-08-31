@@ -10,12 +10,13 @@ import (
 	"time"
 
 	"github.com/junikimm717/static-python/src/staticpy/internal/bench"
+	"github.com/junikimm717/static-python/src/staticpy/internal/config"
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
 // runPyperfSuite drives the pyperformance suite across the selected arms and
 // writes a session directory that can be re-read long after the run.
-func runPyperfSuite(e *core.Env, order []string, paths map[string]string,
+func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, paths map[string]string,
 	baseline, suiteRoot, pyperfHint string, useVenv bool, noPin bool, cpu int, timeout time.Duration, offline bool, pins bench.Pins) error {
 
 	var skipped []string
@@ -52,6 +53,7 @@ func runPyperfSuite(e *core.Env, order []string, paths map[string]string,
 		if err != nil {
 			return fmt.Errorf("%s: %w", label, err)
 		}
+		enrichIdentity(g, cfg, e, &id)
 		ids = append(ids, id)
 
 		a := bench.Arm{Label: label, Python: paths[label]}
@@ -130,6 +132,19 @@ func runPyperfSuite(e *core.Env, order []string, paths map[string]string,
 		// until that dependency is installed.
 		runner.Step("detect sub-benchmarks")
 		bench.DetectSubBenchmarks(ctx, runner, venvs[order[0]].Python, suite)
+	}
+
+	runner.Step("inventory")
+	for i, label := range order {
+		py := paths[label]
+		if v := venvs[label]; v != nil {
+			py = v.Python
+		}
+		pkgs, err := bench.InventoryPackages(ctx, runner, py)
+		if err != nil {
+			return fmt.Errorf("%s: %w", label, err)
+		}
+		ids[i].Packages = pkgs
 	}
 
 	// Written before the measurements and again after them. The early copy is

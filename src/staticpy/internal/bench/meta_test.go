@@ -26,8 +26,8 @@ func TestManifestRecordsProtocol(t *testing.T) {
 	if m["protocol"] != Protocol {
 		t.Fatalf("protocol = %v, want %d", m["protocol"], Protocol)
 	}
-	if Protocol != 1 {
-		t.Fatalf("Protocol = %d, want 1", Protocol)
+	if Protocol != 2 {
+		t.Fatalf("Protocol = %d, want 2", Protocol)
 	}
 	suite, ok := m["suite"].(map[string]string)
 	if !ok {
@@ -86,8 +86,8 @@ func TestRenderHTMLContainsChartAndArms(t *testing.T) {
 		Machine: Machine{Kernel: "Linux", CPUModel: "cpu", MemoryBytes: 1, Memory: "1 B"},
 		Pins:    DefaultPins(),
 		Identities: []Identity{
-			{Label: "reference", SHA256: "aaaaaaaaaaaa", Linkage: "dynamic", Size: 10},
-			{Label: "default", SHA256: "bbbbbbbbbbbb", Linkage: "static", Size: 20},
+			{Label: "reference", BinarySHA256: "aaaaaaaaaaaa", Size: 10, Factors: &Factors{Linkage: "dynamic"}},
+			{Label: "default", BinarySHA256: "bbbbbbbbbbbb", Size: 20, Factors: &Factors{Linkage: "static"}},
 		},
 		Skipped: 2,
 	}

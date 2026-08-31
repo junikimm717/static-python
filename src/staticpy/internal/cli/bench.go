@@ -89,11 +89,13 @@ SUITES
   Results land in dist/bench/<UTC-stamp>-<arch>/, never overwritten and never
   deduplicated: a measurement is not a pure function of its inputs. The session
   holds report.md, report.html (geomean bars, ratio table, env, identities),
-  the unaggregated pyperf JSON, a manifest with protocol and pins plus each
-  binary's sha256, env.json (kernel, cpu, memory, affinity, fingerprint), and
-  timeline.jsonl -- one record per measurement with its wall time, load
-  average and the busy fraction of the pinned core's SMT sibling, which is
-  what lets a suspicious number be audited months later.
+	the unaggregated pyperf JSON, a manifest with protocol and pins plus each
+	binary's sha256, factors, artifact key, the packages each venv imported,
+	this executable's git revision, env.json (kernel, cpu, memory, affinity,
+	fingerprint identity + telemetry), and timeline.jsonl -- one record per
+	measurement with its wall time, load average and the busy fraction of the
+	pinned core's SMT sibling, which is what lets a suspicious number be
+	audited months later.
 
 MEASUREMENT
   The run is confined to one logical CPU with sched_setaffinity, inherited by
@@ -158,6 +160,7 @@ func runBench(g *Global, args []string) error {
 	if err := parse(fs, args); err != nil {
 		return finish("bench", err)
 	}
+	g.applyGitRevision()
 	if *iters < 1 {
 		return usagef("--iters must be at least 1, got %d", *iters)
 	}
@@ -269,7 +272,7 @@ func runBench(g *Global, args []string) error {
 			return err
 		}
 		defer done()
-		return runPyperfSuite(e, order, paths, baseline, *suiteRoot, *pyperfSrc,
+		return runPyperfSuite(g, cfg, e, order, paths, baseline, *suiteRoot, *pyperfSrc,
 			!*noVenv, *noPin, *cpu, *timeout, g.Offline, pins)
 	}
 

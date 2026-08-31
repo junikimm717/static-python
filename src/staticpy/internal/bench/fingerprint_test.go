@@ -84,8 +84,13 @@ func TestFingerprintRecordsCPUMicrocodeSMTAndVulns(t *testing.T) {
 		t.Fatalf("manifest digest %v vs %s", man["fingerprint_sha256"], m.Fingerprint.SHA256)
 	}
 	fp2, ok := man["fingerprint"].(*Fingerprint)
-	if !ok || fp2.Isolation.Affinity != "pinned to cpu1" {
+	if !ok || fp2.Telemetry == nil || fp2.Telemetry.Affinity != "pinned to cpu1" {
 		t.Fatalf("manifest fingerprint = %#v", man["fingerprint"])
+	}
+	before := m.Fingerprint.SHA256
+	m.SetRunPlacement("pinned to cpu2", "moved")
+	if m.Fingerprint.SHA256 != before {
+		t.Fatalf("pin change moved fingerprint sha %s -> %s", before, m.Fingerprint.SHA256)
 	}
 	if vulnSummary(fp.Vulnerabilities) == "" {
 		t.Fatal("empty vuln summary")
@@ -99,6 +104,33 @@ func TestFingerprintSealStableAcrossReseal(t *testing.T) {
 	f.seal()
 	if f.SHA256 != a || a == "" {
 		t.Fatalf("digest moved %q -> %q", a, f.SHA256)
+	}
+}
+
+func TestFingerprintHashIgnoresTelemetry(t *testing.T) {
+	f := &Fingerprint{
+		CPU:    CPUInfo{ModelName: "x", Microcode: "0x1"},
+		Kernel: KernelInfo{Release: "1"},
+		Telemetry: &Telemetry{
+			CapturedUTC: "2020-01-01T00:00:00Z",
+			CPUMHz:      "1000",
+			Loadavg1:    "0.10",
+		},
+	}
+	f.seal()
+	a := f.SHA256
+	f.Telemetry.CapturedUTC = "2026-08-31T00:00:00Z"
+	f.Telemetry.CPUMHz = "5400"
+	f.Telemetry.Loadavg1 = "12.0"
+	f.Telemetry.Affinity = "pinned to cpu7"
+	f.seal()
+	if f.SHA256 != a {
+		t.Fatalf("telemetry moved digest %s -> %s", a, f.SHA256)
+	}
+	f.CPU.Microcode = "0x2"
+	f.seal()
+	if f.SHA256 == a {
+		t.Fatal("identity change left digest unmoved")
 	}
 }
 

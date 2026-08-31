@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"html"
 	"strings"
+
+	"github.com/junikimm717/static-python/src/staticpy/internal/buildinfo"
 )
 
 // SuiteReport is everything the markdown and HTML reports share, so the
@@ -41,6 +43,9 @@ func EnvMarkdown(m Machine, protocol int, pins Pins) string {
 	var b strings.Builder
 	b.WriteString("## Environment\n\n")
 	fmt.Fprintf(&b, "- protocol: %d\n", protocol)
+	if rev := buildinfo.GitRevision; rev != "" {
+		fmt.Fprintf(&b, "- git_revision: %s\n", rev)
+	}
 	fmt.Fprintf(&b, "- suite: pyperformance %s, pyperf %s\n", pins.Pyperformance, pins.Pyperf)
 	fmt.Fprintf(&b, "- kernel: %s\n", dash(m.Kernel))
 	fmt.Fprintf(&b, "- cpu: %s\n", dash(m.CPUModel))
@@ -94,6 +99,20 @@ func dash(s string) string {
 	return s
 }
 
+func identityFactors(id Identity) Factors {
+	if id.Factors != nil {
+		return *id.Factors
+	}
+	return Factors{}
+}
+
+func pgoCell(pgo bool) string {
+	if pgo {
+		return "yes"
+	}
+	return "no"
+}
+
 func (r SuiteReport) Markdown() string {
 	var b strings.Builder
 	b.WriteString("# pyperformance comparison\n\n")
@@ -109,10 +128,12 @@ func (r SuiteReport) Markdown() string {
 
 	if len(r.Identities) > 0 {
 		b.WriteString("## Interpreters\n\n")
-		b.WriteString("| label | sha256 | linkage | size |\n|---|---|---|---:|\n")
+		b.WriteString("| label | sha256 | linkage | lto | allocator | pgo | size |\n|---|---|---|---|---|---|---:|\n")
 		for _, id := range r.Identities {
-			fmt.Fprintf(&b, "| %s | `%s` | %s | %s |\n",
-				id.Label, shortSHA(id.SHA256), dash(id.Linkage), formatBytes(id.Size))
+			f := identityFactors(id)
+			fmt.Fprintf(&b, "| %s | `%s` | %s | %s | %s | %s | %s |\n",
+				id.Label, shortSHA(id.BinarySHA256), dash(f.Linkage),
+				dash(f.LTO), dash(f.Allocator), pgoCell(f.PGO), formatBytes(id.Size))
 		}
 		b.WriteString("\n")
 	}
@@ -208,6 +229,9 @@ func (r SuiteReport) envHTML() string {
 	var b strings.Builder
 	b.WriteString(`<dl class="env">` + "\n")
 	b.WriteString(row("protocol", fmt.Sprintf("%d", r.protocol())))
+	if rev := buildinfo.GitRevision; rev != "" {
+		b.WriteString(row("git_revision", rev))
+	}
 	b.WriteString(row("suite", "pyperformance "+pins.Pyperformance+", pyperf "+pins.Pyperf))
 	b.WriteString(row("kernel", dash(m.Kernel)))
 	b.WriteString(row("cpu", dash(m.CPUModel)))
@@ -328,12 +352,16 @@ func (r SuiteReport) ratioTableHTML() string {
 
 func (r SuiteReport) identityTableHTML() string {
 	var b strings.Builder
-	b.WriteString("<table>\n<thead><tr><th>label</th><th>sha256</th><th>linkage</th><th>size</th></tr></thead>\n<tbody>\n")
+	b.WriteString("<table>\n<thead><tr><th>label</th><th>sha256</th><th>linkage</th><th>lto</th><th>allocator</th><th>pgo</th><th>size</th></tr></thead>\n<tbody>\n")
 	for _, id := range r.Identities {
-		fmt.Fprintf(&b, "<tr><td>%s</td><td><code>%s</code></td><td>%s</td><td>%s</td></tr>\n",
+		f := identityFactors(id)
+		fmt.Fprintf(&b, "<tr><td>%s</td><td><code>%s</code></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>\n",
 			html.EscapeString(id.Label),
-			html.EscapeString(shortSHA(id.SHA256)),
-			html.EscapeString(dash(id.Linkage)),
+			html.EscapeString(shortSHA(id.BinarySHA256)),
+			html.EscapeString(dash(f.Linkage)),
+			html.EscapeString(dash(f.LTO)),
+			html.EscapeString(dash(f.Allocator)),
+			html.EscapeString(pgoCell(f.PGO)),
 			html.EscapeString(formatBytes(id.Size)))
 	}
 	b.WriteString("</tbody></table>\n")

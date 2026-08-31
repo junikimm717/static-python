@@ -9,6 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/junikimm717/static-python/src/staticpy/internal/buildinfo"
+	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
 // Session is one bench run's output directory.
@@ -116,7 +119,7 @@ func Manifest(stamp, baseline string, pins Pins, ids []Identity, skipped []strin
 	if ids == nil {
 		ids = []Identity{}
 	}
-	return map[string]any{
+	m := map[string]any{
 		"stamp":        stamp,
 		"baseline":     baseline,
 		"protocol":     Protocol,
@@ -124,19 +127,26 @@ func Manifest(stamp, baseline string, pins Pins, ids []Identity, skipped []strin
 		"interpreters": ids,
 		"skipped":      skipped,
 	}
+	if rev := buildinfo.GitRevision; rev != "" {
+		m["git_revision"] = rev
+	}
+	return m
 }
 
 // Identity is everything needed to know which binary produced a column.
+// Factors exist because a profile name is not a stable description of
+// linkage, LTO, allocator or toolchain; those can change under "default".
 type Identity struct {
-	Label   string `json:"label"`
-	Path    string `json:"path"`
-	SHA256  string `json:"sha256"`
-	Size    int64  `json:"size_bytes"`
-	Linkage string `json:"linkage"`
-	Version string `json:"version,omitempty"`
-	BuildID string `json:"build_id,omitempty"`
-	// Core is the libpython a shared build delegates to; see sharedCore.
-	Core *Identity `json:"core,omitempty"`
+	Label        string            `json:"label"`
+	Path         string            `json:"path,omitempty"`
+	BinarySHA256 string            `json:"binary_sha256"`
+	ArtifactKey  string            `json:"artifact_key,omitempty"`
+	Factors      *Factors          `json:"factors,omitempty"`
+	Packages     map[string]string `json:"packages,omitempty"`
+	Size         int64             `json:"size_bytes,omitempty"`
+	Version      string            `json:"version,omitempty"`
+	BuildID      string            `json:"build_id,omitempty"`
+	Core         *Identity         `json:"core,omitempty"`
 }
 
 func Identify(label, path string) (Identity, error) {
@@ -159,14 +169,31 @@ func Identify(label, path string) (Identity, error) {
 	if _, err := io.Copy(h, f); err != nil {
 		return id, err
 	}
-	id.SHA256 = hex.EncodeToString(h.Sum(nil))
-	id.Linkage, id.BuildID = linkage(real)
+	id.BinarySHA256 = hex.EncodeToString(h.Sum(nil))
+	link, buildID := linkage(real)
+	id.BuildID = buildID
+	id.Factors = &Factors{Linkage: link}
+	id.ArtifactKey = artifactKeyNear(real)
 	if lib := sharedCore(real); lib != "" {
-		if core, err := Identify(label+":libpython", lib); err == nil {
-			id.Core = &core
+		if coreID, err := Identify(label+":libpython", lib); err == nil {
+			id.Core = &coreID
 		}
 	}
 	return id, nil
+}
+
+// Walk toward the prefix looking for the job stamp. An unpacked pack
+// tarball has none; a dist/artifacts tree does.
+func artifactKeyNear(path string) string {
+	dir := filepath.Dir(path)
+	for i := 0; i < 8 && dir != "" && dir != "/" && dir != "."; i++ {
+		m, err := core.ReadManifest(dir)
+		if err == nil && m.Key != "" {
+			return m.Key
+		}
+		dir = filepath.Dir(dir)
+	}
+	return ""
 }
 
 func loadAvg1() float64 {

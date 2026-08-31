@@ -66,8 +66,10 @@ func readMachine(fs procFS) Machine {
 		}
 		m.MemoryBytes = fp.Memory.TotalBytes
 		m.Memory = fp.Memory.Total
-		m.MemoryAvailableBytes = fp.Memory.AvailableBytes
-		m.MemoryAvailable = fp.Memory.Available
+		if fp.Telemetry != nil {
+			m.MemoryAvailableBytes = fp.Telemetry.MemoryAvailableBytes
+			m.MemoryAvailable = fp.Telemetry.MemoryAvailable
+		}
 		if s := cacheByType(fp.Caches, "1", "Data"); s != "" {
 			m.CacheL1d = s
 		}
