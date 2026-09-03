@@ -276,6 +276,7 @@ type Config struct {
 	PyPackages map[string]PyPackage  `toml:"pkg"`
 	Expect     map[string]TestExpect `toml:"expect"`
 	Bench      BenchConfig           `toml:"bench"`
+	Kits       map[string]Kit        `toml:"kit"`
 
 	// Origin records, per file, where the winning copy came from: "embedded" or
 	// an absolute path. It feeds Manifest.Provenance so a build assembled from
@@ -286,6 +287,22 @@ type Config struct {
 // Pins for the pyperformance suite. The lineup is whatever --interp names;
 // there is no baked-in matrix, because the comparison set keeps changing.
 type BenchConfig struct {
-	Pyperformance string `toml:"pyperformance"`
-	Pyperf        string `toml:"pyperf"`
+	Pyperformance string               `toml:"pyperformance"`
+	Pyperf        string               `toml:"pyperf"`
+	Vendor        map[string]VendorPin `toml:"vendor"`
+}
+
+// VendorPin is a sha256-pinned sdist shipped inside a kit so the quiet box
+// can pip-install the suite without PyPI for those two packages.
+type VendorPin struct {
+	File   string   `toml:"file"`
+	SHA256 string   `toml:"sha256"`
+	URLs   []string `toml:"urls"`
+}
+
+// Kit is a named comparison set: several profiles packed together with a
+// runner so a quiet machine can unzip and measure without a checkout.
+type Kit struct {
+	Baseline string   `toml:"baseline"`
+	Arms     []string `toml:"arms"`
 }

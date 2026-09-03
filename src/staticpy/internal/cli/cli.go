@@ -99,7 +99,7 @@ var registry []*command
 
 func init() {
 	registry = []*command{
-		cmdBuild, cmdStatus, cmdVerify, cmdBench, cmdLogs, cmdShell,
+		cmdBuild, cmdStatus, cmdVerify, cmdBench, cmdKit, cmdLogs, cmdShell,
 		cmdDoctor, cmdConfig, cmdSources, cmdPrint,
 	}
 }

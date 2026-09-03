@@ -82,6 +82,7 @@ const layoutHelp = `WHERE THINGS LAND under dist/
                                     manifest written last, so a crash leaves no
                                     half-built artifact behind.
   out/                              the interpreters and tarballs you came for
+  out/kit/<name>/<triple>/          a benchmark kit tarball
   src/                              verified upstream tarballs (keep these)
   srctrees/                         extracted + patched source trees
   logs/jobs/<slug>/<attempt>/       every command a job ran, with cwd and env
@@ -133,6 +134,7 @@ func printHelp(w io.Writer, topic string) {
 		fmt.Fprintln(w, "  ./staticpy doctor                 what this machine has and is missing")
 		fmt.Fprintln(w, "  ./staticpy build                  a static interpreter for this machine")
 		fmt.Fprintln(w, "  ./staticpy build --target aarch64-linux-musl --verify smoke")
+		fmt.Fprintln(w, "  ./staticpy kit --verify core      pack a benchmark kit for this machine")
 		fmt.Fprintln(w, "  ./staticpy status                 what exists, what is stale, what is running")
 		fmt.Fprintln(w, "  ./staticpy logs <slug> --follow   watch a job as it builds")
 		fmt.Fprintln(w)

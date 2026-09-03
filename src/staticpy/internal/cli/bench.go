@@ -63,6 +63,12 @@ LINEUP
   --baseline is omitted, reference is the baseline; otherwise the first
   --interp wins.
 
+  --kit DIR is the other way to name a lineup: an unpacked kit tarball
+  (staticpy kit) already lists every arm in kit.json, so ./run on the quiet
+  box passes --kit and nothing else. --interp still adds or overrides an
+  arm. Results write to DIR/results/ rather than dist/bench/. --cpu is the
+  same pin as without a kit.
+
   Each arm runs inside its own venv, so the arms differ only in the
   interpreter. Without one, a system python drags in distro site-packages --
   whose .pth files execute during the startup probe -- and sys.path ends up a
@@ -155,6 +161,8 @@ func runBench(g *Global, args []string) error {
 	// enough to be interesting would drop real measurements and leave the
 	// geomean quietly computed over the benchmarks that happened to be quick.
 	timeout := fs.Duration("timeout", 20*time.Minute, "per-benchmark timeout; a hang detector, not a budget")
+	kitDir := fs.String("kit", "", "unpacked kit directory; lineup comes from kit.json")
+	listArms := fs.Bool("list", false, "print the lineup and exit")
 	if err := parse(fs, args); err != nil {
 		return finish("bench", err)
 	}
@@ -164,6 +172,20 @@ func runBench(g *Global, args []string) error {
 	}
 	if *repeat < 1 {
 		return usagef("--repeat must be at least 1, got %d", *repeat)
+	}
+
+	if *kitDir != "" {
+		abs, err := filepath.Abs(*kitDir)
+		if err != nil {
+			return err
+		}
+		*kitDir = abs
+		if !g.flagGiven("dist") {
+			g.Dist = filepath.Join(*kitDir, "results", ".staticpy")
+		}
+		if !g.flagGiven("hermetic") {
+			g.noHermetic = true
+		}
 	}
 
 	cfg, err := g.load()
@@ -188,6 +210,29 @@ func runBench(g *Global, args []string) error {
 		return err
 	}
 
+	var kitDoc *bench.KitDoc
+	sessionParent := ""
+	findLinks := ""
+	if *kitDir != "" {
+		if *build {
+			return fmt.Errorf("--kit cannot be combined with --build; the kit already holds the interpreters")
+		}
+		kitDoc, err = bench.LoadKit(*kitDir)
+		if err != nil {
+			return err
+		}
+		if err := kitDoc.MatchesThisMachine(); err != nil {
+			return err
+		}
+		if kitDoc.Triple != "" && kitDoc.Triple != host {
+			return fmt.Errorf("kit is for %s; this machine is %s", kitDoc.Triple, host)
+		}
+		sessionParent = filepath.Join(*kitDir, "results")
+		if vendor := filepath.Join(*kitDir, "vendor"); isDir(vendor) {
+			findLinks = vendor
+		}
+	}
+
 	overrides := map[string]string{}
 	var overrideOrder []string
 	for _, e := range interpOverrides {
@@ -205,26 +250,49 @@ func runBench(g *Global, args []string) error {
 		paths[label] = path
 	}
 
-	// Nothing is benchmarked unless it was asked for by name. Auto-discovery
-	// would let adding an interpreter silently change the baseline, and with
-	// it every ratio the report prints.
+	// Nothing is benchmarked unless it was asked for by name, or a kit
+	// already named the lineup. Auto-discovery would let adding an
+	// interpreter silently change the baseline, and with it every ratio.
 	if len(overrideOrder) == 0 {
-		return fmt.Errorf("nothing to benchmark: pass --interp at least once, or twice to compare.\n"+
-			"  --interp static                the artifact for %s\n"+
-			"  --interp reference             the dynamic reference build\n"+
-			"  --interp system                python3 from PATH\n"+
-			"  --interp PROFILE               any other profile's interpreter\n"+
-			"  --interp LABEL=/path/to/python any other binary", host)
-	}
-	for _, label := range overrideOrder {
-		p := overrides[label]
-		if p == "" {
-			var err error
-			if p, err = resolveKnownInterp(g, cfg, label, abi, *build); err != nil {
+		if kitDoc == nil {
+			return fmt.Errorf("nothing to benchmark: pass --interp at least once, or twice to compare.\n"+
+				"  --interp static                the artifact for %s\n"+
+				"  --interp reference             the dynamic reference build\n"+
+				"  --interp system                python3 from PATH\n"+
+				"  --interp PROFILE               any other profile's interpreter\n"+
+				"  --interp LABEL=/path/to/python any other binary\n"+
+				"  --kit DIR                      lineup from an unpacked kit", host)
+		}
+		kitOrder, kitPaths, err := kitDoc.ResolveArms(*kitDir)
+		if err != nil {
+			return err
+		}
+		for _, label := range kitOrder {
+			add(label, kitPaths[label])
+		}
+		if *baselineFlag == "" {
+			*baselineFlag = kitDoc.Baseline
+		}
+	} else {
+		var kitPaths map[string]string
+		if kitDoc != nil {
+			_, kitPaths, err = kitDoc.ResolveArms(*kitDir)
+			if err != nil {
 				return err
 			}
 		}
-		add(label, p)
+		for _, label := range overrideOrder {
+			p := overrides[label]
+			if p == "" && kitPaths != nil {
+				p = kitPaths[label]
+			}
+			if p == "" {
+				if p, err = resolveKnownInterp(g, cfg, label, abi, *build); err != nil {
+					return err
+				}
+			}
+			add(label, p)
+		}
 	}
 
 	if len(only) > 0 {
@@ -257,6 +325,13 @@ func runBench(g *Global, args []string) error {
 	if err != nil {
 		return err
 	}
+	if *listArms {
+		for _, l := range order {
+			fmt.Printf("%s\t%s\n", l, paths[l])
+		}
+		fmt.Fprintf(os.Stderr, "baseline %s\n", baseline)
+		return nil
+	}
 
 	switch *suite {
 	case "pyperformance", "micro":
@@ -271,9 +346,9 @@ func runBench(g *Global, args []string) error {
 	// A --pyperformance directory names the suite as surely as --suite does.
 	if *suite == "pyperformance" || *suiteRoot != "" {
 		return runPyperfSuite(g, cfg, e, order, paths, baseline, *suiteRoot, *pyperfSrc,
-			!*noVenv, *noPin, *cpu, *timeout, g.Offline, pins, *out)
+			!*noVenv, *noPin, *cpu, *timeout, g.Offline, pins, sessionParent, findLinks, *out)
 	}
-	return runMicroSuite(g, cfg, e, order, paths, baseline, *noPin, *cpu, *iters, *repeat, pins, *out)
+	return runMicroSuite(g, cfg, e, order, paths, baseline, *noPin, *cpu, *iters, *repeat, pins, sessionParent, *out)
 }
 
 func publishSession(sess *bench.Session, md string, report map[string]any, out string, asJSON bool) error {
@@ -297,7 +372,7 @@ func publishSession(sess *bench.Session, md string, report map[string]any, out s
 }
 
 func runMicroSuite(g *Global, cfg *config.Config, e *core.Env, order []string, paths map[string]string,
-	baseline string, noPin bool, cpu, iters, repeat int, pins bench.Pins, outPath string) error {
+	baseline string, noPin bool, cpu, iters, repeat int, pins bench.Pins, sessionParent, outPath string) error {
 
 	tmpDir, err := os.MkdirTemp("", "staticpy-bench-")
 	if err != nil {
@@ -320,7 +395,7 @@ func runMicroSuite(g *Global, cfg *config.Config, e *core.Env, order []string, p
 	}
 	machine.SetRunPlacement(pin.Describe(), topoDesc)
 
-	sess, err := bench.NewSession(g.Dist, runtime.GOARCH, time.Now())
+	sess, err := openBenchSession(g.Dist, sessionParent, runtime.GOARCH, time.Now())
 	if err != nil {
 		return err
 	}
@@ -368,6 +443,13 @@ func runMicroSuite(g *Global, cfg *config.Config, e *core.Env, order []string, p
 		return err
 	}
 	return publishSession(sess, md, report, outPath, g.JSON)
+}
+
+func openBenchSession(dist, parent, arch string, now time.Time) (*bench.Session, error) {
+	if parent != "" {
+		return bench.NewSessionIn(parent, arch, now)
+	}
+	return bench.NewSession(dist, arch, now)
 }
 
 func pinsOf(cfg *config.Config) bench.Pins {

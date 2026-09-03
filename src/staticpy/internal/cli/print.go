@@ -32,6 +32,8 @@ KEYS
   toolchains        the toolchain directory in use
   recipe-version    the recipe generation; every job key includes it
   git-revision      the commit stamped into this executable (-X / --git-revision)
+  kits              named kits in bench.toml, space separated
+  kit:<name>        that kit's arms, space separated
   version:<name>    the pinned version of one source, e.g. version:openssl
   sha256:<name>     its pinned checksum
 
@@ -71,6 +73,15 @@ func runPrint(g *Global, args []string) error {
 			return err
 		}
 		fmt.Println(s.SHA256)
+		return nil
+	}
+
+	if name, ok := strings.CutPrefix(key, "kit:"); ok {
+		k, ok := cfg.Kits[name]
+		if !ok {
+			return fmt.Errorf("no kit named %q (have %s)", name, strings.Join(sortedKeys(cfg.Kits), ", "))
+		}
+		fmt.Println(strings.Join(k.Arms, " "))
 		return nil
 	}
 
@@ -134,6 +145,9 @@ func runPrint(g *Global, args []string) error {
 		return nil
 	case "git-revision":
 		fmt.Println(buildinfo.GitRevision)
+		return nil
+	case "kits":
+		fmt.Println(strings.Join(sortedKeys(cfg.Kits), " "))
 		return nil
 	}
 	return usagef("unknown key %q", key)

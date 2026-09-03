@@ -10,6 +10,7 @@
 //	pynative:<prof>:<T>        the shipped interpreter, host == target
 //	pycross:<prof>:<H>:<T>     the shipped interpreter, host != target
 //	pack:<prof>:<T>            the distributable tarball
+//	kit:<name>:<T>             several packed prefixes plus a bench runner
 //
 // pycross depends on pyhost, never on pynative: a cross build needs a runnable
 // same-version interpreter to freeze bytecode, and that is all it needs. Making
@@ -49,11 +50,17 @@ type PlanOptions struct {
 
 	Verify string // "", "smoke", "core", "full"
 	Pack   bool
+	// Kit, if set, ignores Profile and fans in every arm of that named kit
+	// plus a kit job. Each arm is packed (and verified, when Verify is set).
+	Kit string
 }
 
 // The CLI never constructs a job itself, so the shape of the graph is decided
 // in exactly one place.
 func Plan(cfg *config.Config, assets fs.FS, o PlanOptions) ([]core.Job, error) {
+	if o.Kit != "" {
+		return planKit(cfg, assets, o)
+	}
 	if o.Profile == "" {
 		o.Profile = "default"
 	}

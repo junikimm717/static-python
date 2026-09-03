@@ -71,6 +71,7 @@ pyhost:<ver>               static-musl CPython that runs on the build machine
 pynative:<prof>:<T>        the shipped interpreter, host == target
 pycross:<prof>:<H>:<T>     the shipped interpreter, host != target
 pack:<prof>:<T>            the distributable tarball
+kit:<name>:<T>             several packed prefixes plus a bench runner
 ```
 
 Two edges carry the design:

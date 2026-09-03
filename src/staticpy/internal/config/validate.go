@@ -26,6 +26,7 @@ func (c *Config) Validate() error {
 		c.validatePyPackages,
 		c.validateBundles,
 		c.validateBench,
+		c.validateKits,
 	} {
 		if err := check(); err != nil {
 			return err
@@ -298,6 +299,44 @@ func (c *Config) validateBundles() error {
 func (c *Config) validateBench() error {
 	if c.Bench.Pyperformance == "" || c.Bench.Pyperf == "" {
 		return fmt.Errorf("bench: pyperformance and pyperf pins are required")
+	}
+	return nil
+}
+
+func (c *Config) validateKits() error {
+	if len(c.Kits) == 0 {
+		return nil
+	}
+	for _, name := range []string{"pyperformance", "pyperf"} {
+		p, ok := c.Bench.Vendor[name]
+		if !ok {
+			return fmt.Errorf("kit: [bench.vendor.%s] is required so a kit can ship the suite offline", name)
+		}
+		if p.File == "" || !isSHA256(p.SHA256) || len(p.URLs) == 0 {
+			return fmt.Errorf("kit: [bench.vendor.%s] needs file, sha256 and at least one url", name)
+		}
+	}
+	for name, k := range c.Kits {
+		where := fmt.Sprintf("kit %q", name)
+		if len(k.Arms) == 0 {
+			return fmt.Errorf("%s: arms is empty", where)
+		}
+		seen := map[string]bool{}
+		for _, arm := range k.Arms {
+			if _, ok := c.Profiles[arm]; !ok {
+				return fmt.Errorf("%s: arm %q is not a profile (have %s)", where, arm, keysOf(c.Profiles))
+			}
+			if seen[arm] {
+				return fmt.Errorf("%s: arm %q listed twice", where, arm)
+			}
+			seen[arm] = true
+		}
+		if k.Baseline == "" {
+			return fmt.Errorf("%s: baseline is required", where)
+		}
+		if !seen[k.Baseline] {
+			return fmt.Errorf("%s: baseline %q is not in arms", where, k.Baseline)
+		}
 	}
 	return nil
 }

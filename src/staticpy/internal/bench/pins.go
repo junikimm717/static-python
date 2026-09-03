@@ -44,6 +44,13 @@ func PyperformanceSpecs(pyperformance, pyperf string) []string {
 // PipInstallArgs is the pip argv that installs the suite, still --no-deps:
 // pyperformance depends on psutil, a C extension that will not load here.
 func PipInstallArgs(pins Pins) []string {
-	return append([]string{"install", "--quiet", "--no-deps"},
-		PyperformanceSpecs(pins.Pyperformance, pins.Pyperf)...)
+	return PipInstallArgsFrom(pins, "")
+}
+
+func PipInstallArgsFrom(pins Pins, findLinks string) []string {
+	args := []string{"install", "--quiet", "--no-deps"}
+	if findLinks != "" {
+		args = append(args, "--no-index", "--find-links", findLinks)
+	}
+	return append(args, PyperformanceSpecs(pins.Pyperformance, pins.Pyperf)...)
 }

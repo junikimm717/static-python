@@ -151,6 +151,40 @@ func TestBenchPinsArePresent(t *testing.T) {
 	if c.Bench.Pyperformance == "" || c.Bench.Pyperf == "" {
 		t.Errorf("bench pins empty: pyperformance=%q pyperf=%q", c.Bench.Pyperformance, c.Bench.Pyperf)
 	}
+	if c.Bench.Vendor["pyperformance"].SHA256 == "" || c.Bench.Vendor["pyperf"].SHA256 == "" {
+		t.Errorf("bench vendor pins missing: %+v", c.Bench.Vendor)
+	}
+}
+
+func TestDefaultKitArmsAreProfiles(t *testing.T) {
+	c := loadEmbedded(t)
+	k, ok := c.Kits["default"]
+	if !ok {
+		t.Fatal("missing [kit.default]")
+	}
+	if k.Baseline != "reference" {
+		t.Errorf("baseline = %q, want reference", k.Baseline)
+	}
+	if len(k.Arms) != 10 {
+		t.Errorf("default kit has %d arms, want 10: %v", len(k.Arms), k.Arms)
+	}
+	seen := map[string]bool{}
+	for _, arm := range k.Arms {
+		if _, ok := c.Profiles[arm]; !ok {
+			t.Errorf("arm %q is not a profile", arm)
+		}
+		if seen[arm] {
+			t.Errorf("arm %q duplicated", arm)
+		}
+		seen[arm] = true
+	}
+	if !seen[k.Baseline] {
+		t.Errorf("baseline %q not in arms", k.Baseline)
+	}
+	smoke := c.Kits["smoke"]
+	if len(smoke.Arms) != 2 || smoke.Arms[0] != "default" || smoke.Arms[1] != "reference" {
+		t.Errorf("smoke kit = %+v", smoke)
+	}
 }
 
 func TestSepltoKeepsPythonLTOAndHashesModeOnDeps(t *testing.T) {

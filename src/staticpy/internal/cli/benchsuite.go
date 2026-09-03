@@ -17,7 +17,7 @@ import (
 // runPyperfSuite drives the pyperformance suite across the selected arms and
 // writes a session directory that can be re-read long after the run.
 func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, paths map[string]string,
-	baseline, suiteRoot, pyperfHint string, useVenv bool, noPin bool, cpu int, timeout time.Duration, offline bool, pins bench.Pins, outPath string) error {
+	baseline, suiteRoot, pyperfHint string, useVenv bool, noPin bool, cpu int, timeout time.Duration, offline bool, pins bench.Pins, sessionParent, findLinks, outPath string) error {
 
 	var skipped []string
 	pin, topo, err := choosePin(noPin, cpu)
@@ -32,7 +32,7 @@ func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, 
 	}
 	machine.SetRunPlacement(pin.Describe(), topoDesc)
 
-	sess, err := bench.NewSession(e.Dist, runtime.GOARCH, time.Now())
+	sess, err := openBenchSession(e.Dist, sessionParent, runtime.GOARCH, time.Now())
 	if err != nil {
 		return err
 	}
@@ -92,7 +92,7 @@ func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, 
 		for _, label := range order {
 			all = append(all, venvs[label])
 		}
-		if suiteRoot, err = bench.Bootstrap(ctx, runner, all, offline, pins); err != nil {
+		if suiteRoot, err = bench.Bootstrap(ctx, runner, all, offline, pins, findLinks); err != nil {
 			return err
 		}
 	}

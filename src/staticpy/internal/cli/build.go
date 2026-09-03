@@ -152,6 +152,7 @@ type session struct {
 	host    string
 	targets []string
 	jobs    []core.Job
+	kit     string
 }
 
 func (g *Global) session(o recipe.PlanOptions, runLog bool) (*session, error) {
@@ -190,7 +191,7 @@ func (g *Global) session(o recipe.PlanOptions, runLog bool) (*session, error) {
 		}
 		return nil, err
 	}
-	return &session{g: g, cfg: cfg, e: e, close: done, host: host, targets: targets, jobs: jobs}, nil
+	return &session{g: g, cfg: cfg, e: e, close: done, host: host, targets: targets, jobs: jobs, kit: o.Kit}, nil
 }
 
 type planRow struct {
@@ -226,10 +227,14 @@ func (s *session) printPlan(nodes []core.PlanNode, verb string) error {
 	if s.g.JSON {
 		return emitJSON(map[string]any{
 			"dist": s.e.Dist, "host": s.host, "targets": s.targets,
-			"profile": s.g.Profile, "jobs": rows,
+			"profile": s.g.Profile, "kit": s.kit, "jobs": rows,
 		})
 	}
-	fmt.Printf("%s %s -> %s   profile %s\n", bold("plan:"), s.host, strings.Join(s.targets, " "), s.g.Profile)
+	if s.kit != "" {
+		fmt.Printf("%s %s -> %s   kit %s\n", bold("plan:"), s.host, strings.Join(s.targets, " "), s.kit)
+	} else {
+		fmt.Printf("%s %s -> %s   profile %s\n", bold("plan:"), s.host, strings.Join(s.targets, " "), s.g.Profile)
+	}
 	fmt.Printf("%s\n\n", dim("dist "+s.e.Dist))
 
 	t := newTable("#", "STATE", "SLUG", "KEY")

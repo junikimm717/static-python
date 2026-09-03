@@ -144,23 +144,23 @@ func ParseResult(path string) (map[string][]float64, error) {
 // interpreter running one has to be able to import pyperf itself. Installing
 // into a single venv leaves every other arm failing at the first import, and
 // the ratios are then computed over whichever benchmarks happened to survive.
-func Bootstrap(ctx context.Context, x Exec, venvs []*Venv, offline bool, pins Pins) (string, error) {
+func Bootstrap(ctx context.Context, x Exec, venvs []*Venv, offline bool, pins Pins, findLinks string) (string, error) {
 	if len(venvs) == 0 {
 		return "", fmt.Errorf("bootstrap: no venvs to install pyperformance into")
 	}
-	if offline {
+	if offline && findLinks == "" {
 		return "", fmt.Errorf("--offline: pyperformance cannot be installed without the network.\n" +
-			"Pass --pyperformance DIR to use a copy already on disk, or --suite micro for the built-in benchmarks")
+			"Pass --pyperformance DIR to use a copy already on disk, --kit with a vendor/ directory, or --suite micro for the built-in benchmarks")
 	}
 	for _, v := range venvs {
-		if err := installPyperformance(ctx, x, v, pins); err != nil {
+		if err := installPyperformance(ctx, x, v, pins, findLinks); err != nil {
 			return "", err
 		}
 	}
 	return locateBenchmarks(ctx, x, venvs[0])
 }
 
-func installPyperformance(ctx context.Context, x Exec, v *Venv, pins Pins) error {
+func installPyperformance(ctx context.Context, x Exec, v *Venv, pins Pins, findLinks string) error {
 	if !v.HasPip(ctx, x) {
 		return fmt.Errorf("%s: this interpreter's venv has no pip, so pyperformance cannot be installed.\n"+
 			"It needs the ensurepip module and its bundled wheel; a build configured with --without-ensurepip still has both", v.Label)
@@ -172,7 +172,7 @@ func installPyperformance(ctx context.Context, x Exec, v *Venv, pins Pins) error
 	// benchmark's own requirements are installed separately, where a C
 	// extension that genuinely matters fails against the benchmark that needs
 	// it rather than against the whole suite.
-	if err := v.Pip(ctx, x, "install-pyperformance", PipInstallArgs(pins)...); err != nil {
+	if err := v.Pip(ctx, x, "install-pyperformance", PipInstallArgsFrom(pins, findLinks)...); err != nil {
 		return fmt.Errorf("%s: installing pyperformance: %w", v.Label, err)
 	}
 	return nil

@@ -27,8 +27,12 @@ type Session struct {
 }
 
 func NewSession(distDir, arch string, now time.Time) (*Session, error) {
+	return NewSessionIn(filepath.Join(distDir, "bench"), arch, now)
+}
+
+func NewSessionIn(parent, arch string, now time.Time) (*Session, error) {
 	stamp := now.UTC().Format("20060102T150405Z")
-	dir := filepath.Join(distDir, "bench", stamp+"-"+arch)
+	dir := filepath.Join(parent, stamp+"-"+arch)
 	for _, sub := range []string{"raw", "logs", "venv"} {
 		if err := os.MkdirAll(filepath.Join(dir, sub), 0o755); err != nil {
 			return nil, err
@@ -42,7 +46,7 @@ func NewSession(distDir, arch string, now time.Time) (*Session, error) {
 	if s.quiet, err = os.Create(filepath.Join(dir, "quiet.jsonl")); err != nil {
 		return nil, err
 	}
-	updateLatest(filepath.Join(distDir, "bench"), stamp+"-"+arch)
+	updateLatest(parent, stamp+"-"+arch)
 	return s, nil
 }
 
