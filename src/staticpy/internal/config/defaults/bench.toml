@@ -1,0 +1,48 @@
+[bench]
+pyperformance = "1.14.0"
+pyperf = "2.10.0"
+
+# Archives shipped inside a kit so the quiet box can install the suite
+# without git and without PyPI for these packages. setuptools is a
+# wheel: both sdists declare `requires = ["setuptools>=61"]`, pip's
+# isolated build honors that even with --no-deps, and 3.13 ensurepip
+# no longer seeds setuptools. Per-benchmark requirements may still
+# hit the network.
+[bench.vendor.pyperformance]
+version = "1.14.0"
+file = "pyperformance-1.14.0.tar.gz"
+sha256 = "91f74393997b604375ad5b79bf569a24076d70181c076a53abad5383a238a8aa"
+urls = ["https://files.pythonhosted.org/packages/9e/bc/ebc48f2af24abe0d13681ac7ccb21c3f0ed0128361522f5904d4f21953e9/pyperformance-1.14.0.tar.gz"]
+
+[bench.vendor.pyperf]
+version = "2.10.0"
+file = "pyperf-2.10.0.tar.gz"
+sha256 = "dd93ccfda79214725293e95f1fa6e00cb4a64adcf1326039486d4e1f91caaa62"
+urls = ["https://files.pythonhosted.org/packages/16/91/39ca77aa58f13e8c65d747ac7e06584b55acabfa98987fb8d546bc24860d/pyperf-2.10.0.tar.gz"]
+
+[bench.vendor.setuptools]
+version = "80.9.0"
+file = "setuptools-80.9.0-py3-none-any.whl"
+sha256 = "062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922"
+urls = ["https://files.pythonhosted.org/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl"]
+
+# Several already-built interpreters plus a runner. `staticpy kit` packs
+# [kit.default]; `staticpy kit --name smoke` is the two-arm check.
+[kit.default]
+baseline = "reference"
+arms = [
+  "default",
+  "nomimalloc",
+  "nolto",
+  "nolto-nomimalloc",
+  "seplto",
+  "seplto-nomimalloc",
+  "reference",
+  "reference-nolto",
+  "reference-mimalloc",
+  "reference-nolto-mimalloc",
+]
+
+[kit.smoke]
+baseline = "reference"
+arms = ["default", "reference"]

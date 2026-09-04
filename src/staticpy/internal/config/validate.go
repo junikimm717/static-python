@@ -11,6 +11,7 @@ var (
 	editActions  = map[string]bool{"insert_after": true, "insert_before": true, "replace_line": true, "delete_line": true}
 	targetStatus = map[string]bool{"proven": true, "experimental": true}
 	pgoModes     = map[string]bool{"off": true, "native-only": true, "on": true}
+	ltoModes     = map[string]bool{LTOModePerDep: true, LTOModeWholeGraph: true}
 	moduleSets   = map[string]bool{"minimal": true, "full": true}
 )
 
@@ -24,6 +25,8 @@ func (c *Config) Validate() error {
 		c.validateProfiles,
 		c.validatePyPackages,
 		c.validateBundles,
+		c.validateBench,
+		c.validateKits,
 	} {
 		if err := check(); err != nil {
 			return err
@@ -151,7 +154,7 @@ func (c *Config) validatePackages() error {
 				return fmt.Errorf("%s: [package.%s.profile.%s] names no profile (have %s)",
 					where, key, prof, keysOf(c.Profiles))
 			}
-			if v.Configure == nil && v.Provides == nil && v.MakeVars == nil && !v.Skip {
+			if v.Configure == nil && v.Provides == nil && v.MakeVars == nil && v.Skip == nil {
 				return fmt.Errorf("%s: [package.%s.profile.%s] overrides nothing; drop it, or set configure, provides, make_vars or skip",
 					where, key, prof)
 			}
@@ -207,8 +210,12 @@ func (c *Config) validateProfiles() error {
 	for _, name := range names {
 		scopes := append([]string{ScopeDeps, ScopePython, ScopePyhost}, depScopes(sortedKeys(c.Profiles[name].Scopes))...)
 		for _, s := range scopes {
-			if _, err := c.Resolve(name, s); err != nil {
+			r, err := c.Resolve(name, s)
+			if err != nil {
 				return err
+			}
+			if s == ScopeDeps && r.LTOMode != "" && r.HostBuilt() {
+				return fmt.Errorf("profile %q: lto_mode is for static archives; this profile is host-built", name)
 			}
 		}
 	}
@@ -228,6 +235,9 @@ func depScopes(scopes []string) []string {
 func (c *Config) checkProfileValues(p Profile, where string) error {
 	if p.PGO != "" && !pgoModes[p.PGO] {
 		return fmt.Errorf("%s: pgo %q, want %s", where, p.PGO, keysOf(pgoModes))
+	}
+	if p.LTOMode != "" && !ltoModes[p.LTOMode] {
+		return fmt.Errorf("%s: lto_mode %q, want %s", where, p.LTOMode, keysOf(ltoModes))
 	}
 	if p.Modules != "" && !moduleSets[p.Modules] {
 		return fmt.Errorf("%s: modules %q, want %s", where, p.Modules, keysOf(moduleSets))
@@ -282,6 +292,51 @@ func (c *Config) validateBundles() error {
 	}
 	if err := c.validateExpect(); err != nil {
 		return err
+	}
+	return nil
+}
+
+func (c *Config) validateBench() error {
+	if c.Bench.Pyperformance == "" || c.Bench.Pyperf == "" {
+		return fmt.Errorf("bench: pyperformance and pyperf pins are required")
+	}
+	return nil
+}
+
+func (c *Config) validateKits() error {
+	if len(c.Kits) == 0 {
+		return nil
+	}
+	for _, name := range []string{"pyperformance", "pyperf", "setuptools"} {
+		p, ok := c.Bench.Vendor[name]
+		if !ok {
+			return fmt.Errorf("kit: [bench.vendor.%s] is required so a kit can ship the suite offline", name)
+		}
+		if p.Version == "" || p.File == "" || !isSHA256(p.SHA256) || len(p.URLs) == 0 {
+			return fmt.Errorf("kit: [bench.vendor.%s] needs version, file, sha256 and at least one url", name)
+		}
+	}
+	for name, k := range c.Kits {
+		where := fmt.Sprintf("kit %q", name)
+		if len(k.Arms) == 0 {
+			return fmt.Errorf("%s: arms is empty", where)
+		}
+		seen := map[string]bool{}
+		for _, arm := range k.Arms {
+			if _, ok := c.Profiles[arm]; !ok {
+				return fmt.Errorf("%s: arm %q is not a profile (have %s)", where, arm, keysOf(c.Profiles))
+			}
+			if seen[arm] {
+				return fmt.Errorf("%s: arm %q listed twice", where, arm)
+			}
+			seen[arm] = true
+		}
+		if k.Baseline == "" {
+			return fmt.Errorf("%s: baseline is required", where)
+		}
+		if !seen[k.Baseline] {
+			return fmt.Errorf("%s: baseline %q is not in arms", where, k.Baseline)
+		}
 	}
 	return nil
 }

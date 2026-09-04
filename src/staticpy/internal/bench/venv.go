@@ -139,10 +139,21 @@ func copyTree(src, dst string) error {
 // Network access is the caller's concern: an --offline bench must not reach
 // PyPI, and says so rather than failing on a timeout.
 func (v *Venv) Pip(ctx context.Context, x Exec, name string, args ...string) error {
+	return v.pip(ctx, x, name, false, args)
+}
+
+// pipSoft is for installs whose failure skips a benchmark rather than
+// aborting the run. The Runner must not log those as ERROR.
+func (v *Venv) pipSoft(ctx context.Context, x Exec, name string, args ...string) error {
+	return v.pip(ctx, x, name, true, args)
+}
+
+func (v *Venv) pip(ctx context.Context, x Exec, name string, soft bool, args []string) error {
 	return x.Run(ctx, core.Cmd{
-		Dir:  v.Dir,
-		Args: append([]string{v.Python, "-m", "pip", "--disable-pip-version-check", "--no-input"}, args...),
-		Name: name + "-" + v.Label,
+		Dir:      v.Dir,
+		Args:     append([]string{v.Python, "-m", "pip", "--disable-pip-version-check", "--no-input"}, args...),
+		Name:     name + "-" + v.Label,
+		SoftFail: soft,
 	})
 }
 

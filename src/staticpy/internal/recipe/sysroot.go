@@ -22,6 +22,13 @@ func Sysroot(cfg *config.Config, assets fs.FS, t config.Target, profile string) 
 		memo: map[string]*depJob{}, onStack: map[string]bool{}}
 	j := &sysrootJob{target: t, profile: profile}
 	for _, name := range sortedKeys(cfg.Packages) {
+		skip, err := cfg.PackageSkipped(name, profile)
+		if err != nil {
+			return nil, err
+		}
+		if skip {
+			continue
+		}
 		d, err := b.job(name)
 		if err != nil {
 			return nil, err

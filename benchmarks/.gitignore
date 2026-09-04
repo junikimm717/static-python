@@ -1,0 +1,21 @@
+# Allowlist. A dumped session directory can land here whole; only the
+# archive index, this README, and the seven importable session files
+# are tracked. venv/, raw/, logs/, quiet.jsonl, and anything else stay out.
+
+*
+!**/
+!/.gitignore
+!/README.md
+!/index.json
+!**/manifest.json
+!**/env.json
+!**/report.json
+!**/report.md
+!**/report.html
+!**/skipped.json
+!**/timeline.jsonl
+
+# Never recurse into these, even if a file name collides with the allowlist.
+venv/
+raw/
+logs/

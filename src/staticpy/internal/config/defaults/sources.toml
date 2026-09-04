@@ -120,7 +120,10 @@ sha256 = "f9cde7b0e2ec8165d7326e2a0f59ea2686ce9d0c617dbbb3d66a7e54d31b74b9"
 # Programs/_freeze_module links getpath_noop.o rather than getpath.o, and with
 # the _test* modules built in, _testinternalcapi.o joins that link referencing
 # _Py_Get_Getpath_CodeObject. Give the stub file the stub.
-patches = ["0001-stub-getpath-codeobject-for-the-freeze-bootstrap.diff"]
+patches = [
+  "0001-stub-getpath-codeobject-for-the-freeze-bootstrap.diff",
+  "0002-linux-real-executable-from-proc-self-exe.diff",
+]
 
 # ctypes assumes a libdl underneath it. A fully static interpreter has none, so
 # the three edits below replace dlopen-based access to the interpreter's own
@@ -161,3 +164,5 @@ file = "mimalloc-cd69707c3ca01a4c5fb358e8b92a710554f15356.tar.gz"
 topdir = "mimalloc-cd69707c3ca01a4c5fb358e8b92a710554f15356"
 urls = ["https://github.com/microsoft/mimalloc/archive/cd69707c3ca01a4c5fb358e8b92a710554f15356.tar.gz"]
 sha256 = "0700824da164c6b2ccb9541109ccf2845a8d4a628c763337eb05744a5b27eb72"
+# pthread_mutex_t has no atfork; see staticpy-traps LIBATOMIC_FORK.
+patches = ["0001-fork-safe-locks.diff"]

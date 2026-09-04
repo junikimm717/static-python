@@ -1,6 +1,7 @@
 package recipe
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io/fs"
@@ -39,6 +40,13 @@ func Deps(cfg *config.Config, assets fs.FS, t config.Target, profile string) ([]
 		memo: map[string]*depJob{}, onStack: map[string]bool{}}
 	var out []core.Job
 	for _, name := range sortedKeys(cfg.Packages) {
+		skip, err := cfg.PackageSkipped(name, profile)
+		if err != nil {
+			return nil, err
+		}
+		if skip {
+			continue
+		}
 		j, err := b.job(name)
 		if err != nil {
 			return nil, err
@@ -201,6 +209,15 @@ func (j *depJob) KeyInputs() map[string]string {
 		// the artifact that never satisfied it invalid.
 		"provides": strings.Join(j.pkg.Provides, "\x00"),
 	}
+	if j.res.LTOMode == config.LTOModePerDep {
+		in["lto_rel"] = "replace"
+		if !j.res.HostBuilt() {
+			in["configure_prefix"] = keepablePrefix
+		}
+	}
+	if j.shape() == buildOpenSSL && !j.res.HostBuilt() {
+		in["openssldir"] = opensslCertDir
+	}
 	if j.tgtPatchHash != "none" {
 		in["target_patches"] = j.tgtPatchHash
 	}
@@ -299,6 +316,9 @@ func (j *depJob) Build(ctx context.Context, e *core.Env, r *core.Runner, work, s
 	if err != nil {
 		return err
 	}
+	if err := j.materializeArchives(ctx, r, te, stage, work); err != nil {
+		return err
+	}
 	return j.assertProvides(stage)
 }
 
@@ -324,9 +344,10 @@ func (j *depJob) makeVars(e *core.Env) []string {
 }
 
 func (j *depJob) autotools(ctx context.Context, e *core.Env, r *core.Runner, te *toolenv, src, stage, prefix string) error {
+	cfgPrefix := j.configurePrefix(prefix)
 	args := []string{"./configure",
-		"--prefix=" + prefix,
-		"--exec-prefix=" + prefix,
+		"--prefix=" + cfgPrefix,
+		"--exec-prefix=" + cfgPrefix,
 	}
 	// --host is what puts autotools into cross mode, where it may not run a test
 	// program and falls back to guessing. It would also send configure looking
@@ -335,7 +356,7 @@ func (j *depJob) autotools(ctx context.Context, e *core.Env, r *core.Runner, te 
 	if !j.res.HostBuilt() {
 		args = append(args, "--host="+j.target.Triple)
 	}
-	args = append(args, j.pkg.Configure...)
+	args = append(args, stripRecipeOwnedFlags(j.pkg.Configure)...)
 
 	r.Step("configuring " + j.name)
 	if err := r.Run(ctx, te.cmd(j.name+"-configure", src, args, nil)); err != nil {
@@ -360,13 +381,22 @@ func (j *depJob) autotools(ctx context.Context, e *core.Env, r *core.Runner, te 
 		})); err != nil {
 		return err
 	}
-	return hoistDestdir(stage, prefix, j.name)
+	return j.finishInstall(stage, cfgPrefix, prefix)
 }
 
 func (j *depJob) openssl(ctx context.Context, e *core.Env, r *core.Runner, te *toolenv, src, stage, prefix string) error {
+	cfgPrefix := j.configurePrefix(prefix)
 	args := []string{"./Configure", j.platform}
-	args = append(args, j.pkg.Configure...)
-	args = append(args, "--prefix="+prefix, "--openssldir="+prefix)
+	args = append(args, stripRecipeOwnedFlags(j.pkg.Configure)...)
+	args = append(args, "--prefix="+cfgPrefix)
+	// OPENSSLDIR is read by ssl.create_default_context. An artifact path is
+	// gone on the user's machine; /etc/ssl is the portable Linux default.
+	// Host-built keeps the rootfs prefix, which is where the files land.
+	if j.res.HostBuilt() {
+		args = append(args, "--openssldir="+cfgPrefix)
+	} else {
+		args = append(args, "--openssldir="+opensslCertDir)
+	}
 
 	r.Step("configuring " + j.name)
 	if err := r.Run(ctx, te.cmd(j.name+"-configure", src, args, nil)); err != nil {
@@ -384,7 +414,7 @@ func (j *depJob) openssl(ctx context.Context, e *core.Env, r *core.Runner, te *t
 		[]string{"make", "install_sw", "DESTDIR=" + stage}, nil)); err != nil {
 		return err
 	}
-	return hoistDestdir(stage, prefix, j.name)
+	return j.finishInstall(stage, cfgPrefix, prefix)
 }
 
 // The Makefile is assumed to honour CC/AR/CFLAGS from the environment (bzip2
@@ -475,10 +505,85 @@ func (j *depJob) fromSources(ctx context.Context, r *core.Runner, te *toolenv, s
 	return nil
 }
 
+// Per-dep LTO materializes prefix strings in .a files. The artifact path is
+// a rewrite target the composer refuses, so those deps configure with /usr
+// (keepable) and hoist DESTDIR+/usr. Text metadata is rewritten back so
+// pkg-config still points at the artifact. See staticpy-traps (seplto prefix).
+const keepablePrefix = "/usr"
+
+// opensslCertDir is OPENSSLDIR on every non-host openssl. /usr/ssl is empty
+// on Alpine/Debian/Fedora; /etc/ssl is where the CA bundle lives.
+const opensslCertDir = "/etc/ssl"
+
+func (j *depJob) configurePrefix(artifact string) string {
+	if j.res.LTOMode == config.LTOModePerDep && !j.res.HostBuilt() {
+		return keepablePrefix
+	}
+	return artifact
+}
+
+// destDirTree is POSIX DESTDIR: stage concatenated with an absolute prefix,
+// never filepath.Join of two abs paths (which a future Clean could drop).
+func destDirTree(stage, prefix string) string {
+	p := filepath.Clean(prefix)
+	p = strings.TrimPrefix(p, string(os.PathSeparator))
+	return filepath.Join(stage, p)
+}
+
+func stripRecipeOwnedFlags(args []string) []string {
+	var out []string
+	for _, a := range args {
+		if strings.HasPrefix(a, "--prefix=") ||
+			strings.HasPrefix(a, "--exec-prefix=") ||
+			strings.HasPrefix(a, "--openssldir=") {
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
+}
+
+func (j *depJob) finishInstall(stage, cfgPrefix, artifact string) error {
+	if err := hoistDestdir(stage, cfgPrefix, j.name); err != nil {
+		return err
+	}
+	if cfgPrefix != artifact {
+		return rewriteKeepableMetadata(stage, cfgPrefix, artifact)
+	}
+	return nil
+}
+
+func rewriteKeepableMetadata(root, from, to string) error {
+	return filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		name := d.Name()
+		ext := filepath.Ext(name)
+		keep := ext == ".pc" || ext == ".la" || strings.HasSuffix(name, "-config") ||
+			strings.Contains(p, string(filepath.Separator)+"cmake"+string(filepath.Separator))
+		if !keep {
+			return nil
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		if !bytes.Contains(b, []byte(from)) {
+			return nil
+		}
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(p, bytes.ReplaceAll(b, []byte(from), []byte(to)), info.Mode().Perm())
+	})
+}
+
 // hoistDestdir lifts <stage><prefix> to <stage>, so the artifact is the
 // installed tree itself rather than a deep path mirroring the store.
 func hoistDestdir(stage, prefix, pkg string) error {
-	staged := filepath.Join(stage, prefix)
+	staged := destDirTree(stage, prefix)
 	ents, err := os.ReadDir(staged)
 	if os.IsNotExist(err) {
 		return fmt.Errorf("recipe: %s installed nothing under %s: its install target ignored DESTDIR, "+

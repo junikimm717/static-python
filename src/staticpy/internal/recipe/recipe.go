@@ -10,6 +10,7 @@
 //	pynative:<prof>:<T>        the shipped interpreter, host == target
 //	pycross:<prof>:<H>:<T>     the shipped interpreter, host != target
 //	pack:<prof>:<T>            the distributable tarball
+//	kit:<name>:<T>             several packed prefixes plus a bench runner
 //
 // pycross depends on pyhost, never on pynative: a cross build needs a runnable
 // same-version interpreter to freeze bytecode, and that is all it needs. Making
@@ -35,7 +36,10 @@ import (
 // 2: dependencies may publish a merged relocatable object, and the interpreter
 // links every object a sysroot carries.
 // 3: that object is localised before it is merged, not after.
-const Version = 3
+// 4: host-built trees rewrite RUNPATH to $ORIGIN after install, so the
+//
+//	rootfs can be copied; pack includes those trees.
+const Version = 4
 
 type PlanOptions struct {
 	Profile string
@@ -46,11 +50,17 @@ type PlanOptions struct {
 
 	Verify string // "", "smoke", "core", "full"
 	Pack   bool
+	// Kit, if set, ignores Profile and fans in every arm of that named kit
+	// plus a kit job. Each arm is packed (and verified, when Verify is set).
+	Kit string
 }
 
 // The CLI never constructs a job itself, so the shape of the graph is decided
 // in exactly one place.
 func Plan(cfg *config.Config, assets fs.FS, o PlanOptions) ([]core.Job, error) {
+	if o.Kit != "" {
+		return planKit(cfg, assets, o)
+	}
 	if o.Profile == "" {
 		o.Profile = "default"
 	}
@@ -81,9 +91,6 @@ func Plan(cfg *config.Config, assets fs.FS, o PlanOptions) ([]core.Job, error) {
 			if final, err = Verify(cfg, assets, t, o.Profile, o.Verify, interp); err != nil {
 				return nil, err
 			}
-		}
-		if o.Pack && interp.Name() == "pyref" {
-			return nil, fmt.Errorf("recipe: a host-built interpreter links against this machine's libc and is reproducible nowhere else, so there is nothing to pack")
 		}
 		if o.Pack {
 			if final, err = Pack(cfg, t, o.Profile, interp, final); err != nil {

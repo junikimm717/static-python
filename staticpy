@@ -24,12 +24,36 @@ NATIVE_ARCH="$(uname -m)"
 
 die() { echo "staticpy: $*" >&2; exit 1; }
 
+git_revision() {
+    if [ -n "${STATICPY_GIT_REVISION:-}" ]; then
+        printf '%s' "$STATICPY_GIT_REVISION"
+        return
+    fi
+    git -C "$ROOT" rev-parse HEAD 2>/dev/null || true
+}
+
+git_dirty_suffix() {
+    if git -C "$ROOT" status --porcelain --untracked-files=no 2>/dev/null | grep -q .; then
+        printf '%s' "-dirty"
+    fi
+}
+
 build_binary() {
     command -v go >/dev/null 2>&1 || die "go is not installed, and $BIN does not exist.
   Either install go, or fetch a released staticpy binary and put it at $BIN."
     mkdir -p "$DIST/.bin"
+    rev="$(git_revision)"
+    [ -n "$rev" ] && rev="$rev$(git_dirty_suffix)"
+    ldflags=""
+    if [ -n "$rev" ]; then
+        ldflags="-X github.com/junikimm717/static-python/src/staticpy/internal/buildinfo.GitRevision=$rev"
+    fi
     # CGO off so the result is static and runs wherever the tarballs do.
-    ( cd "$ROOT/src/staticpy" && CGO_ENABLED=0 go build -o "$BIN" . )
+    # -buildvcs=false: we stamp GitRevision ourselves. go's git probe dies
+    # with exit 128 on a bind-mounted repo whose owner is not the container
+    # user (Ubuntu reference loop, same class on the next Alpine rebuild).
+    ( cd "$ROOT/src/staticpy" && CGO_ENABLED=0 go build -buildvcs=false -ldflags "$ldflags" -o "$BIN" . )
+    printf '%s\n' "$rev" > "$BIN.rev"
 }
 
 # Rebuild when any source file is newer than the binary. Every file counts, not
@@ -92,5 +116,7 @@ fi
 
 set -- --toolchains "$TOOLCHAINS" --dist "$DIST" "$@"
 [ -n "$BUSYBOX" ] && set -- --busybox "$BUSYBOX" "$@"
+rev="$(cat "$BIN.rev" 2>/dev/null || git_revision)"
+[ -n "$rev" ] && set -- --git-revision "$rev" "$@"
 
 exec "$BIN" "$@"

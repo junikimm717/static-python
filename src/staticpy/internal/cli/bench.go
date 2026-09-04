@@ -1,11 +1,9 @@
 package cli
 
 import (
-	"debug/elf"
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,15 +25,20 @@ var cmdBench = &command{
 	Short:    "compare interpreters' CPU and startup performance",
 	Synopsis: "staticpy bench --interp NAME|LABEL=PATH ... [--baseline LABEL] [--cpu N] [--suite NAME]",
 	Long: `Runs pyperformance against a lineup of interpreters and renders a markdown
-comparison report.
+and HTML comparison report.
 
 pyperformance is the default because it is what speed.python.org publishes
-against. It is installed into each arm's venv, so nothing has to be located or
-passed in. ` + "`--with-ensurepip=no`" + ` means pip was never installed into the
+against. It is installed into each arm's venv at a pinned version
+(pyperformance ` + bench.DefaultPyperformance + `, pyperf ` + bench.DefaultPyperf + `, --no-deps), so nothing has to be located
+or passed in. ` + "`--with-ensurepip=no`" + ` means pip was never installed into the
 interpreter's own prefix; it leaves the ensurepip module and its bundled wheel
 in the stdlib, so ` + "`-m venv`" + ` seeds a working pip. What a static interpreter
 genuinely cannot do is load a C extension, so a benchmark whose requirement
 ships one is dropped by name into skipped.json rather than quietly excluded.
+
+Every session records protocol ` + fmt.Sprintf("%d", bench.Protocol) + `. Bump that constant when a measurement bug
+means old numbers cannot be compared to new ones; a pyperformance pin bump is
+a suite change, not a protocol bump.
 
 --suite micro selects the built-in suite instead: eleven stdlib-only loops
 (dispatch, attribute access, dict/list churn) plus a spawn-latency probe. It
@@ -46,15 +49,25 @@ good at.
 
 LINEUP
   Nothing is benchmarked unless it is named. --interp is repeatable and takes
-  either a well-known name or an explicit path:
-    --interp static             the pynative artifact for this machine
+  a well-known name, a profile name, or an explicit path:
+    --interp static             the pynative artifact for --profile
     --interp reference          the dynamic interpreter, from
                                 ` + "`staticpy build --profile reference`" + `
     --interp system             python3 from PATH
+    --interp PROFILE            any other profile's built interpreter
+                                (nomimalloc, nolto, seplto, reference-nolto, ...)
     --interp LABEL=/path/to/py  any other binary
-  --baseline LABEL fixes the denominator of every ratio; without it the first
-  --interp wins. Naming it matters: with auto-discovery, adding an interpreter
-  could silently change which one everything was measured against.
+  Name each arm. There is no bundled lineup: the comparison set is whatever
+  --interp flags you pass, in that order. --baseline LABEL fixes the
+  denominator of every ratio. When the lineup contains reference and
+  --baseline is omitted, reference is the baseline; otherwise the first
+  --interp wins.
+
+  --kit DIR is the other way to name a lineup: an unpacked kit tarball
+  (staticpy kit) already lists every arm in kit.json, so ./run on the quiet
+  box passes --kit and nothing else. --interp still adds or overrides an
+  arm. Results write to DIR/results/ rather than dist/bench/. --cpu is the
+  same pin as without a kit.
 
   Each arm runs inside its own venv, so the arms differ only in the
   interpreter. Without one, a system python drags in distro site-packages --
@@ -78,11 +91,15 @@ SUITES
   than no number at all.
 
   Results land in dist/bench/<UTC-stamp>-<arch>/, never overwritten and never
-  deduplicated: a measurement is not a pure function of its inputs. Alongside
-  the report are the unaggregated pyperf JSON, a manifest recording each
-  binary's sha256, and timeline.jsonl -- one record per measurement with its
-  wall time, load average and the busy fraction of the pinned core's SMT
-  sibling, which is what lets a suspicious number be audited months later.
+  deduplicated: a measurement is not a pure function of its inputs. Every
+  suite writes the same files: report.json (rows + geomean_vs_baseline,
+  >1 is faster), report.md, report.html, manifest.json (protocol, suite.name,
+  pins, each binary's sha256/factors/artifact key, venv packages, this
+  executable's git revision), env.json (kernel, cpu, memory, affinity,
+  fingerprint identity + telemetry), skipped.json, and timeline.jsonl --
+  one record per measurement with its wall time, load average and the busy
+  fraction of the pinned core's SMT sibling. pyperformance also keeps the
+  unaggregated pyperf JSON under raw/.
 
 MEASUREMENT
   The run is confined to one logical CPU with sched_setaffinity, inherited by
@@ -116,8 +133,9 @@ uniform across benchmarks, so the numbers would be comparable to nothing - not
 to native, and not to each other. Passing --target for anything but this
 machine's own triple is refused.
 
-The report is written to dist/bench/<UTC-stamp>_<arch>.md (or --out) and also
-printed to stdout; --json prints the raw measurements instead.`,
+The markdown report is also printed to stdout; --json prints report.json
+instead. The session directory is written either way. --out writes a copy of
+the markdown beside the session directory.`,
 	Run: runBench,
 }
 
@@ -131,21 +149,24 @@ func runBench(g *Global, args []string) error {
 	var only []string
 	fs.Var(listFlag{&only}, "only", "restrict to these labels, comma-separated or repeated")
 	var interpOverrides []interpEntry
-	fs.Var(interpFlag{&interpOverrides}, "interp", "<label>=<path> to add or override one interpreter; repeatable")
-	out := fs.String("out", "", "write the report here instead of dist/bench/<stamp>_<arch>.md")
+	fs.Var(interpFlag{&interpOverrides}, "interp", "well-known name (static, reference, system), a profile, or <label>=<path>; repeatable")
+	out := fs.String("out", "", "also write the markdown report here (session dir is still used)")
 	suite := fs.String("suite", "pyperformance", "which benchmarks to run: \"pyperformance\" (installed into each venv) or \"micro\" (the built-in stdlib-only suite)")
 	suiteRoot := fs.String("pyperformance", "", "use pyperformance's benchmarks from this directory instead of installing them")
 	pyperfSrc := fs.String("pyperf", "", "directory holding the pyperf package to install into each venv")
-	baselineFlag := fs.String("baseline", "", "the interpreter every ratio is measured against (default: the first --interp)")
+	baselineFlag := fs.String("baseline", "", "the interpreter every ratio is measured against (default: reference if present, else the first --interp)")
 	noVenv := fs.Bool("no-venv", false, "run interpreters directly instead of through a per-arm venv")
 	// Generous on purpose. This is a hang detector, not a budget: pinned to one
 	// core, bm_base64 legitimately takes over seven minutes, and a limit tight
 	// enough to be interesting would drop real measurements and leave the
 	// geomean quietly computed over the benchmarks that happened to be quick.
 	timeout := fs.Duration("timeout", 20*time.Minute, "per-benchmark timeout; a hang detector, not a budget")
+	kitDir := fs.String("kit", "", "unpacked kit directory; lineup comes from kit.json")
+	listArms := fs.Bool("list", false, "print the lineup and exit")
 	if err := parse(fs, args); err != nil {
 		return finish("bench", err)
 	}
+	g.applyGitRevision()
 	if *iters < 1 {
 		return usagef("--iters must be at least 1, got %d", *iters)
 	}
@@ -153,10 +174,25 @@ func runBench(g *Global, args []string) error {
 		return usagef("--repeat must be at least 1, got %d", *repeat)
 	}
 
+	if *kitDir != "" {
+		abs, err := filepath.Abs(*kitDir)
+		if err != nil {
+			return err
+		}
+		*kitDir = abs
+		if !g.flagGiven("dist") {
+			g.Dist = filepath.Join(*kitDir, "results", ".staticpy")
+		}
+		if !g.flagGiven("hermetic") {
+			g.noHermetic = true
+		}
+	}
+
 	cfg, err := g.load()
 	if err != nil {
 		return err
 	}
+	pins := pinsOf(cfg)
 	host, err := g.HostTriple(cfg)
 	if err != nil {
 		return err
@@ -174,6 +210,29 @@ func runBench(g *Global, args []string) error {
 		return err
 	}
 
+	var kitDoc *bench.KitDoc
+	sessionParent := ""
+	findLinks := ""
+	if *kitDir != "" {
+		if *build {
+			return fmt.Errorf("--kit cannot be combined with --build; the kit already holds the interpreters")
+		}
+		kitDoc, err = bench.LoadKit(*kitDir)
+		if err != nil {
+			return err
+		}
+		if err := kitDoc.MatchesThisMachine(); err != nil {
+			return err
+		}
+		if kitDoc.Triple != "" && kitDoc.Triple != host {
+			return fmt.Errorf("kit is for %s; this machine is %s", kitDoc.Triple, host)
+		}
+		sessionParent = filepath.Join(*kitDir, "results")
+		if vendor := filepath.Join(*kitDir, "vendor"); isDir(vendor) {
+			findLinks = vendor
+		}
+	}
+
 	overrides := map[string]string{}
 	var overrideOrder []string
 	for _, e := range interpOverrides {
@@ -182,7 +241,6 @@ func runBench(g *Global, args []string) error {
 		}
 		overrides[e.Label] = e.Path
 	}
-
 	var order []string
 	paths := map[string]string{}
 	add := func(label, path string) {
@@ -192,25 +250,49 @@ func runBench(g *Global, args []string) error {
 		paths[label] = path
 	}
 
-	// Nothing is benchmarked unless it was asked for by name. Auto-discovery
-	// would let adding an interpreter silently change the baseline, and with
-	// it every ratio the report prints.
+	// Nothing is benchmarked unless it was asked for by name, or a kit
+	// already named the lineup. Auto-discovery would let adding an
+	// interpreter silently change the baseline, and with it every ratio.
 	if len(overrideOrder) == 0 {
-		return fmt.Errorf("nothing to benchmark: pass --interp at least once, or twice to compare.\n"+
-			"  --interp static                the artifact for %s\n"+
-			"  --interp reference             the dynamic reference build\n"+
-			"  --interp system                python3 from PATH\n"+
-			"  --interp LABEL=/path/to/python any other binary", host)
-	}
-	for _, label := range overrideOrder {
-		p := overrides[label]
-		if p == "" {
-			var err error
-			if p, err = resolveKnownInterp(g, label, abi, host, *build); err != nil {
+		if kitDoc == nil {
+			return fmt.Errorf("nothing to benchmark: pass --interp at least once, or twice to compare.\n"+
+				"  --interp static                the artifact for %s\n"+
+				"  --interp reference             the dynamic reference build\n"+
+				"  --interp system                python3 from PATH\n"+
+				"  --interp PROFILE               any other profile's interpreter\n"+
+				"  --interp LABEL=/path/to/python any other binary\n"+
+				"  --kit DIR                      lineup from an unpacked kit", host)
+		}
+		kitOrder, kitPaths, err := kitDoc.ResolveArms(*kitDir)
+		if err != nil {
+			return err
+		}
+		for _, label := range kitOrder {
+			add(label, kitPaths[label])
+		}
+		if *baselineFlag == "" {
+			*baselineFlag = kitDoc.Baseline
+		}
+	} else {
+		var kitPaths map[string]string
+		if kitDoc != nil {
+			_, kitPaths, err = kitDoc.ResolveArms(*kitDir)
+			if err != nil {
 				return err
 			}
 		}
-		add(label, p)
+		for _, label := range overrideOrder {
+			p := overrides[label]
+			if p == "" && kitPaths != nil {
+				p = kitPaths[label]
+			}
+			if p == "" {
+				if p, err = resolveKnownInterp(g, cfg, label, abi, *build); err != nil {
+					return err
+				}
+			}
+			add(label, p)
+		}
 	}
 
 	if len(only) > 0 {
@@ -239,13 +321,16 @@ func runBench(g *Global, args []string) error {
 			return fmt.Errorf("interpreter %q at %s is missing or not executable", l, paths[l])
 		}
 	}
-	baseline := order[0]
-	if *baselineFlag != "" {
-		if !slices.Contains(order, *baselineFlag) {
-			return fmt.Errorf("--baseline %q is not one of the interpreters being compared (have: %s)",
-				*baselineFlag, strings.Join(order, ", "))
+	baseline, err := pickBaseline(order, *baselineFlag)
+	if err != nil {
+		return err
+	}
+	if *listArms {
+		for _, l := range order {
+			fmt.Printf("%s\t%s\n", l, paths[l])
 		}
-		baseline = *baselineFlag
+		fmt.Fprintf(os.Stderr, "baseline %s\n", baseline)
+		return nil
 	}
 
 	switch *suite {
@@ -253,16 +338,41 @@ func runBench(g *Global, args []string) error {
 	default:
 		return fmt.Errorf("--suite %q: want \"pyperformance\" or \"micro\"", *suite)
 	}
+	e, done, err := g.newEnv(cfg, true)
+	if err != nil {
+		return err
+	}
+	defer done()
 	// A --pyperformance directory names the suite as surely as --suite does.
 	if *suite == "pyperformance" || *suiteRoot != "" {
-		e, done, err := g.newEnv(cfg, true)
-		if err != nil {
+		return runPyperfSuite(g, cfg, e, order, paths, baseline, *suiteRoot, *pyperfSrc,
+			!*noVenv, *noPin, *cpu, *timeout, g.Offline, pins, sessionParent, findLinks, *out)
+	}
+	return runMicroSuite(g, cfg, e, order, paths, baseline, *noPin, *cpu, *iters, *repeat, pins, sessionParent, *out)
+}
+
+func publishSession(sess *bench.Session, md string, report map[string]any, out string, asJSON bool) error {
+	if asJSON {
+		if err := emitJSON(report); err != nil {
 			return err
 		}
-		defer done()
-		return runPyperfSuite(e, order, paths, baseline, *suiteRoot, *pyperfSrc,
-			!*noVenv, *noPin, *cpu, *timeout, g.Offline)
+	} else {
+		fmt.Print(md)
 	}
+	if out != "" {
+		if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+			return err
+		}
+		if err := os.WriteFile(out, []byte(md), 0o644); err != nil {
+			return err
+		}
+	}
+	fmt.Fprintf(os.Stderr, "\n%s %s\n", bold("session:"), sess.Dir)
+	return nil
+}
+
+func runMicroSuite(g *Global, cfg *config.Config, e *core.Env, order []string, paths map[string]string,
+	baseline string, noPin bool, cpu, iters, repeat int, pins bench.Pins, sessionParent, outPath string) error {
 
 	tmpDir, err := os.MkdirTemp("", "staticpy-bench-")
 	if err != nil {
@@ -274,51 +384,86 @@ func runBench(g *Global, args []string) error {
 	}
 	scriptPath := filepath.Join(tmpDir, "bench", "microbench.py")
 
-	pin, topo, err := choosePin(*noPin, *cpu)
+	pin, topo, err := choosePin(noPin, cpu)
 	if err != nil {
+		return err
+	}
+	machine := bench.ReadMachine()
+	topoDesc := ""
+	if topo != nil {
+		topoDesc = topo.Describe()
+	}
+	machine.SetRunPlacement(pin.Describe(), topoDesc)
+
+	sess, err := openBenchSession(g.Dist, sessionParent, runtime.GOARCH, time.Now())
+	if err != nil {
+		return err
+	}
+	defer sess.Close()
+
+	var ids []bench.Identity
+	for _, label := range order {
+		id, err := bench.Identify(label, paths[label])
+		if err != nil {
+			return fmt.Errorf("%s: %w", label, err)
+		}
+		enrichIdentity(g, cfg, e, &id)
+		ids = append(ids, id)
+	}
+	acc := bench.Accounting{
+		Baseline:   baseline,
+		SuiteName:  bench.SuiteMicro,
+		Pins:       pins,
+		Identities: ids,
+		Skipped:    []string{},
+		Machine:    machine,
+	}
+	if err := sess.WriteAccounting(acc); err != nil {
 		return err
 	}
 
 	measurements := map[string]*interpMeasurement{}
 	for _, l := range order {
 		fmt.Fprintf(os.Stderr, "%s %s (%s)\n", bold("benchmarking:"), l, paths[l])
-		m, err := measureInterpreter(paths[l], scriptPath, *iters, *repeat)
+		m, err := measureInterpreter(sess, pin, l, paths[l], scriptPath, iters, repeat)
 		if err != nil {
 			return fmt.Errorf("%s: %w", l, err)
 		}
 		measurements[l] = m
 	}
 
-	env := gatherBenchEnv()
-	env.Affinity = pin.Describe()
-	if topo != nil {
-		env.Topology = topo.Describe()
-	}
-	arch := cfg.Targets[host].Arch
-	stamp := time.Now().UTC().Format("2006-01-02T1504Z")
-
-	if g.JSON {
-		return emitJSON(benchJSONReport(arch, stamp, baseline, env, order, measurements))
-	}
-
-	report := renderBenchReport(arch, stamp, baseline, env, order, measurements)
-	fmt.Print(report)
-
-	reportPath := *out
-	if reportPath == "" {
-		if err := g.resolve(); err != nil {
-			return err
-		}
-		reportPath = filepath.Join(g.Dist, "bench", stamp+"_"+arch+".md")
-	}
-	if err := os.MkdirAll(filepath.Dir(reportPath), 0o755); err != nil {
+	rows, geo := bench.Compare(samplesToResults(order, measurements), baseline, order)
+	md, report, err := sess.WriteReports(bench.Reports{
+		Accounting: acc,
+		Order:      order,
+		Rows:       rows,
+		Geomean:    geo,
+	})
+	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(reportPath, []byte(report), 0o644); err != nil {
-		return err
+	return publishSession(sess, md, report, outPath, g.JSON)
+}
+
+func openBenchSession(dist, parent, arch string, now time.Time) (*bench.Session, error) {
+	if parent != "" {
+		return bench.NewSessionIn(parent, arch, now)
 	}
-	fmt.Fprintf(os.Stderr, "%s %s\n", dim("saved:"), reportPath)
-	return nil
+	return bench.NewSession(dist, arch, now)
+}
+
+func pinsOf(cfg *config.Config) bench.Pins {
+	p := bench.Pins{
+		Pyperformance: cfg.Bench.Pyperformance,
+		Pyperf:        cfg.Bench.Pyperf,
+	}
+	if p.Pyperformance == "" {
+		p.Pyperformance = bench.DefaultPyperformance
+	}
+	if p.Pyperf == "" {
+		p.Pyperf = bench.DefaultPyperf
+	}
+	return p
 }
 
 func pythonABI(cfg *config.Config) (string, error) {
@@ -423,14 +568,13 @@ func (f interpFlag) String() string {
 	return strings.Join(parts, ",")
 }
 
-// A bare well-known name resolves to the artifact staticpy built; anything
-// else must say where it is.
+// A bare name is a well-known interp or a profile.
+// Profiles are validated after config load; Set has none.
 func (f interpFlag) Set(v string) error {
 	label, path, ok := strings.Cut(v, "=")
 	if !ok {
-		if !slices.Contains(knownInterps, v) {
-			return fmt.Errorf("want <label>=<path>, or one of %s; got %q",
-				strings.Join(knownInterps, ", "), v)
+		if v == "" {
+			return fmt.Errorf("empty --interp")
 		}
 		*f.v = append(*f.v, interpEntry{Label: v})
 		return nil
@@ -446,17 +590,21 @@ func (f interpFlag) Set(v string) error {
 	return nil
 }
 
-// Names that resolve without a path.
-var knownInterps = []string{"static", "reference", "system"}
+// Names that resolve without a path, plus every profile.
+var wellKnownInterps = []string{"static", "reference", "system"}
 
-// cpuBenchOrder fixes the CPU table's row order. It must match the
-// registration order of BENCHMARKS in assets/files/bench/microbench.py -
-// results come back as a JSON object, and object key order is not something
-// Go's map-based unmarshal preserves.
-var cpuBenchOrder = []string{
-	"fib_recursive", "fib_iter", "arith_loop", "listcomp", "dictops",
-	"attr_access", "str_format", "regex_match", "json_roundtrip",
-	"func_call", "except_path",
+func pickBaseline(order []string, flag string) (string, error) {
+	if flag != "" {
+		if !slices.Contains(order, flag) {
+			return "", fmt.Errorf("--baseline %q is not one of the interpreters being compared (have: %s)",
+				flag, strings.Join(order, ", "))
+		}
+		return flag, nil
+	}
+	if slices.Contains(order, "reference") {
+		return "reference", nil
+	}
+	return order[0], nil
 }
 
 type startupScenario struct {
@@ -470,33 +618,46 @@ var startupScenarios = []startupScenario{
 	{"stdlib", []string{"-c", "import json, re, os, sys, collections, hashlib"}},
 }
 
-type startupStat struct{ MinMs, MedianMs float64 }
-
 type interpMeasurement struct {
-	Path      string
-	Version   string
-	Linkage   string
-	SizeBytes int64
-	SizeLabel string
-	CPU       map[string]float64
-	// Whether the minimum can be trusted: (max-min)/min across repeats.
-	CPUSpread map[string]float64
-	Startup   map[string]startupStat
+	CPU     map[string][]float64 // ns/op
+	Startup map[string][]float64 // milliseconds
 }
 
-func measureInterpreter(path, scriptPath string, iters, repeat int) (*interpMeasurement, error) {
-	version, err := runCapture(path, "-c", "import sys; print(sys.version.split()[0])")
-	if err != nil {
-		return nil, fmt.Errorf("version probe: %w", err)
+func samplesToResults(order []string, ms map[string]*interpMeasurement) bench.Results {
+	res := bench.Results{}
+	for _, l := range order {
+		res[l] = map[string][]float64{}
+		m := ms[l]
+		if m == nil {
+			continue
+		}
+		for name, ns := range m.CPU {
+			secs := make([]float64, len(ns))
+			for i, v := range ns {
+				secs[i] = v / 1e9
+			}
+			res[l][name] = secs
+		}
+		for name, millis := range m.Startup {
+			secs := make([]float64, len(millis))
+			for i, v := range millis {
+				secs[i] = v / 1000
+			}
+			res[l]["startup."+name] = secs
+		}
 	}
-	linkage, sizeBytes, sizeLabel, err := linkageAndSize(path)
-	if err != nil {
-		return nil, fmt.Errorf("inspect binary: %w", err)
-	}
-	// Minimum per benchmark, not averaged: see bench.Reduce.
+	return res
+}
+
+func measureInterpreter(sess *bench.Session, pin bench.Pin, label, path, scriptPath string, iters, repeat int) (*interpMeasurement, error) {
 	series := map[string][]float64{}
 	for range repeat {
-		one, err := runMicrobench(path, scriptPath)
+		var one map[string]float64
+		err := sess.Trace(pin, label, "cpu", func() error {
+			var e error
+			one, e = runMicrobench(path, scriptPath)
+			return e
+		})
 		if err != nil {
 			return nil, fmt.Errorf("cpu micro-benchmarks: %w", err)
 		}
@@ -504,78 +665,20 @@ func measureInterpreter(path, scriptPath string, iters, repeat int) (*interpMeas
 			series[k] = append(series[k], v)
 		}
 	}
-	cpu := make(map[string]float64, len(series))
-	spread := make(map[string]float64, len(series))
-	for k, vs := range series {
-		agg, ok := bench.Reduce(vs)
-		if !ok {
-			return nil, fmt.Errorf("cpu micro-benchmarks: %s produced no usable samples", k)
+	startup := make(map[string][]float64, len(startupScenarios))
+	for _, sc := range startupScenarios {
+		var samples []float64
+		err := sess.Trace(pin, label, "startup."+sc.Name, func() error {
+			var e error
+			samples, e = measureStartupScenario(path, sc, iters)
+			return e
+		})
+		if err != nil {
+			return nil, err
 		}
-		cpu[k] = agg.Min
-		spread[k] = agg.Spread()
+		startup[sc.Name] = samples
 	}
-	startup, err := measureStartup(path, iters)
-	if err != nil {
-		return nil, fmt.Errorf("startup probe: %w", err)
-	}
-	return &interpMeasurement{
-		Path: path, Version: version, Linkage: linkage,
-		SizeBytes: sizeBytes, SizeLabel: sizeLabel,
-		CPU: cpu, CPUSpread: spread, Startup: startup,
-	}, nil
-}
-
-func runCapture(path string, args ...string) (string, error) {
-	cmd := exec.Command(path, args...)
-	out, err := cmd.Output()
-	if err != nil {
-		if ee, ok := err.(*exec.ExitError); ok {
-			return "", fmt.Errorf("%v: %s", err, strings.TrimSpace(string(ee.Stderr)))
-		}
-		return "", err
-	}
-	return strings.TrimSpace(string(out)), nil
-}
-
-// linkageAndSize replaces the shell script's `file` + `ldd` combo with
-// debug/elf, so bench needs nothing on the host beyond the interpreters it is
-// comparing.
-func linkageAndSize(path string) (linkage string, sizeBytes int64, sizeLabel string, err error) {
-	real, rerr := filepath.EvalSymlinks(path)
-	if rerr != nil {
-		real = path
-	}
-	fi, err := os.Stat(real)
-	if err != nil {
-		return "", 0, "", err
-	}
-	stubBytes := fi.Size()
-
-	f, oerr := elf.Open(real)
-	if oerr != nil {
-		return "unknown", stubBytes, humanBytes(stubBytes), nil
-	}
-	defer f.Close()
-	libs, lerr := f.ImportedLibraries()
-	if lerr != nil || len(libs) == 0 {
-		return "static", stubBytes, humanBytes(stubBytes), nil
-	}
-
-	total := stubBytes
-	label := humanBytes(stubBytes)
-	for _, lib := range libs {
-		if !strings.HasPrefix(lib, "libpython") {
-			continue
-		}
-		prefix := filepath.Dir(filepath.Dir(real)) // .../bin/pythonX.Y -> prefix
-		candidate := filepath.Join(prefix, "lib", lib)
-		if lfi, serr := os.Stat(candidate); serr == nil {
-			total += lfi.Size()
-			label = fmt.Sprintf("%s stub + %s libpython = %s", humanBytes(stubBytes), humanBytes(lfi.Size()), humanBytes(total))
-		}
-		break
-	}
-	return "dynamic", total, label, nil
+	return &interpMeasurement{CPU: series, Startup: startup}, nil
 }
 
 func runMicrobench(path, scriptPath string) (map[string]float64, error) {
@@ -601,25 +704,21 @@ func runMicrobench(path, scriptPath string) (map[string]float64, error) {
 	return res, nil
 }
 
-func measureStartup(path string, iters int) (map[string]startupStat, error) {
-	out := make(map[string]startupStat, len(startupScenarios))
-	for _, sc := range startupScenarios {
-		for range 3 {
-			if err := runQuiet(path, sc.Args); err != nil {
-				return nil, fmt.Errorf("%s warmup: %w", sc.Name, err)
-			}
+func measureStartupScenario(path string, sc startupScenario, iters int) ([]float64, error) {
+	for range 3 {
+		if err := runQuiet(path, sc.Args); err != nil {
+			return nil, fmt.Errorf("%s warmup: %w", sc.Name, err)
 		}
-		samples := make([]float64, iters)
-		for i := range iters {
-			t0 := time.Now()
-			if err := runQuiet(path, sc.Args); err != nil {
-				return nil, fmt.Errorf("%s: %w", sc.Name, err)
-			}
-			samples[i] = time.Since(t0).Seconds() * 1000
-		}
-		out[sc.Name] = startupStat{MinMs: minFloat(samples), MedianMs: medianFloat(samples)}
 	}
-	return out, nil
+	samples := make([]float64, iters)
+	for i := range iters {
+		t0 := time.Now()
+		if err := runQuiet(path, sc.Args); err != nil {
+			return nil, fmt.Errorf("%s: %w", sc.Name, err)
+		}
+		samples[i] = time.Since(t0).Seconds() * 1000
+	}
+	return samples, nil
 }
 
 func runQuiet(path string, args []string) error {
@@ -627,265 +726,6 @@ func runQuiet(path string, args []string) error {
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
 	return cmd.Run()
-}
-
-func minFloat(xs []float64) float64 {
-	m := xs[0]
-	for _, v := range xs[1:] {
-		if v < m {
-			m = v
-		}
-	}
-	return m
-}
-
-func medianFloat(xs []float64) float64 {
-	s := append([]float64(nil), xs...)
-	sort.Float64s(s)
-	n := len(s)
-	if n%2 == 1 {
-		return s[n/2]
-	}
-	return (s[n/2-1] + s[n/2]) / 2
-}
-
-func geomean(vals []float64) float64 {
-	sum := 0.0
-	for _, v := range vals {
-		sum += math.Log(v)
-	}
-	return math.Exp(sum / float64(len(vals)))
-}
-
-type benchEnv struct {
-	Container bool
-	CPUModel  string
-	Cores     int
-	CacheL1d  string
-	CacheL1i  string
-	CacheL2   string
-	CacheL3   string
-	Kernel    string
-	// A ratio is only meaningful alongside the placement it was measured under.
-	Topology string
-	Affinity string
-}
-
-func gatherBenchEnv() benchEnv {
-	e := benchEnv{Cores: runtime.NumCPU(), CPUModel: "unknown", Kernel: "unknown"}
-	if _, err := os.Stat("/.dockerenv"); err == nil {
-		e.Container = true
-	}
-	if b, err := os.ReadFile("/proc/cpuinfo"); err == nil {
-		for _, key := range []string{"model name", "Model name", "Hardware"} {
-			if v := cpuinfoField(string(b), key); v != "" {
-				e.CPUModel = v
-				break
-			}
-		}
-	}
-	e.CacheL1d = cacheSizeAt(0)
-	e.CacheL1i = cacheSizeAt(1)
-	e.CacheL2 = cacheSizeAt(2)
-	e.CacheL3 = cacheSizeAt(3)
-	if out, err := exec.Command("uname", "-sr").Output(); err == nil {
-		e.Kernel = strings.TrimSpace(string(out))
-	}
-	return e
-}
-
-func cpuinfoField(text, key string) string {
-	for _, line := range strings.Split(text, "\n") {
-		if k, v, ok := strings.Cut(line, ":"); ok && strings.TrimSpace(k) == key {
-			return strings.TrimSpace(v)
-		}
-	}
-	return ""
-}
-
-func cacheSizeAt(index int) string {
-	b, err := os.ReadFile(fmt.Sprintf("/sys/devices/system/cpu/cpu0/cache/index%d/size", index))
-	if err != nil {
-		return "?"
-	}
-	return strings.TrimSpace(string(b))
-}
-
-func fmtNs(ns float64) string {
-	switch {
-	case ns >= 1_000_000:
-		return fmt.Sprintf("%.2f ms", ns/1_000_000)
-	case ns >= 1_000:
-		return fmt.Sprintf("%.2f us", ns/1_000)
-	default:
-		return fmt.Sprintf("%.1f ns", ns)
-	}
-}
-
-func renderBenchReport(arch, stamp, baseline string, env benchEnv, order []string, m map[string]*interpMeasurement) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "# staticpy bench -- %s -- %s\n\n", arch, stamp)
-	fmt.Fprintf(&b, "Generated: %s\n\n", time.Now().UTC().Format("2006-01-02 15:04:05 UTC"))
-
-	b.WriteString("## Environment\n\n")
-	container := ""
-	if env.Container {
-		container = " (inside container)"
-	}
-	fmt.Fprintf(&b, "- arch: `%s`%s\n", arch, container)
-	fmt.Fprintf(&b, "- cpu: %s\n", env.CPUModel)
-	fmt.Fprintf(&b, "- logical cores: %d\n", env.Cores)
-	fmt.Fprintf(&b, "- caches: L1d %s / L1i %s / L2 %s / L3 %s\n", env.CacheL1d, env.CacheL1i, env.CacheL2, env.CacheL3)
-	fmt.Fprintf(&b, "- kernel: %s\n", env.Kernel)
-	if env.Topology != "" {
-		fmt.Fprintf(&b, "- topology: %s\n", env.Topology)
-	}
-	fmt.Fprintf(&b, "- affinity: %s\n\n", env.Affinity)
-
-	writeRow := func(label string, get func(string) string) {
-		fmt.Fprintf(&b, "| %s |", label)
-		for _, l := range order {
-			fmt.Fprintf(&b, " %s |", get(l))
-		}
-		b.WriteString("\n")
-	}
-	fmt.Fprintf(&b, "| |")
-	for _, l := range order {
-		fmt.Fprintf(&b, " %s |", l)
-	}
-	b.WriteString("\n|---")
-	for range order {
-		b.WriteString("|---")
-	}
-	b.WriteString("|\n")
-	writeRow("executable", func(l string) string { return "`" + m[l].Path + "`" })
-	writeRow("version", func(l string) string { return m[l].Version })
-	writeRow("linkage", func(l string) string { return m[l].Linkage })
-	writeRow("size on disk", func(l string) string { return m[l].SizeLabel })
-	b.WriteString("\n")
-
-	var others []string
-	for _, l := range order {
-		if l != baseline {
-			others = append(others, l)
-		}
-	}
-
-	b.WriteString("## CPU micro-benchmarks (lower ns/op is better)\n\n")
-	fmt.Fprintf(&b, "Best of 7 runs after warmup; values are per inner-loop op.")
-	if len(others) > 0 {
-		fmt.Fprintf(&b, " Ratio column is X / %s: > 1 means %s was faster on that row. The final row is the geometric mean of those ratios.", baseline, baseline)
-	}
-	b.WriteString("\n\n")
-	header := append([]string{"benchmark"}, order...)
-	for _, o := range others {
-		header = append(header, o+"/"+baseline)
-	}
-	b.WriteString("| " + strings.Join(header, " | ") + " |\n")
-	b.WriteString("|---" + strings.Repeat("|---:", len(header)-1) + "|\n")
-	ratios := map[string][]float64{}
-	for _, name := range cpuBenchOrder {
-		cells := []string{name}
-		for _, l := range order {
-			if v, ok := m[l].CPU[name]; ok {
-				cells = append(cells, fmtNs(v))
-			} else {
-				cells = append(cells, "-")
-			}
-		}
-		base, hasBase := m[baseline].CPU[name]
-		for _, o := range others {
-			v, ok := m[o].CPU[name]
-			if !ok || !hasBase || base == 0 {
-				cells = append(cells, "-")
-				continue
-			}
-			r := v / base
-			ratios[o] = append(ratios[o], r)
-			cells = append(cells, fmt.Sprintf("%.2fx", r))
-		}
-		b.WriteString("| " + strings.Join(cells, " | ") + " |\n")
-	}
-	if len(others) > 0 {
-		cells := []string{"**geomean (X / " + baseline + ")**"}
-		for range order {
-			cells = append(cells, "")
-		}
-		for _, o := range others {
-			cells = append(cells, fmt.Sprintf("**%.2fx**", geomean(ratios[o])))
-		}
-		b.WriteString("| " + strings.Join(cells, " | ") + " |\n")
-	}
-	b.WriteString("\n")
-
-	b.WriteString("## Startup / first-import latency (lower ms is better)\n\n")
-	fmt.Fprintf(&b, "Wall-clock spawn time, min of the sampled runs.")
-	if len(others) > 0 {
-		fmt.Fprintf(&b, " Ratio column is X / %s: > 1 means %s spawned faster. Final row is the geometric mean across scenarios.", baseline, baseline)
-	}
-	b.WriteString("\n\n")
-	header = append([]string{"scenario"}, order...)
-	for _, o := range others {
-		header = append(header, o+"/"+baseline)
-	}
-	b.WriteString("| " + strings.Join(header, " | ") + " |\n")
-	b.WriteString("|---" + strings.Repeat("|---:", len(header)-1) + "|\n")
-	startRatios := map[string][]float64{}
-	for _, sc := range startupScenarios {
-		cells := []string{sc.Name}
-		for _, l := range order {
-			cells = append(cells, fmt.Sprintf("%.2f ms", m[l].Startup[sc.Name].MinMs))
-		}
-		base := m[baseline].Startup[sc.Name].MinMs
-		for _, o := range others {
-			v := m[o].Startup[sc.Name].MinMs
-			if base == 0 {
-				cells = append(cells, "-")
-				continue
-			}
-			r := v / base
-			startRatios[o] = append(startRatios[o], r)
-			cells = append(cells, fmt.Sprintf("%.2fx", r))
-		}
-		b.WriteString("| " + strings.Join(cells, " | ") + " |\n")
-	}
-	if len(others) > 0 {
-		cells := []string{"**geomean (X / " + baseline + ")**"}
-		for range order {
-			cells = append(cells, "")
-		}
-		for _, o := range others {
-			cells = append(cells, fmt.Sprintf("**%.2fx**", geomean(startRatios[o])))
-		}
-		b.WriteString("| " + strings.Join(cells, " | ") + " |\n")
-	}
-	return b.String()
-}
-
-func benchJSONReport(arch, stamp, baseline string, env benchEnv, order []string, m map[string]*interpMeasurement) map[string]any {
-	interps := make([]map[string]any, 0, len(order))
-	for _, l := range order {
-		mm := m[l]
-		startup := map[string]any{}
-		for _, sc := range startupScenarios {
-			s := mm.Startup[sc.Name]
-			startup[sc.Name] = map[string]float64{"min_ms": s.MinMs, "median_ms": s.MedianMs}
-		}
-		interps = append(interps, map[string]any{
-			"label": l, "executable": mm.Path, "version": mm.Version,
-			"linkage": mm.Linkage, "size_bytes": mm.SizeBytes,
-			"cpu_ns_per_op": mm.CPU, "startup_ms": startup,
-		})
-	}
-	return map[string]any{
-		"arch": arch, "stamp": stamp, "baseline": baseline,
-		"environment": map[string]any{
-			"container": env.Container, "cpu_model": env.CPUModel, "logical_cores": env.Cores,
-			"cache_l1d": env.CacheL1d, "cache_l1i": env.CacheL1i, "cache_l2": env.CacheL2, "cache_l3": env.CacheL3,
-			"kernel": env.Kernel, "topology": env.Topology, "affinity": env.Affinity,
-		},
-		"interpreters": interps,
-	}
 }
 
 func applyPin(disabled bool) (bench.Pin, *bench.Topology) {
@@ -922,7 +762,7 @@ func applyPin(disabled bool) (bench.Pin, *bench.Topology) {
 	return pin, topo
 }
 
-func resolveKnownInterp(g *Global, label, abi, host string, build bool) (string, error) {
+func resolveKnownInterp(g *Global, cfg *config.Config, label, abi string, build bool) (string, error) {
 	switch label {
 	case "static":
 		p, err := findBuiltInterp(g, "", abi, build)
@@ -945,5 +785,15 @@ func resolveKnownInterp(g *Global, label, abi, host string, build bool) (string,
 		}
 		return p, nil
 	}
-	return "", fmt.Errorf("--interp %s: unknown name", label)
+	if cfg != nil {
+		if _, ok := cfg.Profiles[label]; ok {
+			p, err := findBuiltInterp(g, label, abi, build)
+			if err != nil {
+				return "", fmt.Errorf("--interp %s: %w\nBuild it with `staticpy build --profile %s`, or pass --build", label, err, label)
+			}
+			return p, nil
+		}
+	}
+	return "", fmt.Errorf("--interp %s: unknown name (want %s, or a profile name)",
+		label, strings.Join(wellKnownInterps, ", "))
 }

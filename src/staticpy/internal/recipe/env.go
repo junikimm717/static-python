@@ -92,6 +92,77 @@ func (id ToolchainID) keyInputs() map[string]string {
 	}
 }
 
+// Host-built jobs already fold id.Key into the Merkle key; they must also
+// publish to a path that includes it. Two host compilers sharing dist/
+// otherwise write the same prefix and ld mixes their .so files
+// (staticpy-traps PYREF_RPATH). Provisioned toolchains stay unsuffixed:
+// their identity is the triple plus the gccfactory key, and they do not
+// share a prefix across machines.
+func hostPublishSuffix(id ToolchainID) string {
+	if id.Source != toolchainHost {
+		return ""
+	}
+	k := id.Key
+	if k == "" {
+		return "_host"
+	}
+	if len(k) > 12 {
+		k = k[:12]
+	}
+	return "_" + k
+}
+
+// Factor is the compact toolchain identity a bench session records, so a
+// later reader does not have to reconstruct it from a profile name.
+func (id ToolchainID) Factor() string {
+	if id.Triple == "" && id.Key == "" && id.Probe == "" {
+		return ""
+	}
+	var parts []string
+	if id.Triple != "" {
+		parts = append(parts, id.Triple)
+	}
+	if v := id.gccMajor(); v != "" {
+		parts = append(parts, v)
+	}
+	if id.Source != "" {
+		parts = append(parts, id.Source)
+	}
+	if id.Key != "" {
+		k := id.Key
+		if len(k) > 12 {
+			k = k[:12]
+		}
+		parts = append(parts, k)
+	} else if id.Probe != "" {
+		parts = append(parts, id.Probe)
+	}
+	return strings.Join(parts, ":")
+}
+
+func (id ToolchainID) gccMajor() string {
+	ver := ""
+	if id.CC != "" {
+		if v, err := ccOutput(id.CC, "-dumpversion"); err == nil {
+			ver = v
+		}
+	}
+	if ver == "" && strings.HasPrefix(id.Probe, "gcc ") {
+		rest := strings.TrimPrefix(id.Probe, "gcc ")
+		if f := strings.Fields(rest); len(f) > 0 {
+			ver = f[0]
+		}
+	}
+	if ver == "" {
+		return ""
+	}
+	major, _, _ := strings.Cut(ver, ".")
+	if major == "" {
+		return ""
+	}
+	return "gcc" + major
+}
+
 // Provenance is empty for a toolchain that identified itself, and non-empty
 // for one we had to fingerprint. core stamps it into the manifest, so a build
 // assembled on trust never looks identical to one that was verified.
@@ -365,13 +436,27 @@ func (te *toolenv) ldflags() []string {
 			continue
 		}
 		// ld does not consult -L when resolving a shared library's own NEEDED
-		// entries; it uses -rpath-link and then the library's RUNPATH. In a
-		// rootfs build that RUNPATH is the published path, which does not exist
-		// while the build is running, so a configure test that links -lreadline
-		// fails to find libncursesw and the module is dropped as "necessary bits
-		// not found" -- a green build missing half its extension modules.
+		// entries; it uses the library's RUNPATH, then -rpath, then
+		// -rpath-link. See staticpy-traps PYREF_RPATH.
 		out = append(out, "-Wl,-rpath-link,"+filepath.Join(v, "lib"),
 			"-Wl,-rpath-link,"+filepath.Join(v, "lib64"))
+	}
+	// Host-built .so files must carry a DT_RUNPATH or rewriteRootfsRpaths
+	// cannot shrink them to $ORIGIN. Bake it on the view (this build's
+	// staged copies). The published prefix on a rebuild is the previous
+	// generation; same-toolchain leftovers usually link, a foreign
+	// leftover is the PYREF_RPATH mix. The view is still longer than
+	// $ORIGIN, so the rewrite fits.
+	if te.res.HostBuilt() {
+		rpathFrom := te.view
+		if len(rpathFrom) == 0 && te.prefix != "" {
+			rpathFrom = []string{te.prefix}
+		}
+		for _, v := range rpathFrom {
+			out = append(out,
+				"-Wl,-rpath,"+filepath.Join(v, "lib"),
+				"-Wl,-rpath,"+filepath.Join(v, "lib64"))
+		}
 	}
 	if te.dir == "" {
 		// Joining an empty dir would produce a relative -L that silently

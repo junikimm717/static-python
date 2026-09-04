@@ -21,6 +21,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/junikimm717/static-python/src/staticpy/internal/buildinfo"
 	"github.com/junikimm717/static-python/src/staticpy/internal/config"
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 	"github.com/junikimm717/static-python/src/staticpy/internal/ensure"
@@ -45,13 +46,14 @@ type Global struct {
 	Workers int
 	Jobs    int
 
-	Offline    bool
-	hermetic   bool
-	noHermetic bool
-	KeepWork   bool
-	Verbose    bool
-	JSON       bool
-	ColorWhen  string
+	Offline     bool
+	hermetic    bool
+	noHermetic  bool
+	KeepWork    bool
+	Verbose     bool
+	JSON        bool
+	ColorWhen   string
+	GitRevision string
 
 	repoRoot   string
 	resolved   bool
@@ -66,6 +68,12 @@ func (g *Global) noteGiven(fs *flag.FlagSet) {
 		g.givenFlags = map[string]bool{}
 	}
 	fs.Visit(func(f *flag.Flag) { g.givenFlags[f.Name] = true })
+}
+
+func (g *Global) applyGitRevision() {
+	if g.GitRevision != "" {
+		buildinfo.GitRevision = g.GitRevision
+	}
 }
 
 func (g *Global) flagGiven(name string) bool {
@@ -91,7 +99,7 @@ var registry []*command
 
 func init() {
 	registry = []*command{
-		cmdBuild, cmdStatus, cmdVerify, cmdBench, cmdLogs, cmdShell,
+		cmdBuild, cmdStatus, cmdVerify, cmdBench, cmdKit, cmdLogs, cmdShell,
 		cmdDoctor, cmdConfig, cmdSources, cmdPrint,
 	}
 }
@@ -139,6 +147,7 @@ func Main(args []string) int {
 		return 2
 	}
 	g.noteGiven(pre)
+	g.applyGitRevision()
 	rest := pre.Args()
 	if len(rest) == 0 {
 		printHelp(os.Stdout, "")
@@ -244,6 +253,8 @@ func (g *Global) register(fs *flag.FlagSet) {
 	fs.BoolVar(&g.JSON, "json", g.JSON,
 		"emit machine-readable JSON instead of a table, where the command has a JSON form")
 	fs.StringVar(&g.ColorWhen, "color", g.ColorWhen, "colorize output: auto|always|never")
+	fs.StringVar(&g.GitRevision, "git-revision", g.GitRevision,
+		"commit the running executable was built from; the ./staticpy shim stamps this via -X and passes it here")
 }
 
 // flagSet returns a FlagSet that also understands the global flags, so they may

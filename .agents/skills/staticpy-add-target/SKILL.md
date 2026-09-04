@@ -194,6 +194,11 @@ that justified it.
 **An unexpected pass fails the run.** Add an entry only for something you have
 actually observed failing on this target, and delete it the moment it passes.
 
+Do not invent `[expect."<triple>"]` for a failure you have not reproduced on
+a second arm. If native x86_64 static fails the same method, the scope is
+`[expect.static]` or a recipe fix, not the new triple. See staticpy-traps
+**Do not overfit the last failure** — agent time is cheap, the sweep is not.
+
 Two things to know before editing this file:
 
 - Expect keys are **not** validated. A typo'd triple is silently ignored, and

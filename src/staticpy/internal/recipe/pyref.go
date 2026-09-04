@@ -30,6 +30,12 @@ import (
 //
 // The cost is that changing one library rebuilds the whole baseline. Nothing
 // depends on a measuring stick, so nothing else pays for that.
+//
+// After install, every ELF RUNPATH is rewritten to $ORIGIN-relative so the
+// rootfs can be copied. The configure-time --prefix stays the published
+// path: that is what make and libtool need while the artifact does not
+// exist yet. Shrinking the string in .dynstr is safe because $ORIGIN/../lib
+// is shorter than dist/artifacts/pyref_.../rootfs/lib.
 func PyRef(cfg *config.Config, assets fs.FS, target config.Target, profile string) (core.Job, error) {
 	res, err := resolveScope(cfg, profile, config.ScopePython)
 	if err != nil {
@@ -94,6 +100,12 @@ func PyRef(cfg *config.Config, assets fs.FS, target config.Target, profile strin
 	}
 	j.abi = pyABI(src.Version)
 	return j, nil
+}
+
+// Unset means the recipe default (pass --with-lto). Static builds ignore
+// this: their LTO is the flag lists.
+func withLTO(res config.Resolved) bool {
+	return res.EffectiveLTO()
 }
 
 // The major.minor CPython installs its binary and libdir under.
@@ -164,7 +176,7 @@ func (j *pyRef) KeyInputs() map[string]string {
 }
 
 func (j *pyRef) ArtifactDir(e *core.Env) string {
-	return e.Path(core.DirArtifact, artifactName(j.Slug()))
+	return e.Path(core.DirArtifact, artifactName(j.Slug())+hostPublishSuffix(j.tc))
 }
 
 // Always non-empty: a host-built artifact is reproducible nowhere, and that has
@@ -176,7 +188,11 @@ func (j *pyRef) Build(ctx context.Context, e *core.Env, r *core.Runner, work, st
 	// after publication, not where it is being built. The shadow is that same
 	// absolute path rooted under work, so a .pc file naming the prefix resolves
 	// to the staged copy once PKG_CONFIG_SYSROOT_DIR is set to the shadow root.
-	rootfs := filepath.Join(j.ArtifactDir(e), "rootfs")
+	art := j.ArtifactDir(e)
+	if err := rejectForeignHostPrefix(art, j.tc.Key); err != nil {
+		return err
+	}
+	rootfs := filepath.Join(art, "rootfs")
 	shadowRoot := filepath.Join(work, "shadow")
 	shadowRootfs := filepath.Join(shadowRoot, rootfs)
 	if err := os.MkdirAll(shadowRootfs, 0o755); err != nil {
@@ -208,6 +224,11 @@ func (j *pyRef) Build(ctx context.Context, e *core.Env, r *core.Runner, work, st
 	}
 
 	if err := j.cpython(ctx, e, r, work, shadowRoot, shadowRootfs, rootfs); err != nil {
+		return err
+	}
+
+	r.Step("rewriting RUNPATH to $ORIGIN")
+	if err := rewriteRootfsRpaths(shadowRootfs); err != nil {
 		return err
 	}
 
@@ -264,19 +285,29 @@ func (j *pyRef) cpython(ctx context.Context, e *core.Env, r *core.Runner, work, 
 	if j.res.PGO != "off" {
 		args = append(args, "--enable-optimizations")
 	}
-	args = append(args, "--with-lto")
+	if withLTO(j.res) {
+		args = append(args, "--with-lto")
+	}
+	// Same LIBS= path as pynative; see staticpy-traps for the glibc interposition.
+	objs, oerr := sysrootObjects(shadowRootfs)
+	if oerr != nil {
+		return oerr
+	}
+	if len(objs) > 0 {
+		args = append(args, "LIBS="+strings.Join(objs, " "))
+	}
 
-	// LDFLAGS finds the libraries now, LDFLAGS_NODIST records where they will
-	// be. lib64 as well as lib because libffi installs there whatever --libdir
-	// says, and OpenSSL's platform configs disagree about which they use.
+	// LDFLAGS finds the libraries now. LDFLAGS_NODIST rpaths the shadow
+	// so a rebuild's -lreadline NEEDED walk does not prefer the previous
+	// prefix (staticpy-traps PYREF_RPATH). rewriteRootfsRpaths then
+	// shrinks it to $ORIGIN.
 	extra := map[string]string{
-		"LDFLAGS_NODIST": "-Wl,-rpath," + rootfs + "/lib:" + rootfs + "/lib64",
-		// CPython imports every extension module it builds to check it, and an
-		// import resolves through the loader, not through -L. The rpath above
-		// names the published artifact, which does not exist yet, so without
-		// this the check either fails outright or -- worse -- succeeds against
-		// whatever the host happens to ship in /lib64, which is how a build can
-		// look green while testing somebody else's libraries.
+		"LDFLAGS_NODIST": "-Wl,-rpath," + filepath.Join(shadowRootfs, "lib") + ":" + filepath.Join(shadowRootfs, "lib64"),
+		// CPython imports every extension it builds. An import resolves
+		// through the loader, not -L. The rpath above names the shadow,
+		// which exists; LD_LIBRARY_PATH still covers any ELF that did
+		// not get our rpath, and stops a miss from succeeding against
+		// /lib64.
 		"LD_LIBRARY_PATH": filepath.Join(shadowRootfs, "lib") + ":" + filepath.Join(shadowRootfs, "lib64"),
 	}
 	r.Step("configuring CPython")
@@ -353,13 +384,11 @@ func (j *pyRef) assertModules(ctx context.Context, r *core.Runner, rootfs string
 		// Cleared rather than inherited: a PYTHONPATH from the caller's shell
 		// could satisfy an import the interpreter itself cannot.
 		//
-		// LD_LIBRARY_PATH is the exception, and only here: the interpreter's
-		// RPATH names the published artifact, which does not exist until this
-		// job's stage is renamed into place. Without it the probe cannot even
-		// load libpython and every module looks missing.
+		// No LD_LIBRARY_PATH: RUNPATH is $ORIGIN-relative after the rewrite,
+		// so a missing rewrite would load the host's libssl and look green.
 		EnvAdd: map[string]string{
 			"PYTHONNOUSERSITE": "1", "PYTHONHOME": "", "PYTHONPATH": "",
-			"LD_LIBRARY_PATH": filepath.Join(rootfs, "lib") + ":" + filepath.Join(rootfs, "lib64"),
+			"LD_LIBRARY_PATH": "",
 		},
 	})
 	if err == nil {
@@ -410,4 +439,52 @@ func unstaticCtypes(src string) error {
 		text = strings.Replace(text, fix.from, fix.to, 1)
 	}
 	return os.WriteFile(path, []byte(text), 0o644)
+}
+
+func rejectForeignHostPrefix(dir, wantKey string) error {
+	m, err := core.ReadManifest(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			if hasRootfsLib(dir) {
+				return fmt.Errorf("recipe: %s has a rootfs and no manifest; refusing to reuse a prefix that may belong to another host compiler", dir)
+			}
+			return nil
+		}
+		return fmt.Errorf("recipe: %s: %w", dir, err)
+	}
+	have := manifestToolchain(m)
+	if have == "" || have != wantKey {
+		return fmt.Errorf("recipe: %s belongs to host toolchain %s; this job is %s. Different host compilers must not share a prefix",
+			dir, shortKey(have), shortKey(wantKey))
+	}
+	return nil
+}
+
+func manifestToolchain(m *core.Manifest) string {
+	if m.Inputs != nil {
+		if v := m.Inputs["toolchain"]; v != "" {
+			return v
+		}
+	}
+	if m.Provenance != nil {
+		if v := m.Provenance["toolchain"]; v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+func hasRootfsLib(dir string) bool {
+	st, err := os.Stat(filepath.Join(dir, "rootfs", "lib"))
+	return err == nil && st.IsDir()
+}
+
+func shortKey(k string) string {
+	if k == "" {
+		return "unknown"
+	}
+	if len(k) > 12 {
+		return k[:12]
+	}
+	return k
 }

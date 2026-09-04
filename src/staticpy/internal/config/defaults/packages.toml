@@ -57,6 +57,10 @@ configure = [
   "--without-progs",
   # readline links against termcap names.
   "--enable-termcap",
+  # TIC_PATH=true, so no terminfo database is installed. Baking the path
+  # from --prefix would point at nothing (and, after per-dep LTO, become
+  # a contiguous string the sysroot composer refuses). Same as reference.
+  "--disable-database",
 ]
 provides = ["lib/libncursesw.a"]
 
@@ -180,6 +184,7 @@ provides = ["lib/libmimalloc.a", "lib/mimalloc.o"]
 # Collapsed into one object and stripped down to the allocator's public entry
 # points. CPython bundles its own mimalloc in obmalloc.o, so leaving the
 # internals global is a duplicate-symbol link failure waiting to happen.
+# Locks are patched fork-safe (staticpy-traps LIBATOMIC_FORK).
 object = "lib/mimalloc.o"
 keep_globals = [
   "malloc",
@@ -228,9 +233,10 @@ configure = [
 
 [package.libffi.profile.reference]
 configure = ["--disable-static", "--enable-shared"]
-# libffi installs into lib64 whatever --libdir says: that is its own
-# toolexeclibdir convention, and its .pc file agrees.
-provides = ["lib64/libffi.so"]
+# libffi 3.5's toolexeclibdir is lib/, not lib64, on both glibc and musl
+# x86_64. The .pc file agrees. A stale lib64 pin fails assertProvides after
+# a green configure.
+provides = ["lib/libffi.so"]
 
 [package.xz.profile.reference]
 configure = ["--disable-static", "--enable-shared"]
@@ -282,3 +288,18 @@ provides = ["lib/libsqlite3.so"]
 # build carrying it would not be the stock interpreter it exists to measure.
 [package.mimalloc.profile.reference]
 skip = true
+
+[package.mimalloc.profile.nomimalloc]
+skip = true
+
+[package.mimalloc.profile.nolto-nomimalloc]
+skip = true
+
+[package.mimalloc.profile.seplto-nomimalloc]
+skip = true
+
+[package.mimalloc.profile.reference-mimalloc]
+skip = false
+
+[package.mimalloc.profile.reference-nolto-mimalloc]
+skip = false

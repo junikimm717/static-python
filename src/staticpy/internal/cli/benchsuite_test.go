@@ -5,7 +5,47 @@ import (
 	"testing"
 
 	"github.com/junikimm717/static-python/src/staticpy/internal/bench"
+	"github.com/junikimm717/static-python/src/staticpy/internal/config"
 )
+
+func TestInterpFlagAcceptsProfileNames(t *testing.T) {
+	var entries []interpEntry
+	f := interpFlag{&entries}
+	for _, name := range []string{"static", "nomimalloc", "reference-nolto"} {
+		if err := f.Set(name); err != nil {
+			t.Fatalf("Set(%q): %v", name, err)
+		}
+	}
+	if len(entries) != 3 || entries[1].Label != "nomimalloc" {
+		t.Fatalf("entries = %+v", entries)
+	}
+}
+
+func TestPickBaselineDefaultsToReference(t *testing.T) {
+	got, err := pickBaseline([]string{"static", "reference"}, "")
+	if err != nil || got != "reference" {
+		t.Fatalf("got %q err %v, want reference", got, err)
+	}
+	got, err = pickBaseline([]string{"static", "system"}, "")
+	if err != nil || got != "static" {
+		t.Fatalf("without reference, first interp wins: got %q err %v", got, err)
+	}
+	got, err = pickBaseline([]string{"static", "reference"}, "static")
+	if err != nil || got != "static" {
+		t.Fatalf("--baseline must win: got %q err %v", got, err)
+	}
+}
+
+func TestPinsOfUsesConfigBench(t *testing.T) {
+	cfg := &config.Config{Bench: config.BenchConfig{
+		Pyperformance: "1.14.0",
+		Pyperf:        "2.10.0",
+	}}
+	p := pinsOf(cfg)
+	if p.Pyperformance != "1.14.0" || p.Pyperf != "2.10.0" {
+		t.Fatalf("pins = %+v", p)
+	}
+}
 
 // One line per benchmark naming every arm that lost it: all arms means the
 // suite is at fault, one arm means the interpreters actually differ, and that
@@ -27,5 +67,41 @@ func TestSummarizeFailuresGroupsArmsPerBenchmark(t *testing.T) {
 	}
 	if len(summarizeFailures(nil)) != 0 {
 		t.Fatal("no failures must produce no lines")
+	}
+}
+
+func TestSamplesToResultsConvertsToSeconds(t *testing.T) {
+	ms := map[string]*interpMeasurement{
+		"reference": {
+			CPU:     map[string][]float64{"fib_iter": {20, 22}},
+			Startup: map[string][]float64{"bare": {10, 12}},
+		},
+		"default": {
+			CPU:     map[string][]float64{"fib_iter": {10, 11}},
+			Startup: map[string][]float64{"bare": {20, 21}},
+		},
+	}
+	res := samplesToResults([]string{"reference", "default"}, ms)
+	rows, geo := bench.Compare(res, "reference", []string{"reference", "default"})
+	byName := map[string]bench.Row{}
+	for _, r := range rows {
+		byName[r.Benchmark] = r
+	}
+	fib := byName["fib_iter"]
+	if fib.Min["reference"] != 20e-9 || fib.Min["default"] != 10e-9 {
+		t.Fatalf("fib min_s = %+v", fib.Min)
+	}
+	if fib.Ratio["default"] != 2 {
+		t.Fatalf("fib ratio = %v, want 2 (faster)", fib.Ratio["default"])
+	}
+	st := byName["startup.bare"]
+	if st.Min["reference"] != 0.01 || st.Min["default"] != 0.02 {
+		t.Fatalf("startup min_s = %+v", st.Min)
+	}
+	if st.Ratio["default"] != 0.5 {
+		t.Fatalf("startup ratio = %v, want 0.5 (slower)", st.Ratio["default"])
+	}
+	if geo["default"] == 0 {
+		t.Fatal("geomean missing")
 	}
 }

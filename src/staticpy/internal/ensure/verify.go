@@ -47,6 +47,9 @@ type Options struct {
 	// TestTimeout and SuiteTimeout bound one test and the whole suite.
 	TestTimeout  time.Duration
 	SuiteTimeout time.Duration
+	// WantDynamic is the host-built reference: shared libpython, a PT_INTERP,
+	// no staticapi symbol table in the executable.
+	WantDynamic bool
 }
 
 // A verification job depends on the job that produced the interpreter and
@@ -75,7 +78,7 @@ func NewJob(interp core.Job, target config.Target, profile string, level Level, 
 // checkerVersion invalidates stored reports when the checks themselves change.
 // Without it a green report written by a laxer checker outlives the fix that
 // tightened it, which is how a verification system lies.
-const checkerVersion = "2"
+const checkerVersion = "3"
 
 func (j *Job) Name() string { return "verify" }
 
@@ -93,6 +96,7 @@ func (j *Job) KeyInputs() map[string]string {
 		"expect":  ExpectHash(j.expect),
 		"python":  j.opts.PythonRel,
 		"checker": checkerVersion,
+		"dynamic": fmt.Sprintf("%t", j.opts.WantDynamic),
 		// The set of tests a level runs is part of what the report claims, so
 		// editing CoreTests has to invalidate it. checkerVersion covers the
 		// checking code; this covers what was checked.
@@ -116,7 +120,7 @@ func testSetHash(level Level) string {
 }
 
 func (j *Job) ArtifactDir(e *core.Env) string {
-	return e.Path(core.DirArtifact, pathSlug(j.Slug()))
+	return e.Path(core.DirArtifact, pathSlug(j.Slug())+hostPublishTail(j.interp.ArtifactDir(e)))
 }
 
 func SkipRequested() bool { return os.Getenv(SkipEnv) == "1" }
@@ -130,7 +134,12 @@ func (j *Job) Build(ctx context.Context, e *core.Env, r *core.Runner, work, stag
 		return writeReport(stage, rep)
 	}
 
-	python := filepath.Join(j.interp.ArtifactDir(e), j.opts.PythonRel)
+	dir := j.interp.ArtifactDir(e)
+	// Host-built reference publishes a rootfs/ wrapper; pynative is the prefix.
+	if st, err := os.Stat(filepath.Join(dir, "rootfs")); err == nil && st.IsDir() {
+		dir = filepath.Join(dir, "rootfs")
+	}
+	python := filepath.Join(dir, j.opts.PythonRel)
 	rep, err := Verify(ctx, e, r, j.target, j.level, python, work, j.expect, j.opts)
 	if werr := writeReport(stage, rep); werr != nil && err == nil {
 		err = werr
@@ -162,7 +171,7 @@ func Verify(ctx context.Context, e *core.Env, r *core.Runner, t config.Target, l
 		return rep, rep.Err()
 	}
 
-	CheckELF(rep, python, t, opts.Symbols)
+	CheckELF(rep, python, t, opts.Symbols, opts.WantDynamic)
 
 	l, err := NewLauncher(e, t)
 	if err != nil {
@@ -252,6 +261,27 @@ func pathSlug(slug string) string {
 		}
 	}
 	return string(out)
+}
+
+// Matches recipe.hostPublishSuffix: a host-built interpreter dir ends in
+// _<12 hex>. Verify must not share a report directory across host compilers.
+func hostPublishTail(interpDir string) string {
+	base := filepath.Base(interpDir)
+	i := strings.LastIndex(base, "_")
+	if i < 0 || i+1 == len(base) {
+		return ""
+	}
+	tail := base[i+1:]
+	if len(tail) != 12 {
+		return ""
+	}
+	for _, c := range tail {
+		hex := c >= '0' && c <= '9' || c >= 'a' && c <= 'f'
+		if !hex {
+			return ""
+		}
+	}
+	return "_" + tail
 }
 
 var _ core.Job = (*Job)(nil)

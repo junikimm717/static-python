@@ -1,0 +1,60 @@
+{
+  "stamp": "20000101T000000Z",
+  "baseline": "reference",
+  "protocol": 2,
+  "git_revision": "0000000000000000000000000000000000000000",
+  "suite": {"name": "pyperformance", "pyperformance": "1.14.0", "pyperf": "2.10.0"},
+  "interpreters": [
+    {
+      "label": "reference",
+      "binary_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "artifact_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "factors": {
+        "linkage": "dynamic",
+        "libc": "glibc",
+        "lto": "whole-graph",
+        "allocator": "glibc",
+        "pgo": true,
+        "toolchain": "x86_64-linux-gnu:gcc:host:bbbbbbbbbbbb"
+      },
+      "packages": {
+        "pyperformance": "1.14.0",
+        "pyperf": "2.10.0"
+      },
+      "size_bytes": 1
+    },
+    {
+      "label": "default",
+      "binary_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "artifact_key": "9e84ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "factors": {
+        "linkage": "static",
+        "libc": "musl",
+        "lto": "whole-graph",
+        "allocator": "mimalloc",
+        "pgo": true,
+        "toolchain": "x86_64-linux-musl:gcc16:gccfactory:cccccccccccc"
+      },
+      "packages": {
+        "pyperformance": "1.14.0",
+        "pyperf": "2.10.0"
+      },
+      "size_bytes": 1
+    }
+  ],
+  "skipped": [],
+  "suite_root": "/nonexistent/FIXTURE",
+  "venv": true,
+  "fingerprint_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "fingerprint": {
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "cpu": {"model_name": "FIXTURE CPU (synthetic demo, not a measured score)", "microcode": "0x0"},
+    "smt": {"control": "notsupported"},
+    "vulnerabilities": {"spectre_v2": "FIXTURE: not a real mitigation status"},
+    "telemetry": {
+      "captured_utc": "2000-01-01T00:00:00Z",
+      "affinity": "FIXTURE",
+      "topology": "FIXTURE"
+    }
+  }
+}

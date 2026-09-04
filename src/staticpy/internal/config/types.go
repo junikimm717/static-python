@@ -130,11 +130,11 @@ type PackageVariant struct {
 	Configure []string `toml:"configure"`
 	Provides  []string `toml:"provides"`
 	MakeVars  []string `toml:"make_vars"`
-	// Drops the package from this profile entirely. mimalloc is the case:
-	// it exists to beat musl's allocator at static link time, and a reference
-	// build that shipped it would no longer be the stock interpreter it exists
-	// to be measured against.
-	Skip bool `toml:"skip"`
+	// Drops the package from this profile. mimalloc is the case: it exists to
+	// beat musl's allocator at static link, and a reference build that shipped
+	// it would not be the stock interpreter it is measured against. A pointer
+	// so a child can un-skip; a bool can only set true in the inherit walk.
+	Skip *bool `toml:"skip"`
 }
 
 // Scopes layer on top of the profile-wide values, so a change confined to one
@@ -153,6 +153,14 @@ type Profile struct {
 
 	Strip *bool `toml:"strip"`
 	Debug *bool `toml:"debug_symbols"`
+	// Host-built LTO is CPython's --with-lto, not the flag lists the static
+	// build uses. Unset means on (the recipe default).
+	LTO *bool `toml:"lto"`
+	// LTOMode selects how LTO IR is consumed. Empty is whole-program at the
+	// python link (slim archives, one WHOPR). "per-dep" runs LTO on each
+	// library to native code first, so CPython cannot inline across that
+	// boundary.
+	LTOMode string `toml:"lto_mode"`
 	// PGO is "off", "native-only", or "on".
 	PGO         string `toml:"pgo"`
 	ProfileTask string `toml:"profile_task"`
@@ -184,6 +192,9 @@ type Resolved struct {
 
 	Strip       bool
 	Debug       bool
+	LTO         bool
+	LTOSet      bool
+	LTOMode     string
 	PGO         string
 	ProfileTask string
 	TestModules bool
@@ -193,6 +204,18 @@ type Resolved struct {
 }
 
 func (r Resolved) HostBuilt() bool { return r.Toolchain == ToolchainHost }
+
+// EffectiveLTO is what the recipe will pass: unset is on, because that is
+// CPython's --with-lto default for a host-built profile.
+func (r Resolved) EffectiveLTO() bool { return !r.LTOSet || r.LTO }
+
+// LTOModeWholeGraph is slim IR in every archive and one WHOPR at the python
+// link. Empty in the file means this.
+const LTOModeWholeGraph = "whole-graph"
+
+// LTO each static archive to native code after install, rather than leaving
+// slim IR for the python link to WHOPR over.
+const LTOModePerDep = "per-dep"
 
 // It must contain no absolute path and no value that varies between runs.
 func (r Resolved) KeyInputs() map[string]string { return r.keyInputs() }
@@ -252,9 +275,37 @@ type Config struct {
 	Bundles    map[string]Bundle     `toml:"bundle"`
 	PyPackages map[string]PyPackage  `toml:"pkg"`
 	Expect     map[string]TestExpect `toml:"expect"`
+	Bench      BenchConfig           `toml:"bench"`
+	Kits       map[string]Kit        `toml:"kit"`
 
 	// Origin records, per file, where the winning copy came from: "embedded" or
 	// an absolute path. It feeds Manifest.Provenance so a build assembled from
 	// an overlay is distinguishable from one that was not.
 	Origin map[string]string `toml:"-"`
+}
+
+// Pins for the pyperformance suite. The lineup is whatever --interp names;
+// there is no baked-in matrix, because the comparison set keeps changing.
+type BenchConfig struct {
+	Pyperformance string               `toml:"pyperformance"`
+	Pyperf        string               `toml:"pyperf"`
+	Vendor        map[string]VendorPin `toml:"vendor"`
+}
+
+// VendorPin is a sha256-pinned archive shipped inside a kit so the quiet
+// box can pip-install the suite without PyPI. setuptools is a wheel
+// because the sdists declare it as a PEP 517 build-system requirement
+// and --no-deps does not skip that.
+type VendorPin struct {
+	Version string   `toml:"version"`
+	File    string   `toml:"file"`
+	SHA256  string   `toml:"sha256"`
+	URLs    []string `toml:"urls"`
+}
+
+// Kit is a named comparison set: several profiles packed together with a
+// runner so a quiet machine can unzip and measure without a checkout.
+type Kit struct {
+	Baseline string   `toml:"baseline"`
+	Arms     []string `toml:"arms"`
 }

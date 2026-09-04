@@ -49,6 +49,8 @@ jobs:
       # Toolchains are fetched by the ./staticpy shim from gccfactory; nothing
       # is compiled here except CPython and its dependencies.
       - name: Build, verify and pack
+        env:
+          STATICPY_GIT_REVISION: ${{ github.sha }}
         run: ./staticpy build --target ${{ matrix.target }} --verify core --pack
 
       - uses: actions/upload-artifact@v4

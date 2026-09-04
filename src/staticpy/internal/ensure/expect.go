@@ -17,13 +17,11 @@ import (
 // running natively.
 func ExpectKey(triple, runner string) string { return triple + ":" + runner }
 
-// LookupExpect resolves the expectations for (triple, runner), merging the
-// triple-wide entries with the runner-specific ones. A bare triple key applies
-// to both runners; "<triple>:qemu" applies only under qemu.
-// ExpectAll and ExpectStatic are scopes rather than triples. Every interpreter
-// staticpy builds is static, so ExpectStatic always applies; it is a separate
-// key only so the same file can describe a dynamic build that does not have to
-// skip the dlopen-dependent tests.
+// LookupExpect resolves the expectations for (triple, runner, linkage).
+// A bare triple key applies to both runners; "<triple>:qemu" applies only
+// under qemu. ExpectAll always applies. ExpectStatic is the no-dlopen
+// skip/ignore set and is merged only when static is true — a host-built
+// reference can dlopen, so those entries would become unexpected passes.
 const (
 	ExpectAll    = "all"
 	ExpectStatic = "static"
@@ -31,12 +29,17 @@ const (
 
 // Keys are resolved widest-first, so a musl divergence is written once rather
 // than repeated for eleven targets.
-func LookupExpect(all map[string]config.TestExpect, triple, runner string) config.TestExpect {
+func LookupExpect(all map[string]config.TestExpect, triple, runner string, static bool) config.TestExpect {
 	var out config.TestExpect
+	keys := []string{ExpectAll}
+	if static {
+		keys = append(keys, ExpectStatic)
+	}
 	// runner alone ("qemu") is what emulator limitations belong under: they hold
 	// for every emulated target and for none of the native ones, so keying them
 	// per triple would repeat the same entry ten times.
-	for _, key := range []string{ExpectAll, ExpectStatic, runner, triple, ExpectKey(triple, runner)} {
+	keys = append(keys, runner, triple, ExpectKey(triple, runner))
+	for _, key := range keys {
 		e, ok := all[key]
 		if !ok {
 			continue

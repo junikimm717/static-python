@@ -324,6 +324,9 @@ func (j *pyBuild) KeyInputs() map[string]string {
 		"configure":      strings.Join(j.decisionFlags(), " "),
 		"staticapi_c":    assets.Hash("staticapi/staticapi.c"),
 	}
+	if j.target.Libatomic {
+		in["libat_atfork"] = assets.Hash("libat_atfork.c")
+	}
 	if j.cross {
 		in["build"] = j.host.Triple
 	}
@@ -414,11 +417,14 @@ func (j *pyBuild) Build(ctx context.Context, e *core.Env, r *core.Runner, work, 
 	// instead of one of them guessing differently.
 	probeDir := j.probe.ArtifactDir(e)
 	extra := map[string]string{"CONFIG_SITE": ConfigSite(probeDir)}
+
+	var libatObj string
 	if j.target.Libatomic {
-		// On these targets the 64-bit _Py_atomic_* operations land in libatomic
-		// rather than in the compiler's builtins, and CPython's own link line
-		// does not ask for it.
-		extra["LDFLAGS"] = strings.Join(append(te.ldflags(), "-latomic"), " ")
+		var aerr error
+		libatObj, aerr = j.compileLibatAtfork(ctx, r, te, work)
+		if aerr != nil {
+			return aerr
+		}
 	}
 
 	args := []string{"./configure", "--prefix=" + prefix, "--exec-prefix=" + prefix, "--with-openssl=" + sysroot}
@@ -440,8 +446,14 @@ func (j *pyBuild) Build(ctx context.Context, e *core.Env, r *core.Runner, work, 
 	if oerr != nil {
 		return oerr
 	}
-	if len(objs) > 0 {
-		args = append(args, "LIBS="+strings.Join(objs, " "))
+	libs := append([]string{}, objs...)
+	if libatObj != "" {
+		// LIBS is after the python objects. -latomic in LDFLAGS can pull
+		// lock.o before our replacement and then multiple-define.
+		libs = append(libs, libatObj, "-latomic")
+	}
+	if len(libs) > 0 {
+		args = append(args, "LIBS="+strings.Join(libs, " "))
 	}
 	if j.cross {
 		if hr := hostRunner(e, j.target); hr != "" {
@@ -534,6 +546,24 @@ func hostRunner(e *core.Env, t config.Target) string {
 		return qemu + " -L " + sysroot
 	}
 	return qemu
+}
+
+// compileLibatAtfork builds the lock-table replacement that registers
+// pthread_atfork. Compiled without -flto so WPA cannot drop the constructor.
+// The .c is spinlocks + child-only zero; see staticpy-traps LIBATOMIC_FORK.
+func (j *pyBuild) compileLibatAtfork(ctx context.Context, r *core.Runner, te *toolenv, work string) (string, error) {
+	if err := assets.WriteTo(work, "libat_atfork.c"); err != nil {
+		return "", err
+	}
+	obj := filepath.Join(work, "libat_atfork.o")
+	r.Step("compiling libat_atfork")
+	if err := r.Run(ctx, te.cmd(j.Name()+"-libat-atfork", work, []string{
+		te.tools.CC, "-static", "-pthread", "-O2", "-c",
+		"-o", obj, filepath.Join(work, "libat_atfork.c"),
+	}, nil)); err != nil {
+		return "", err
+	}
+	return obj, nil
 }
 
 // makesetup resolves a relative source against $(srcdir)/Modules, so both

@@ -34,7 +34,8 @@ Safe at any time, including mid-build and before anything has ever been built.
 FLAGS
   --todo    list only the jobs that are not up to date
   --verify  include verification jobs at this level, as build would
-  --pack    include the packaging jobs, as build would`,
+  --pack    include the packaging jobs, as build would
+  --kit     show the plan for this named kit, as ` + "`staticpy kit`" + ` would`,
 	Run: runStatus,
 }
 
@@ -43,6 +44,7 @@ func runStatus(g *Global, args []string) error {
 	todoOnly := fs.Bool("todo", false, "list only jobs that are not up to date")
 	verify := fs.String("verify", "", "include verification jobs at this level: smoke|core|full")
 	pack := fs.Bool("pack", false, "include the packaging jobs")
+	kitName := fs.String("kit", "", "show the plan for this kit instead of a single profile")
 	if err := parse(fs, args); err != nil {
 		return finish("status", err)
 	}
@@ -52,7 +54,7 @@ func runStatus(g *Global, args []string) error {
 		}
 	}
 
-	s, err := g.session(recipe.PlanOptions{Verify: *verify, Pack: *pack}, false)
+	s, err := g.session(recipe.PlanOptions{Verify: *verify, Pack: *pack, Kit: *kitName}, false)
 	if err != nil {
 		return err
 	}

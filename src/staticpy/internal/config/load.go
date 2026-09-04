@@ -100,6 +100,7 @@ func Load(opts Options) (*Config, error) {
 		Bundles:    map[string]Bundle{},
 		PyPackages: map[string]PyPackage{},
 		Expect:     map[string]TestExpect{},
+		Kits:       map[string]Kit{},
 		Origin:     map[string]string{},
 	}
 
@@ -183,6 +184,10 @@ func mergeFile(dst *Config, data, origin string, allowSources bool) error {
 	mergeInto(dst.Bundles, src.Bundles)
 	mergeInto(dst.PyPackages, src.PyPackages)
 	mergeInto(dst.Expect, src.Expect)
+	mergeInto(dst.Kits, src.Kits)
+	if src.Bench.Pyperformance != "" {
+		dst.Bench = src.Bench
+	}
 	return nil
 }
 

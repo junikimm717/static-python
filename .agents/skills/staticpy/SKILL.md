@@ -55,7 +55,9 @@ dist/                    everything generated; gitignored, safe to delete
 | what this machine is missing | `staticpy doctor`. `perl` is the one irreducible host dependency (OpenSSL's Configure); busybox covers `sh`/`awk`/`sed`/`patch` |
 | a resolved value, for a script | `staticpy print <key>` — `python-version`, `python-abi`, `host`, `targets{,-all,-proven}`, `dist`, `recipe-version`, `version:<src>`, `sha256:<src>` |
 | what the flags actually resolve to | `staticpy config show [--profile N] [--scope S]`, which also names the file each layer came from |
-| why a built interpreter misbehaves | the `staticpy-traps` skill — symptom first |
+| why a built interpreter misbehaves | the `staticpy-traps` skill — symptom first. Read **Do not overfit the last failure** before adding an `[expect]` or a one-package stanza |
+| a verify method failed on one triple | reproduce on native x86_64 static and on a second qemu before writing `[expect.<triple>]`. Agent time is cheap; the sweep is not |
+| what a bench session writes | always the same seven files, regardless of `--suite`: `manifest.json`, `env.json`, `report.json`, `report.md`, `report.html`, `skipped.json`, `timeline.jsonl`. `suite.name` is `pyperformance` or `micro`. `venv/`, `raw/`, `logs/` stay on the machine |
 
 ## The DAG
 
@@ -70,6 +72,7 @@ pyhost:<ver>               static-musl CPython that runs on the build machine
 pynative:<prof>:<T>        the shipped interpreter, host == target
 pycross:<prof>:<H>:<T>     the shipped interpreter, host != target
 pack:<prof>:<T>            the distributable tarball
+kit:<name>:<T>             several packed prefixes plus a bench runner
 ```
 
 Two edges carry the design:
@@ -225,6 +228,14 @@ rebuild does not erase the evidence from the failure before it. The work tree
 is deleted when a job succeeds — rebuild with `--keep-work` if `shell` needs
 somewhere to land. Slugs are exactly the names `staticpy status` prints, e.g.
 `dep:default:x86_64-linux-musl:openssl`.
+
+Do not close a red suite with `[expect.<the-triple-that-failed>]` or a
+`[package.X.profile.<the-profile-that-failed>]` so the current sweep can
+finish. That is overfitting: the next target or the next library hits the
+same hole and you wait out another compile. Hunt the class (recipe, qemu
+version, ABI, getpath) to a complete fix. The traps skill's **Do not
+overfit the last failure** is the rule; this paragraph is the reminder
+at the point you would otherwise edit `tests.toml`.
 
 `staticpy verify` refuses to build by default: it is for asking whether what is
 on disk is good, not for starting an hour of work. Levels are `smoke` (import

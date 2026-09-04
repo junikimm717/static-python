@@ -10,13 +10,14 @@ import (
 	"time"
 
 	"github.com/junikimm717/static-python/src/staticpy/internal/bench"
+	"github.com/junikimm717/static-python/src/staticpy/internal/config"
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
 // runPyperfSuite drives the pyperformance suite across the selected arms and
 // writes a session directory that can be re-read long after the run.
-func runPyperfSuite(e *core.Env, order []string, paths map[string]string,
-	baseline, suiteRoot, pyperfHint string, useVenv bool, noPin bool, cpu int, timeout time.Duration, offline bool) error {
+func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, paths map[string]string,
+	baseline, suiteRoot, pyperfHint string, useVenv bool, noPin bool, cpu int, timeout time.Duration, offline bool, pins bench.Pins, sessionParent, findLinks, outPath string) error {
 
 	var skipped []string
 	pin, topo, err := choosePin(noPin, cpu)
@@ -24,7 +25,14 @@ func runPyperfSuite(e *core.Env, order []string, paths map[string]string,
 		return err
 	}
 
-	sess, err := bench.NewSession(e.Dist, runtime.GOARCH, time.Now())
+	machine := bench.ReadMachine()
+	topoDesc := ""
+	if topo != nil {
+		topoDesc = describeTopo(topo)
+	}
+	machine.SetRunPlacement(pin.Describe(), topoDesc)
+
+	sess, err := openBenchSession(e.Dist, sessionParent, runtime.GOARCH, time.Now())
 	if err != nil {
 		return err
 	}
@@ -45,6 +53,7 @@ func runPyperfSuite(e *core.Env, order []string, paths map[string]string,
 		if err != nil {
 			return fmt.Errorf("%s: %w", label, err)
 		}
+		enrichIdentity(g, cfg, e, &id)
 		ids = append(ids, id)
 
 		a := bench.Arm{Label: label, Python: paths[label]}
@@ -83,7 +92,7 @@ func runPyperfSuite(e *core.Env, order []string, paths map[string]string,
 		for _, label := range order {
 			all = append(all, venvs[label])
 		}
-		if suiteRoot, err = bench.Bootstrap(ctx, runner, all, offline); err != nil {
+		if suiteRoot, err = bench.Bootstrap(ctx, runner, all, offline, pins, findLinks); err != nil {
 			return err
 		}
 	}
@@ -125,26 +134,36 @@ func runPyperfSuite(e *core.Env, order []string, paths map[string]string,
 		bench.DetectSubBenchmarks(ctx, runner, venvs[order[0]].Python, suite)
 	}
 
+	runner.Step("inventory")
+	for i, label := range order {
+		py := paths[label]
+		if v := venvs[label]; v != nil {
+			py = v.Python
+		}
+		pkgs, err := bench.InventoryPackages(ctx, runner, py)
+		if err != nil {
+			return fmt.Errorf("%s: %w", label, err)
+		}
+		ids[i].Packages = pkgs
+	}
+
 	// Written before the measurements and again after them. The early copy is
 	// what a run killed halfway still leaves behind; the late one is the only
 	// place a runtime failure can appear, since it is not known until then.
 	writeAccounting := func() error {
-		if err := sess.WriteJSON("manifest.json", map[string]any{
-			"stamp": sess.Stamp, "baseline": baseline, "suite_root": suiteRoot,
-			"venv": useVenv, "interpreters": ids, "skipped": skipped,
-		}); err != nil {
-			return err
-		}
-		if err := sess.WriteJSON("env.json", map[string]any{
-			"topology": describeTopo(topo), "affinity": pin.Describe(),
-			"benchmarks_found": len(suite.Cases), "benchmarks_skipped": len(skipped),
-			"machine": gatherBenchEnv(),
-		}); err != nil {
-			return err
-		}
-		// Always written, empty list included: an absent skipped.json would
-		// otherwise read the same as a run that skipped nothing.
-		return sess.WriteJSON("skipped.json", skipped)
+		return sess.WriteAccounting(bench.Accounting{
+			Baseline:   baseline,
+			SuiteName:  bench.SuitePyperformance,
+			Pins:       pins,
+			Identities: ids,
+			Skipped:    skipped,
+			Machine:    machine,
+			Extra: map[string]any{
+				"suite_root":       suiteRoot,
+				"venv":             useVenv,
+				"benchmarks_found": len(suite.Cases),
+			},
+		})
 	}
 	if err := writeAccounting(); err != nil {
 		return err
@@ -167,18 +186,28 @@ func runPyperfSuite(e *core.Env, order []string, paths map[string]string,
 	}
 
 	rows, geo := bench.Compare(res, baseline, order)
-	if err := sess.WriteJSON("report.json", map[string]any{
-		"baseline": baseline, "rows": rows, "geomean_vs_baseline": geo,
-	}); err != nil {
+	md, report, err := sess.WriteReports(bench.Reports{
+		Accounting: bench.Accounting{
+			Baseline:   baseline,
+			SuiteName:  bench.SuitePyperformance,
+			Pins:       pins,
+			Identities: ids,
+			Skipped:    skipped,
+			Machine:    machine,
+			Extra: map[string]any{
+				"suite_root":       suiteRoot,
+				"venv":             useVenv,
+				"benchmarks_found": len(suite.Cases),
+			},
+		},
+		Order:   order,
+		Rows:    rows,
+		Geomean: geo,
+	})
+	if err != nil {
 		return err
 	}
-	md := renderSuiteReport(baseline, order, rows, geo, pin, topo)
-	if err := os.WriteFile(filepath.Join(sess.Dir, "report.md"), []byte(md), 0o644); err != nil {
-		return err
-	}
-	fmt.Print(md)
-	fmt.Fprintf(os.Stderr, "\n%s %s\n", bold("session:"), sess.Dir)
-	return nil
+	return publishSession(sess, md, report, outPath, g.JSON)
 }
 
 // One line per benchmark, naming every arm that lost it. Which arms failed is
@@ -210,41 +239,4 @@ func describeTopo(t *bench.Topology) string {
 		return "unknown"
 	}
 	return t.Describe()
-}
-
-func renderSuiteReport(baseline string, order []string, rows []bench.Row,
-	geo map[string]float64, pin bench.Pin, topo *bench.Topology) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "# pyperformance comparison\n\n")
-	fmt.Fprintf(&b, "- baseline: %s\n- %s\n- %s\n- rows: %d\n\n",
-		baseline, describeTopo(topo), pin.Describe(), len(rows))
-
-	fmt.Fprintf(&b, "| benchmark |")
-	for _, a := range order {
-		fmt.Fprintf(&b, " %s |", a)
-	}
-	fmt.Fprintf(&b, "\n|---|")
-	for range order {
-		fmt.Fprintf(&b, "---:|")
-	}
-	b.WriteString("\n")
-	for _, r := range rows {
-		fmt.Fprintf(&b, "| %s |", r.Benchmark)
-		for _, a := range order {
-			if v, ok := r.Ratio[a]; ok {
-				fmt.Fprintf(&b, " %.2fx |", v)
-			} else {
-				b.WriteString(" - |")
-			}
-		}
-		b.WriteString("\n")
-	}
-	b.WriteString("\nGeomean vs baseline (>1 is faster):\n\n")
-	for _, a := range order {
-		if a == baseline {
-			continue
-		}
-		fmt.Fprintf(&b, "- %s: %.3fx\n", a, geo[a])
-	}
-	return b.String()
 }

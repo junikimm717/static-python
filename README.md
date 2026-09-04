@@ -109,8 +109,21 @@ to run this project, you for sure know what you are doing 😇)
 # a stock --enable-shared build of the same pinned source, by this machine's gcc
 ./staticpy build --profile reference
 ./staticpy bench --interp static --interp reference --baseline reference
+
+# name every arm; there is no bundled lineup
+./staticpy bench --interp reference --interp default --interp nomimalloc
 ```
 
 That runs pyperformance -- what speed.python.org publishes against -- and
-writes a markdown report plus the raw pyperf JSON to `dist/bench/`.
-`--suite micro` runs a stdlib-only loop set instead, which needs no network.
+writes a session directory under `dist/bench/<UTC-stamp>-<arch>/`. Every
+suite writes the same files: `manifest.json`, `env.json`, `report.json`,
+`report.md`, `report.html`, `skipped.json`, and `timeline.jsonl`.
+`--suite micro` runs a stdlib-only loop set instead, which needs no network;
+it is still that same session, with `suite.name` set to `micro`.
+
+Commit a session with `./manage_benchmarks.py import dist/bench/<stamp>-<arch>`
+(see `benchmarks/README.md` for the accepted files and the remote/kit path).
+That copies the reviewable files, not `venv/` or `raw/`. A whole-session copy
+into `benchmarks/` is also fine: that tree's `.gitignore` is an allowlist.
+GitHub Pages is built from `benchmarks/` by `.github/workflows/pages.yml`;
+CI does not run `./staticpy bench`.
