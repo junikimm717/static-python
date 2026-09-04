@@ -164,3 +164,5 @@ file = "mimalloc-cd69707c3ca01a4c5fb358e8b92a710554f15356.tar.gz"
 topdir = "mimalloc-cd69707c3ca01a4c5fb358e8b92a710554f15356"
 urls = ["https://github.com/microsoft/mimalloc/archive/cd69707c3ca01a4c5fb358e8b92a710554f15356.tar.gz"]
 sha256 = "0700824da164c6b2ccb9541109ccf2845a8d4a628c763337eb05744a5b27eb72"
+# pthread_mutex_t has no atfork; see staticpy-traps LIBATOMIC_FORK.
+patches = ["0001-fork-safe-locks.diff"]

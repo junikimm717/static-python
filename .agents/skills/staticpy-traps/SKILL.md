@@ -54,10 +54,10 @@ them at the point where they bite:
   upstream.
 - **`references/I386_QEMU_SAHF.md`** — qemu 11.0 SAHF/cc_op making i386 CPython
   compares take the wrong branch.
-- **`references/LIBATOMIC_FORK.md`** — gcc libatomic's mutex table has no
-  atfork; CPython `test_reinit_tls_after_fork` hangs on every triple whose
-  64-bit atomics take that table. The replacement is spinlocks + child-only
-  zero, not an `[expect]` and not `-march=armv7`.
+- **`references/LIBATOMIC_FORK.md`** — two lock tables with no atfork:
+  gcc libatomic (C probe) and mimalloc `mi_lock_t` (CPython test on
+  default eabi). Spinlocks + pid-steal, not an `[expect]`, not
+  `-march=armv7`, not "skip mimalloc on eabi".
 
 **When you corner a failure worth documenting, write it up here.** A paragraph
 is enough for most of them: add an entry to the matching section below,
@@ -495,20 +495,28 @@ correct.
 workloads, so the numbers are comparable to nothing — not to native, and not to
 each other.
 
-**A hung forked child is libatomic, not qemu.** `test_threading` fails as
-*env changed* on arm-musleabi and riscv32 with children "still running
-after 300.5 seconds". The test is `ThreadJoinOnShutdown.test_reinit_tls_after_fork`.
-gcc `libatomic` serialises non-lock-free atomics on a 64-entry mutex table
-with no `pthread_atfork`. The recipe links `libat_atfork.o` *before*
-`-latomic` in `LIBS`. The constructor is present (`.init_array`, no CFLAGS
-leak of `-flto`). The first replacement still hung on eabi/rv32 because
-`prepare` locked all 64 mutexes and deadlocked with CPython's
-stop-the-world; i386 and armhf passing was lock-free 8-byte (armhf) or a
-faster race (i386), not a qemu-arm pin. The `.c` is now 32-bit spinlocks
-and a child handler that only stores zero. See
-`references/LIBATOMIC_FORK.md`. If the hang returns, the `.o` is after
-`-latomic` or was compiled with `-flto`. Do not restore `[expect]`. Do
-not raise arm-eabi to armv7 — that is an ISA change and does not help rv32.
+**A hung forked child is libatomic then mimalloc, not qemu.** `test_threading`
+fails as *env changed* with children "still running after 300.5 seconds".
+The test is `ThreadJoinOnShutdown.test_reinit_tls_after_fork`. Two lock
+tables, same missing atfork:
+
+1. gcc `libatomic` — 64 `pthread_mutex_t`, no `pthread_atfork`. The recipe
+   links `libat_atfork.o` *before* `-latomic`. Spinlocks + child-only zero
+   (pid-steal so a late atomic in the child does not wait for our handler).
+   Fixes the C class: stock `-latomic` hangs 16-fork+64-bit add on eabi,
+   i386, and rv32.
+2. mimalloc `mi_lock_t` — also `pthread_mutex_t` (`MI_USE_PTHREADS` stays
+   on for TLS keys). `mi_process_init()` is a no-op after fork. nomimalloc
+   eabi official test is 3/3 SUCCESS; default eabi with the libatomic
+   object still hung 3/3 until `patches/mimalloc-*/0001-fork-safe-locks.diff`
+   replaced those mutexes with the same pid-steal spinlocks. After that,
+   default eabi is 3/3 in ~0.24s.
+
+Reap leftover qemu children inside the container before calling the next
+run a flake. See `references/LIBATOMIC_FORK.md`. If the C hang returns,
+the `.o` is after `-latomic` or was compiled with `-flto`. Do not restore
+`[expect]`. Do not raise arm-eabi to armv7 — that hides layer 1 the way
+armhf does and does not help rv32. Do not skip mimalloc on one triple.
 
 **A toolchain that works on your box proves nothing about a foreign rootfs.**
 The requirement is that a tarball drops onto *any* Linux rootfs — glibc,

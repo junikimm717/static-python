@@ -34,12 +34,12 @@ or hangs.
 
 Lock-free sizes under the same qemus (`atomic_is_lock_free`):
 
-| triple              | 4-byte | 8-byte | test_reinit_tls |
-|---------------------|--------|--------|-----------------|
-| arm-linux-musleabi  | 1      | 0      | hangs           |
-| riscv32-linux-musl  | 1      | 0      | hangs           |
-| i386-linux-musl     | 1      | 0      | passes          |
-| arm-linux-musleabihf| 1      | 1      | passes          |
+| triple              | 4-byte | 8-byte | official test (default, after both fixes) |
+|---------------------|--------|--------|-------------------------------------------|
+| arm-linux-musleabi  | 1      | 0      | 3/3 SUCCESS ~0.24s (hung 3/3 before layer 2) |
+| riscv32-linux-musl  | 1      | 0      | isolated pass on pre-layer-2 binary; rebuild |
+| i386-linux-musl     | 1      | 0      | usually passes; leftover qemu can hang it |
+| arm-linux-musleabihf| 1      | 1      | passes (layer 1 never taken) |
 
 armhf's `__atomic_fetch_add_8` does not reference `libat_lock_1`.
 i386/eabi/rv32's do.
@@ -87,9 +87,44 @@ The compile/link recipe is unchanged; the `.c` hash is already in the
 pycross key. Do not bump `recipe.Version`. Do not add `[expect]`.
 Do not raise the ARM ISA.
 
+A C hammer of 16 forks + 64-bit atomics is solid with this object
+(stock `-latomic` is not). That is not the end of the CPython test.
+
+## Layer 2: mimalloc `mi_lock_t`
+
+`nomimalloc` eabi official test is 3/3 SUCCESS (~550ms). default eabi
+with the spinlock `libat_atfork.o` still hung 3/3 at 30s. So the
+remaining class is mimalloc, not qemu-arm and not the libatomic table.
+
+mimalloc 3.5 on Linux sets `MI_USE_PTHREADS` and implements `mi_lock_t`
+as `pthread_mutex_t` with no `pthread_atfork`. `mi_process_init()` is
+`mi_atomic_do_once` and is a no-op after fork (`_mi_process_is_initialized`
+is already true in inherited memory). A child forked while another
+thread holds `theap_meta_lock` / a once-lock / any other `mi_lock_t`
+hangs on the next malloc. Those internals are objcopy-local, so a
+sidecar `.c` cannot reach them.
+
+`patches/mimalloc-3.5.0-cd69707c/0001-fork-safe-locks.diff` keeps
+`MI_USE_PTHREADS` for TLS keys and replaces only the lock word with a
+`uintptr_t` spinlock that stores `getpid()`. 4-byte CAS is lock-free
+on the 32-bit triples; a child pid does not match the inherited word
+and steals. After that rebuild, default eabi official test is 3/3 in
+~0.24s (banner `Sep 4 2026, 14:59:30`).
+
+armhf already passed (lock-free 8-byte, so layer 1 never fired; layer 2
+is still the same mutex). Isolated official runs on old rv32/rv64
+binaries can pass while a parallel `--verify core` reports
+`suite:test_threading` failed — reap leftover qemu children inside the
+container before treating that as a new layer. Do not `[expect]` it.
+
 ## What we'd want upstream
 
 gcc `libatomic` should register `pthread_atfork` and re-init the
 table in the child, ideally without taking all 64 mutexes in
 `prepare`. Until then the object we link in front of `-latomic` is
 the portable fix.
+
+mimalloc should not use a `pthread_mutex_t` as `mi_lock_t` without an
+atfork child that re-inits every lock, including the static once-locks
+inside `mi_atomic_do_once`. `mi_process_init()` after fork is not that
+hook.

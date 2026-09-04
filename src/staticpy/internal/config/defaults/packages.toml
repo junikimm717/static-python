@@ -184,6 +184,7 @@ provides = ["lib/libmimalloc.a", "lib/mimalloc.o"]
 # Collapsed into one object and stripped down to the allocator's public entry
 # points. CPython bundles its own mimalloc in obmalloc.o, so leaving the
 # internals global is a duplicate-symbol link failure waiting to happen.
+# Locks are patched fork-safe (staticpy-traps LIBATOMIC_FORK).
 object = "lib/mimalloc.o"
 keep_globals = [
   "malloc",

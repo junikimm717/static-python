@@ -12,6 +12,13 @@
  * still owns its slot. Re-init does not need the owner, and a store
  * of zero is async-signal-safe (mutex_init is not).
  *
+ * Slots store the holder's getpid(), not a 0/1 flag. pthread_atfork
+ * child handlers run in reverse registration order, so CPython's
+ * AfterFork (registered later, or called after fork() returns) can
+ * do a 64-bit atomic before our zero runs. A child pid does not
+ * match the inherited word and steals. Same-process waiters see
+ * their own pid and spin.
+ *
  * See staticpy-traps: "A hung forked child is libatomic, not qemu."
  */
 #include <pthread.h>
@@ -19,6 +26,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <sched.h>
+#include <unistd.h>
 
 #ifndef PAGE_SIZE
 #define PAGE_SIZE 4096
@@ -39,12 +47,23 @@ static inline uintptr_t addr_hash(void *ptr)
 	return ((uintptr_t)ptr / WATCH_SIZE) % NLOCKS;
 }
 
+static unsigned self_token(void)
+{
+	unsigned u = (unsigned)getpid();
+	return u ? u : 1u;
+}
+
 static void lock_one(size_t i)
 {
-	unsigned expected;
+	unsigned me = self_token();
 	for (;;) {
-		expected = 0;
-		if (atomic_compare_exchange_strong_explicit(&locks[i], &expected, 1u,
+		unsigned expected = 0;
+		if (atomic_compare_exchange_strong_explicit(&locks[i], &expected, me,
+							    memory_order_acquire,
+							    memory_order_relaxed))
+			return;
+		if (expected != 0 && expected != me &&
+		    atomic_compare_exchange_strong_explicit(&locks[i], &expected, me,
 							    memory_order_acquire,
 							    memory_order_relaxed))
 			return;
