@@ -3,7 +3,7 @@ FROM alpine
 # Extremely basic dockerfile for dev purposes.
 
 RUN apk add --no-cache\
-  git make curl tar perl jimtcl meson ninja unzip go\
+  git make curl tar perl jimtcl tcl meson ninja unzip go\
   xz build-base flex bison ncurses rsync patchelf\
   openssl-dev zlib-dev sqlite-dev libffi-dev bzip2-dev xz-dev\
   ncurses-dev readline-dev util-linux-dev expat-dev linux-headers\
@@ -62,6 +62,7 @@ RUN printf '%s\n' \
 RUN /bin/busybox --install -s /bin \
  && ln -sf /usr/bin/perl /bin/perl \
  && ln -sf /usr/bin/jimsh /bin/jimsh \
+ && ln -sf /usr/bin/tclsh /bin/tclsh \
  && ln -sf /usr/bin/make /bin/make \
  && ln -sf /usr/bin/patch /bin/patch
 

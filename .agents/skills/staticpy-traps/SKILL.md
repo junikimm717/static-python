@@ -140,6 +140,12 @@ layout, same class as `expr`/`perl`. Put LookPath(jimsh) in the hermetic
 bin. Without it the message is often `./jimsh0: not found` then `No
 working C compiler found`. Do not make qemu able to run configure tests.
 
+**pyref sqlite configure: `Cannot find a tclsh to use for code generation`.**
+sqlite 3.51 autosetup looks for `tclsh`, not `jimsh`. The image shipped
+`jimtcl` (enough for the static `jimsh0` skip) and pyref still died on
+the host gcc path. `apk add tcl` and `/bin/tclsh` in the Dockerfile.
+Do not pass `--disable-tcl` — that drops the amalgamation codegen.
+
 **`suite:test_bytes` unexpected pass on a reference arm.** `expect.static`
 skips `test_bytes` because `_testlimitedcapi` cannot be a builtin or a
 dlopen. LookupExpect used to merge that scope for every interpreter.
