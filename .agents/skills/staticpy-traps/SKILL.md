@@ -78,28 +78,31 @@ Countermeasure: staticpy's Runner checks every exit code and writes one log per
 command; never reintroduce a path where output is only inspectable in aggregate.
 
 **`expr: not found`, then `fcntl: No file descriptors available`.** Hermetic
-PATH is the toolchain plus `dirname(busybox)`. Alpine's busybox binary lives
-in `/bin` but most applets (`expr`, `awk`, `tr`, `basename`) are only linked
-under `/usr/bin`, so a hermetic `./configure` cannot see them. libffi's
-configure retries `expr` until the container's default 1024 nofile is gone,
-and the job dies on an FD error that hides the real cause. `busybox
---install -s /bin` (in the Dockerfile) puts the applets on the hermetic PATH;
-raise `nofile` in compose as well. Do not "fix" this with `--no-hermetic`.
+PATH is toolchain + `dirname(busybox)`, which is not a closed toolbox.
+Alpine keeps `expr`/`awk`/`tr`/`basename` under `/usr/bin` only; CI's
+`/usr/local/bin/busybox` has none of them. The Dockerfile
+`busybox --install -s /bin` plus compose `nofile` is image provisioning,
+not the class. Materialize `dist/.bin/hermetic/` (`busybox --install -s`
+plus LookPath symlinks) and put **that** dir on PATH — not `/usr/bin`,
+not `dirname(busybox)`. Doctor must resolve `expr` on the composed
+hermetic PATH. Do not "fix" this with `--no-hermetic`.
 
-**`env: can't execute 'perl'` on openssl Configure.** OpenSSL's `Configure` is
-`#!/usr/bin/env perl`. Doctor already treats perl as the one irreducible host
-tool, but hermetic PATH never includes `/usr/bin`, so `env` cannot find it.
-Symlink it next to busybox (`ln -sf /usr/bin/perl /bin/perl`). Invoking
-`perl ./Configure` from the recipe would also work — Go's LookPath uses the
-parent PATH — but the shebang path is what we actually run today.
+**`env: can't execute 'perl'` on openssl Configure.** Same class as
+`expr`. `#!/usr/bin/env perl` looks up `perl` on hermetic PATH; doctor
+LookPaths the parent PATH and reports green while Configure dies. A
+`/bin/perl` symlink is the Alpine layout, not the class. Symlink
+LookPath(perl) into the hermetic bin. `perl ./Configure` is a local
+extra, not a substitute.
 
 **riscv64 core verify: ten files fail with `FileNotFoundError: …/bin/python3`.**
 Smoke probes pass (staticpy prefixes `qemu-riscv64`). Anything that
-`exec`s `sys.executable` dies with ENOENT. Host `qemu-user-binfmt`
-registers `/usr/libexec/qemu-binfmt/<arch>-binfmt-P`, which Alpine does
-not ship. The Dockerfile now symlinks those names to `/usr/bin/qemu-<arch>`.
-If the shims are missing (image not rebuilt, or a new arch), re-exec is
-ENOENT again. Not an `[expect]` candidate.
+`exec`s `sys.executable` is the host kernel's binfmt table, which is
+global and first-writer. Host `qemu-user-binfmt` registers
+`/usr/libexec/qemu-binfmt/<arch>-binfmt-P`. Dockerfile shims make that
+path exist *inside spython* for today's apk list; a new arch, a stale
+image, Fedora's `qemu-<arch>-static` names, or CI's host verify all
+miss. Refuse to verify unless the registered interpreter exists in
+this mount namespace. Do not wrap CPython's re-exec. Not an `[expect]`.
 
 **`test_subprocess.test_executable_without_cwd` fails with missing encodings.**
 `Popen(["somethingyoudonthave"], executable=sys.executable)` leaves argv[0]
@@ -118,25 +121,20 @@ is the real x87 1-ulp ABI issue and stays on `[expect.i386-linux-musl]`.
 Write-up: `references/I386_QEMU_SAHF.md`.
 
 **`suite:test_os` unexpected fail under qemu: `test_fork_warns_when_non_python_thread_exists`.**
-CPython reads `/proc/self/stat` field 20 (`num_threads`). qemu < 9.1
-(host Ubuntu 8.2.2) leaves that field as `0`. qemu 9.1+ implements it.
-The IndexError was host 8.2.2 reached through binfmt because the
-`*-binfmt-P` path was missing in Alpine. With the Dockerfile shims,
-re-exec stays on Alpine qemu and the warning fires. Do not restore
-`[expect.qemu]` for this.
+Same binfmt class. CPython reads `/proc/self/stat` field 20
+(`num_threads`). qemu < 9.1 (host Ubuntu 8.2.2) leaves it `0`. A
+missing shim falls through to the host qemu; a present shim keeps
+re-exec on Alpine 11.1.1. Doctor must require the binfmt interpreter
+to exist *and* be ≥ 9.1. Do not restore `[expect.qemu]`.
 
 **sqlite configure: `s390x-binfmt-P: Could not open '/lib/ld-musl-s390x.so.1'`.**
-sqlite's configure builds a bootstrap `jimsh0` with the *target* CC and then
-runs it. Host binfmt (needed for CPython's suite re-exec) intercepts the
-cross ELF; qemu-user then looks for a musl loader that is not at `/lib`.
-The recipe already sets `B.cc=@BUILD_CC@` for the later make helpers;
-configure never sees that. A host `jimsh` on PATH (`apk add jimtcl` in
-Alpine, `apt-get install jimsh` on the Ubuntu sidecar) skips the
-bootstrap. Without it the message is often `./jimsh0: not found` then
-`No working C compiler found` — the compiler is fine; the bootstrap
-binary is a musl ELF the host cannot exec. Do not "fix" this by making
-qemu able to run configure tests — that is how a cross build silently
-takes the wrong AC_RUN_IFELSE branch.
+sqlite's configure builds a bootstrap `jimsh0` with the *target* CC and
+then runs it. Host binfmt intercepts the cross ELF. `B.cc=@BUILD_CC@`
+is make-only; configure never sees it. A host `jimsh` on the *hermetic*
+PATH skips the bootstrap — `/bin/jimsh` in the Dockerfile is the Alpine
+layout, same class as `expr`/`perl`. Put LookPath(jimsh) in the hermetic
+bin. Without it the message is often `./jimsh0: not found` then `No
+working C compiler found`. Do not make qemu able to run configure tests.
 
 **`suite:test_bytes` unexpected pass on a reference arm.** `expect.static`
 skips `test_bytes` because `_testlimitedcapi` cannot be a builtin or a
@@ -155,10 +153,16 @@ skipped (or inverted) when the profile is host-built.
 unwrap `rootfs/`. Verify did not, so a published reference interpreter failed
 core as if it were missing. Unwrap `rootfs/` the same way.
 
-**`lto1: Cannot open Modules/_cursesmodule.o` on a cross LTO link.** `make -j2`
-LTO-links `python` and `Programs/_testembed` at once against the same slim
-objects. gcc 16's lto1 then fails to open one of them. Remaining CPython
-jobs should use `-j 1` for that link; deps can stay parallel.
+**`lto1: Cannot open Modules/_cursesmodule.o` during a CPython LTO link.**
+The other builder's `GCStale` deleted this job's live `dist/work` tree.
+`kill(pid, 0)` is PID-namespace local; spython and kitbuild share `dist/`
+and after `StaleAge` (10 min, shorter than `-flto-partition=none` WPA)
+each treats the other's scratch as dead. gcc 16 then reprints the next
+`open` as `Cannot open %s` with no errno (`_ssl.o`, `blob.o`,
+`odictobject.o` are whichever file was next). Do not serialize `make`.
+GC must skip a scratch dir whose heartbeat is `Live()` — that check
+already accepts a recent `UpdatedAt` across machines. The watchdog
+restarting `Cannot open` as a flake feeds the bug.
 
 **seplto python link: `multiple definition of BZ2_*` / `lzma_*`.**
 `materializeArchives` LTO-rels each `.a` into one relocatable, then used
@@ -189,19 +193,25 @@ linked with `-rpath-link` only. Host-built LDFLAGS now also bake
 `-Wl,-rpath,<prefix>/lib` so the rewrite has something longer than
 `$ORIGIN` to overwrite.
 
-**`libffi built without producing lib64/libffi.so` on Alpine.** The
-reference profile is host-gcc + glibc. Inside the Alpine spython image,
-`cc` is musl and libffi's toolexeclibdir is `lib/`, not `lib64`. That
-failure is the tell you are measuring Alpine, not the machine. Build
-`reference*` on the glibc host (or an Ubuntu sidecar sharing `dist/`).
+**`libffi built without producing lib64/libffi.so` on Alpine.** libffi's
+`toolexeclibdir` follows `$CC -print-multi-os-directory`. Flipping
+`provides` to `lib/libffi.so` after the last fail lets an Alpine
+reference succeed and silently measure musl; on a `../lib64` gcc the
+new pin fails. Own the install dir (`--disable-multi-os-directory`) so
+`provides = lib/libffi.so` is true on every host. Host-built libc is
+whatever `hostcc` fingerprints — do not refuse musl, do not treat
+`lib64` as a canary, and do not let `kitFactors` hardcode `glibc`.
+"Build reference on a glibc host if you want the glibc baseline" is
+docs, not a recipe refuse.
 
 **pyref libffi: `Something went wrong bootstrapping makefile fragments`.**
-Host-built profiles compose PATH as `/bin` only (no toolchain, so gcc cannot
-pick up a musl `ld`). GNU make lives at `/usr/bin/make`. Without a `/bin/make`
-symlink, configure finds no GNU make (`checking whether make sets $(MAKE)...
-no`) and config.status dies on dependency-tracking fragments. Same for
-`patch`. Symlink the real tools next to busybox; do not put `/usr/bin` on
-the hermetic PATH.
+Same hermetic-PATH class as `expr`. Host-built PATH names no toolchain,
+so it is `dirname(busybox)` only. GNU make lives at `/usr/bin/make`.
+`/bin/make` in the Dockerfile is the Alpine layout; Ubuntu "works"
+because usr-merge makes `dirname(/usr/bin/busybox)` equal `/usr/bin`
+and accidentally puts gcc/ld on PATH. Put LookPath(GNU make) and
+LookPath(GNU patch) in the hermetic bin (overwrite busybox's `patch`
+applet). Do not put `/usr/bin` on the hermetic PATH.
 
 **A `sed` fixup silently does nothing.** `sed -i '/anchor/...'` on a source tree
 is a no-op when the anchor moves, and exits 0. Upstream reformats one line on a

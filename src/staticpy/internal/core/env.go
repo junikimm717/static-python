@@ -63,6 +63,10 @@ func (e *Env) EnsureDirs() error {
 }
 
 // It is best-effort: losing a race with another collector is harmless.
+// kill(pid, 0) is PID-namespace local, so two containers sharing dist/
+// would otherwise treat each other's live LTO trees as dead after StaleAge
+// (the scratch dir's mtime is the job start; WPA does not touch it).
+// Heartbeat.Live() already accepts a recent UpdatedAt for that case.
 func (e *Env) GCStale(age time.Duration) {
 	e.gcHeartbeats()
 	for _, root := range []string{e.Path(DirWork), e.Path(DirStaging)} {
@@ -74,15 +78,24 @@ func (e *Env) GCStale(age time.Duration) {
 			if !ent.IsDir() {
 				continue
 			}
-			pid, ok := pidFromScratchName(ent.Name())
-			if !ok || pidAlive(pid) {
+			name := ent.Name()
+			pid, ok := pidFromScratchName(name)
+			if !ok {
+				continue
+			}
+			if slug, ok := slugFromScratchName(name); ok {
+				if hb, err := ReadHeartbeat(e, slug); err == nil && hb.Live() {
+					continue
+				}
+			}
+			if pidAlive(pid) {
 				continue
 			}
 			info, err := ent.Info()
 			if err != nil || time.Since(info.ModTime()) < age {
 				continue
 			}
-			path := filepath.Join(root, ent.Name())
+			path := filepath.Join(root, name)
 			e.Log.Info("collecting stale scratch dir", "path", path, "dead_pid", pid)
 			if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
 				e.Log.Warn("could not remove stale dir", "path", path, "err", err)
@@ -204,8 +217,20 @@ func pidFromScratchName(name string) (int, bool) {
 	return pid, true
 }
 
-// A dist/ shared across machines would defeat this check; the mtime guard
-// keeps that case merely wasteful rather than dangerous.
+func slugFromScratchName(name string) (string, bool) {
+	parts := strings.Split(name, ".")
+	if len(parts) < 3 {
+		return "", false
+	}
+	if _, ok := pidFromScratchName(name); !ok {
+		return "", false
+	}
+	return strings.Join(parts[:len(parts)-2], "."), true
+}
+
+// Same-namespace only. A sibling container sharing dist/ has a different
+// PID namespace, so this is false for a live foreign builder. Prefer
+// Heartbeat.Live(), which also accepts a recent UpdatedAt.
 func pidAlive(pid int) bool {
 	err := syscall.Kill(pid, 0)
 	return err == nil || err == syscall.EPERM
