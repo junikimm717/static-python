@@ -15,7 +15,9 @@ generated from these files by `./manage_benchmarks.py site`.
 ```
 
 Import copies `manifest.json`, `env.json`, `report.json`, `report.md`,
-`report.html`, `skipped.json`, and `timeline.jsonl` if present. The
+`report.html`, `skipped.json`, and `timeline.jsonl` if present. Every
+`./staticpy bench` suite writes that set; `suite.name` on the manifest
+(`pyperformance` or `micro`) is how they differ. The
 manifest includes a host `fingerprint` and `fingerprint_sha256` (identity
 only: cpu, microcode, smt, kernel cmdline, vulnerabilities, total RAM, …).
 Load, current MHz, free RAM, and this run's pin are recorded under
@@ -43,7 +45,8 @@ the current contract unless `--allow-stale-protocol` is passed.
 `src/staticpy/internal/bench/protocol.go`. It is currently **2**. A bump
 means previously recorded numbers cannot be compared to new ones (wrong
 reduction, silently dropped arms, a contaminated pin). A pyperformance pin
-bump is a suite change, not a protocol bump.
+bump is a suite change, not a protocol bump. Adding `suite.name` is not a
+bump: old sessions without it still import.
 
 Stale-protocol runs stay in the tree. `list` and the site badge them.
 They are not deleted automatically.

@@ -64,6 +64,7 @@ class ImportTests(unittest.TestCase):
         self.assertEqual(entry["protocol"], mb.CURRENT_PROTOCOL)
         self.assertEqual(entry["git_revision"], "0000000000000000000000000000000000000000")
         self.assertFalse(entry["stale_protocol"])
+        self.assertEqual(entry["suite"]["name"], "pyperformance")
 
     def test_import_refuses_duplicate_without_force(self):
         mb.import_session(self.root, self.session)
@@ -103,6 +104,21 @@ class ImportTests(unittest.TestCase):
         with self.assertRaises(mb.ManagerError) as ctx:
             mb.import_session(self.root, self.session)
         self.assertIn("manifest.json", str(ctx.exception))
+
+    def test_import_accepts_micro_suite(self):
+        manifest = json.loads((self.session / "manifest.json").read_text(encoding="utf-8"))
+        manifest["suite"] = {"name": "micro"}
+        (self.session / "manifest.json").write_text(
+            json.dumps(manifest, indent=2) + "\n", encoding="utf-8"
+        )
+        report = json.loads((self.session / "report.json").read_text(encoding="utf-8"))
+        report["suite"] = {"name": "micro"}
+        (self.session / "report.json").write_text(
+            json.dumps(report, indent=2) + "\n", encoding="utf-8"
+        )
+        dest = mb.import_session(self.root, self.session)
+        run = mb.load_run(dest, fixture=False)
+        self.assertEqual(mb._suite_label(run["suite"]), "micro")
 
 
 class DeleteTests(unittest.TestCase):
@@ -150,6 +166,7 @@ class VerifyTests(unittest.TestCase):
         run = mb.load_run(FIXTURE, fixture=True)
         self.assertEqual(run["protocol"], mb.CURRENT_PROTOCOL)
         self.assertFalse(run["stale_protocol"])
+        self.assertEqual(run["suite"]["name"], "pyperformance")
         n = mb.verify_runs(ROOT)
         self.assertGreaterEqual(n, 1)
 
@@ -170,6 +187,7 @@ class SiteTests(unittest.TestCase):
         index = (out / "index.html").read_text(encoding="utf-8")
         self.assertIn(FIXTURE_ID, index)
         self.assertIn("Fixture / demo", index)
+        self.assertIn(">pyperformance<", index)
         self.assertTrue((out / "run" / FIXTURE_ID / "index.html").is_file())
         self.assertTrue((out / "data" / "index.json").is_file())
         page = (out / "run" / FIXTURE_ID / "index.html").read_text(encoding="utf-8")

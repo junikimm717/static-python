@@ -115,20 +115,13 @@ to run this project, you for sure know what you are doing 😇)
 ```
 
 That runs pyperformance -- what speed.python.org publishes against -- and
-<<<<<<< HEAD
 writes a session directory under `dist/bench/<UTC-stamp>-<arch>/`. Every
 suite writes the same files: `manifest.json`, `env.json`, `report.json`,
 `report.md`, `report.html`, `skipped.json`, and `timeline.jsonl`.
 `--suite micro` runs a stdlib-only loop set instead, which needs no network;
 it is still that same session, with `suite.name` set to `micro`.
-=======
-writes a session directory under `dist/bench/<UTC-stamp>-<arch>/` containing
-`report.md`, `report.html`, `manifest.json` (protocol, pins, host fingerprint), `env.json`
-(kernel, cpu, memory, affinity, full fingerprint), and the raw pyperf JSON.
-`--suite micro` runs a stdlib-only loop set instead, which needs no network.
 
 Commit a session with `./manage_benchmarks.py import dist/bench/<stamp>-<arch>`
 (see `benchmarks/README.md`). That copies the reviewable files, not `venv/`
 or `raw/`. GitHub Pages is built from `benchmarks/` by
 `.github/workflows/pages.yml`; CI does not run `./staticpy bench`.
->>>>>>> 273f94f (bench: archive sessions, manage_benchmarks.py, and GitHub Pages)

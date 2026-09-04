@@ -3,7 +3,7 @@
   "baseline": "reference",
   "protocol": 2,
   "git_revision": "0000000000000000000000000000000000000000",
-  "suite": {"pyperformance": "1.14.0", "pyperf": "2.10.0"},
+  "suite": {"name": "pyperformance", "pyperformance": "1.14.0", "pyperf": "2.10.0"},
   "interpreters": [
     {
       "label": "reference",

@@ -16,6 +16,7 @@
       },
       "skipped": 0,
       "suite": {
+        "name": "pyperformance",
         "pyperformance": "1.14.0",
         "pyperf": "2.10.0"
       },

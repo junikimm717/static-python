@@ -398,6 +398,17 @@ def _esc(s) -> str:
     return html.escape("" if s is None else str(s), quote=True)
 
 
+def _suite_label(suite) -> str:
+    if not isinstance(suite, dict):
+        return "-"
+    name = suite.get("name")
+    if isinstance(name, str) and name:
+        return name
+    if isinstance(suite.get("pyperformance"), str):
+        return "pyperformance"
+    return "-"
+
+
 def _fmt_geo(geo: dict) -> str:
     parts = []
     for k, v in geo.items():
@@ -492,7 +503,7 @@ def _run_table(runs: list[dict], *, rel_prefix: str) -> str:
         return ""
     parts = [
         "<table>\n<thead><tr>"
-        "<th>id</th><th>protocol</th><th>baseline</th><th>arms</th>"
+        "<th>id</th><th>suite</th><th>protocol</th><th>baseline</th><th>arms</th>"
         "<th>geomean vs baseline</th><th>skipped</th><th>cpu</th>"
         "</tr></thead>\n<tbody>\n"
     ]
@@ -503,6 +514,7 @@ def _run_table(runs: list[dict], *, rel_prefix: str) -> str:
         cpu = (r.get("machine") or {}).get("cpu_model") or ""
         parts.append(
             f'<tr><td><a href="{href}">{_esc(r["id"])}</a>{stale}</td>'
+            f'<td>{_esc(_suite_label(r.get("suite")))}</td>'
             f'<td>{_esc(r["protocol"])}</td>'
             f'<td>{_esc(r["baseline"])}</td>'
             f'<td>{_esc(", ".join(r["arms"]))}</td>'
@@ -714,6 +726,7 @@ def cmd_list(root: Path) -> None:
             f"stamp={r['stamp'] or '-'}",
             f"arch={r['arch'] or '-'}",
             f"protocol={r['protocol']}",
+            f"suite={_suite_label(r.get('suite'))}",
             f"baseline={r['baseline'] or '-'}",
             f"arms={','.join(r['arms']) or '-'}",
             f"geomean={_fmt_geo(r['geomean_vs_baseline'])}",
