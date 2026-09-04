@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestPyperformanceSpecsArePinned(t *testing.T) {
@@ -33,8 +34,83 @@ func TestManifestRecordsProtocol(t *testing.T) {
 	if !ok {
 		t.Fatalf("suite type %T", m["suite"])
 	}
+	if suite["name"] != SuitePyperformance {
+		t.Fatalf("suite name = %q", suite["name"])
+	}
 	if suite["pyperformance"] != "1.14.0" || suite["pyperf"] != "2.10.0" {
 		t.Fatalf("suite pins = %v", suite)
+	}
+}
+
+func TestSuiteMapOmitsPinsForMicro(t *testing.T) {
+	m := SuiteMap(SuiteMicro, Pins{})
+	if m["name"] != SuiteMicro {
+		t.Fatalf("name = %q", m["name"])
+	}
+	if _, ok := m["pyperformance"]; ok {
+		t.Fatalf("micro must not claim pyperformance pins: %v", m)
+	}
+}
+
+func TestEnvMarkdownNamesTheSuite(t *testing.T) {
+	micro := EnvMarkdown(Machine{}, Protocol, DefaultPins(), SuiteMicro)
+	if strings.Contains(micro, "pyperformance") {
+		t.Fatalf("micro env claimed pyperformance:\n%s", micro)
+	}
+	if !strings.Contains(micro, "- suite: micro\n") {
+		t.Fatalf("missing suite: micro\n%s", micro)
+	}
+	py := EnvMarkdown(Machine{}, Protocol, DefaultPins(), SuitePyperformance)
+	if !strings.Contains(py, "pyperformance 1.14.0") {
+		t.Fatalf("pyperformance env:\n%s", py)
+	}
+}
+
+func TestWriteReportsEmitsTheStandardFiles(t *testing.T) {
+	parent := t.TempDir()
+	sess, err := NewSession(parent, "x86_64", time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sess.Close()
+	md, report, err := sess.WriteReports(Reports{
+		Accounting: Accounting{
+			Baseline:  "reference",
+			SuiteName: SuiteMicro,
+			Machine:   Machine{Kernel: "Linux"},
+			Identities: []Identity{
+				{Label: "reference", BinarySHA256: "aa"},
+			},
+		},
+		Order: []string{"reference", "default"},
+		Rows: []Row{
+			{Benchmark: "fib_iter", Min: map[string]float64{"reference": 2e-8, "default": 1e-8},
+				Ratio: map[string]float64{"reference": 1, "default": 2}},
+		},
+		Geomean: map[string]float64{"default": 2},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range SessionFiles {
+		p := filepath.Join(sess.Dir, name)
+		if _, err := os.Stat(p); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+	}
+	if !strings.Contains(md, "# micro comparison") || strings.Contains(md, "pyperformance") {
+		t.Fatalf("markdown:\n%s", md)
+	}
+	suite, _ := report["suite"].(map[string]string)
+	if suite["name"] != SuiteMicro {
+		t.Fatalf("report suite = %v", report["suite"])
+	}
+	raw, err := os.ReadFile(filepath.Join(sess.Dir, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(raw), `"name": "micro"`) {
+		t.Fatalf("manifest:\n%s", raw)
 	}
 }
 
@@ -92,7 +168,7 @@ func TestRenderHTMLContainsChartAndArms(t *testing.T) {
 		Skipped: 2,
 	}
 	html := r.HTML()
-	for _, want := range []string{"reference", "default", "nolto", "<svg", "skipped.json", "protocol"} {
+	for _, want := range []string{"reference", "default", "nolto", "<svg", "skipped.json", "protocol", "pyperformance comparison"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("HTML missing %q:\n%s", want, html)
 		}

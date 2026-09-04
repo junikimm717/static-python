@@ -11,6 +11,7 @@ import (
 // SuiteReport is everything the markdown and HTML reports share, so the
 // two cannot drift on environment, pins, or identity the way they used to.
 type SuiteReport struct {
+	SuiteName  string
 	Baseline   string
 	Order      []string
 	Rows       []Row
@@ -33,9 +34,19 @@ func (r SuiteReport) protocol() int {
 	return r.Protocol
 }
 
-// EnvMarkdown is the provenance block shared with the micro suite, which
-// has no pyperformance rows but still has to say where the numbers came from.
-func EnvMarkdown(m Machine, protocol int, pins Pins) string {
+func (r SuiteReport) suiteName() string {
+	if r.SuiteName == "" {
+		return SuitePyperformance
+	}
+	return r.SuiteName
+}
+
+func (r SuiteReport) title() string {
+	return r.suiteName() + " comparison"
+}
+
+// EnvMarkdown is the provenance block every suite's report shares.
+func EnvMarkdown(m Machine, protocol int, pins Pins, suiteName string) string {
 	if protocol == 0 {
 		protocol = Protocol
 	}
@@ -46,7 +57,7 @@ func EnvMarkdown(m Machine, protocol int, pins Pins) string {
 	if rev := buildinfo.GitRevision; rev != "" {
 		fmt.Fprintf(&b, "- git_revision: %s\n", rev)
 	}
-	fmt.Fprintf(&b, "- suite: pyperformance %s, pyperf %s\n", pins.Pyperformance, pins.Pyperf)
+	fmt.Fprintf(&b, "- suite: %s\n", SuiteLabel(suiteName, pins))
 	fmt.Fprintf(&b, "- kernel: %s\n", dash(m.Kernel))
 	fmt.Fprintf(&b, "- cpu: %s\n", dash(m.CPUModel))
 	if m.Memory != "" {
@@ -115,8 +126,8 @@ func pgoCell(pgo bool) string {
 
 func (r SuiteReport) Markdown() string {
 	var b strings.Builder
-	b.WriteString("# pyperformance comparison\n\n")
-	b.WriteString(EnvMarkdown(r.Machine, r.protocol(), r.pins()))
+	fmt.Fprintf(&b, "# %s\n\n", r.title())
+	b.WriteString(EnvMarkdown(r.Machine, r.protocol(), r.pins(), r.suiteName()))
 	fmt.Fprintf(&b, "- baseline: %s\n", r.Baseline)
 	fmt.Fprintf(&b, "- rows: %d\n", len(r.Rows))
 	if r.Skipped > 0 {
@@ -176,7 +187,7 @@ func (r SuiteReport) HTML() string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>pyperformance comparison</title>
+<title>` + html.EscapeString(r.title()) + `</title>
 <style>
 body{font:14px/1.45 system-ui,sans-serif;max-width:960px;margin:2rem auto;padding:0 1rem;color:#1a202c}
 h1,h2{font-weight:600}
@@ -192,7 +203,7 @@ svg{max-width:100%}
 </head>
 <body>
 `)
-	b.WriteString("<h1>pyperformance comparison</h1>\n")
+	fmt.Fprintf(&b, "<h1>%s</h1>\n", html.EscapeString(r.title()))
 	b.WriteString(r.envHTML())
 	b.WriteString("<h2>Geomean vs " + html.EscapeString(r.Baseline) + "</h2>\n")
 	b.WriteString(r.geomeanSVG())
@@ -207,8 +218,8 @@ svg{max-width:100%}
 		b.WriteString("<h2>Interpreters</h2>\n")
 		b.WriteString(r.identityTableHTML())
 	}
-	fmt.Fprintf(&b, "<p>protocol %d · pyperformance %s · pyperf %s</p>\n",
-		r.protocol(), html.EscapeString(pins.Pyperformance), html.EscapeString(pins.Pyperf))
+	fmt.Fprintf(&b, "<p>protocol %d · %s</p>\n",
+		r.protocol(), html.EscapeString(SuiteLabel(r.suiteName(), pins)))
 	b.WriteString("</body>\n</html>\n")
 	return b.String()
 }
@@ -232,7 +243,7 @@ func (r SuiteReport) envHTML() string {
 	if rev := buildinfo.GitRevision; rev != "" {
 		b.WriteString(row("git_revision", rev))
 	}
-	b.WriteString(row("suite", "pyperformance "+pins.Pyperformance+", pyperf "+pins.Pyperf))
+	b.WriteString(row("suite", SuiteLabel(r.suiteName(), pins)))
 	b.WriteString(row("kernel", dash(m.Kernel)))
 	b.WriteString(row("cpu", dash(m.CPUModel)))
 	b.WriteString(row("memory", mem))

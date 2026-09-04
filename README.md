@@ -115,7 +115,8 @@ to run this project, you for sure know what you are doing 😇)
 ```
 
 That runs pyperformance -- what speed.python.org publishes against -- and
-writes a session directory under `dist/bench/<UTC-stamp>-<arch>/` containing
-`report.md`, `report.html`, `manifest.json` (protocol, pins, host fingerprint), `env.json`
-(kernel, cpu, memory, affinity, full fingerprint), and the raw pyperf JSON.
-`--suite micro` runs a stdlib-only loop set instead, which needs no network.
+writes a session directory under `dist/bench/<UTC-stamp>-<arch>/`. Every
+suite writes the same files: `manifest.json`, `env.json`, `report.json`,
+`report.md`, `report.html`, `skipped.json`, and `timeline.jsonl`.
+`--suite micro` runs a stdlib-only loop set instead, which needs no network;
+it is still that same session, with `suite.name` set to `micro`.

@@ -56,6 +56,7 @@ dist/                    everything generated; gitignored, safe to delete
 | a resolved value, for a script | `staticpy print <key>` — `python-version`, `python-abi`, `host`, `targets{,-all,-proven}`, `dist`, `recipe-version`, `version:<src>`, `sha256:<src>` |
 | what the flags actually resolve to | `staticpy config show [--profile N] [--scope S]`, which also names the file each layer came from |
 | why a built interpreter misbehaves | the `staticpy-traps` skill — symptom first |
+| what a bench session writes | always the same seven files, regardless of `--suite`: `manifest.json`, `env.json`, `report.json`, `report.md`, `report.html`, `skipped.json`, `timeline.jsonl`. `suite.name` is `pyperformance` or `micro`. `venv/`, `raw/`, `logs/` stay on the machine |
 
 ## The DAG
 

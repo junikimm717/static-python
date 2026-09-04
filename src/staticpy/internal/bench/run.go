@@ -141,6 +141,37 @@ func RunSuite(ctx context.Context, x Exec, s *Session, pin Pin, arms []Arm, case
 	return res, failures, nil
 }
 
+// Trace records one timeline event around fn: wall time, load, and how busy
+// the pinned core's SMT sibling was. Micro measures several benches in one
+// process, so one event is one invocation, not one report.json row.
+func (s *Session) Trace(pin Pin, arm, benchmark string, fn func() error) error {
+	watch := append([]int{pin.CPU}, pin.Siblings...)
+	before, _ := sampleCPUs(watch)
+	start := time.Now()
+	runErr := fn()
+	wall := time.Since(start)
+	after, _ := sampleCPUs(watch)
+	ev := Event{
+		UTC:       start.UTC().Format(time.RFC3339),
+		Arm:       arm,
+		Benchmark: benchmark,
+		WallSec:   wall.Seconds(),
+		OK:        runErr == nil,
+		Load1:     loadAvg1(),
+	}
+	ev.PinBusy = busyFrac(before, after, pin.CPU)
+	for _, sib := range pin.Siblings {
+		if f := busyFrac(before, after, sib); f > ev.SibBusy {
+			ev.SibBusy = f
+		}
+	}
+	if runErr != nil {
+		ev.Err = runErr.Error()
+	}
+	s.Record(ev)
+	return runErr
+}
+
 // A suite run is hours long, so every measurement reports as it lands: what
 // ran, how long it took, and how far off the end is. The sibling-busy figure
 // is printed inline rather than left for the postmortem -- it is the signal

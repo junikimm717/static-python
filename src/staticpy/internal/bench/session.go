@@ -109,9 +109,52 @@ func (s *Session) WriteJSON(name string, v any) error {
 	return os.WriteFile(filepath.Join(s.Dir, name), append(b, '\n'), 0o644)
 }
 
-// Manifest is the session accounting file. Protocol and pins live here so a
-// later import can refuse stale numbers without re-reading the report.
+// SessionFiles is the set every suite writes. venv/, raw/, and logs/ stay
+// on the machine that measured.
+var SessionFiles = []string{
+	"manifest.json",
+	"env.json",
+	"report.json",
+	"report.md",
+	"report.html",
+	"skipped.json",
+	"timeline.jsonl",
+}
+
+// SuiteMap is the suite object on manifest.json and report.json.
+// pyperformance records its pins; micro is built-in and has none.
+func SuiteMap(name string, pins Pins) map[string]string {
+	if name == "" {
+		name = SuitePyperformance
+	}
+	m := map[string]string{"name": name}
+	if name == SuitePyperformance {
+		pins = pins.withDefaults()
+		m["pyperformance"] = pins.Pyperformance
+		m["pyperf"] = pins.Pyperf
+	}
+	return m
+}
+
+// SuiteLabel is the one-line suite description in markdown/HTML.
+func SuiteLabel(name string, pins Pins) string {
+	if name == "" {
+		name = SuitePyperformance
+	}
+	if name == SuitePyperformance {
+		pins = pins.withDefaults()
+		return fmt.Sprintf("pyperformance %s, pyperf %s", pins.Pyperformance, pins.Pyperf)
+	}
+	return name
+}
+
+// Manifest is the session accounting file. Protocol and the suite object live
+// here so a later reader can refuse stale numbers without re-reading the report.
 func Manifest(stamp, baseline string, pins Pins, ids []Identity, skipped []string) map[string]any {
+	return ManifestSuite(stamp, baseline, SuitePyperformance, pins, ids, skipped)
+}
+
+func ManifestSuite(stamp, baseline, suiteName string, pins Pins, ids []Identity, skipped []string) map[string]any {
 	pins = pins.withDefaults()
 	if skipped == nil {
 		skipped = []string{}
@@ -123,7 +166,7 @@ func Manifest(stamp, baseline string, pins Pins, ids []Identity, skipped []strin
 		"stamp":        stamp,
 		"baseline":     baseline,
 		"protocol":     Protocol,
-		"suite":        map[string]string{"pyperformance": pins.Pyperformance, "pyperf": pins.Pyperf},
+		"suite":        SuiteMap(suiteName, pins),
 		"interpreters": ids,
 		"skipped":      skipped,
 	}

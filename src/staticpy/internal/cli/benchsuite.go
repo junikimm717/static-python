@@ -17,7 +17,7 @@ import (
 // runPyperfSuite drives the pyperformance suite across the selected arms and
 // writes a session directory that can be re-read long after the run.
 func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, paths map[string]string,
-	baseline, suiteRoot, pyperfHint string, useVenv bool, noPin bool, cpu int, timeout time.Duration, offline bool, pins bench.Pins) error {
+	baseline, suiteRoot, pyperfHint string, useVenv bool, noPin bool, cpu int, timeout time.Duration, offline bool, pins bench.Pins, outPath string) error {
 
 	var skipped []string
 	pin, topo, err := choosePin(noPin, cpu)
@@ -151,20 +151,19 @@ func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, 
 	// what a run killed halfway still leaves behind; the late one is the only
 	// place a runtime failure can appear, since it is not known until then.
 	writeAccounting := func() error {
-		man := bench.Manifest(sess.Stamp, baseline, pins, ids, skipped)
-		man["suite_root"] = suiteRoot
-		man["venv"] = useVenv
-		man["benchmarks_found"] = len(suite.Cases)
-		machine.AttachToManifest(man)
-		if err := sess.WriteJSON("manifest.json", man); err != nil {
-			return err
-		}
-		if err := sess.WriteJSON("env.json", machine); err != nil {
-			return err
-		}
-		// Always written, empty list included: an absent skipped.json would
-		// otherwise read the same as a run that skipped nothing.
-		return sess.WriteJSON("skipped.json", skipped)
+		return sess.WriteAccounting(bench.Accounting{
+			Baseline:   baseline,
+			SuiteName:  bench.SuitePyperformance,
+			Pins:       pins,
+			Identities: ids,
+			Skipped:    skipped,
+			Machine:    machine,
+			Extra: map[string]any{
+				"suite_root":       suiteRoot,
+				"venv":             useVenv,
+				"benchmarks_found": len(suite.Cases),
+			},
+		})
 	}
 	if err := writeAccounting(); err != nil {
 		return err
@@ -187,33 +186,28 @@ func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, 
 	}
 
 	rows, geo := bench.Compare(res, baseline, order)
-	if err := sess.WriteJSON("report.json", map[string]any{
-		"baseline": baseline, "rows": rows, "geomean_vs_baseline": geo,
-		"protocol": bench.Protocol,
-	}); err != nil {
+	md, report, err := sess.WriteReports(bench.Reports{
+		Accounting: bench.Accounting{
+			Baseline:   baseline,
+			SuiteName:  bench.SuitePyperformance,
+			Pins:       pins,
+			Identities: ids,
+			Skipped:    skipped,
+			Machine:    machine,
+			Extra: map[string]any{
+				"suite_root":       suiteRoot,
+				"venv":             useVenv,
+				"benchmarks_found": len(suite.Cases),
+			},
+		},
+		Order:   order,
+		Rows:    rows,
+		Geomean: geo,
+	})
+	if err != nil {
 		return err
 	}
-	rep := bench.SuiteReport{
-		Baseline:   baseline,
-		Order:      order,
-		Rows:       rows,
-		Geomean:    geo,
-		Machine:    machine,
-		Protocol:   bench.Protocol,
-		Pins:       pins,
-		Identities: ids,
-		Skipped:    len(skipped),
-	}
-	md := rep.Markdown()
-	if err := os.WriteFile(filepath.Join(sess.Dir, "report.md"), []byte(md), 0o644); err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(sess.Dir, "report.html"), []byte(rep.HTML()), 0o644); err != nil {
-		return err
-	}
-	fmt.Print(md)
-	fmt.Fprintf(os.Stderr, "\n%s %s\n", bold("session:"), sess.Dir)
-	return nil
+	return publishSession(sess, md, report, outPath, g.JSON)
 }
 
 // One line per benchmark, naming every arm that lost it. Which arms failed is

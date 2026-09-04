@@ -69,3 +69,39 @@ func TestSummarizeFailuresGroupsArmsPerBenchmark(t *testing.T) {
 		t.Fatal("no failures must produce no lines")
 	}
 }
+
+func TestSamplesToResultsConvertsToSeconds(t *testing.T) {
+	ms := map[string]*interpMeasurement{
+		"reference": {
+			CPU:     map[string][]float64{"fib_iter": {20, 22}},
+			Startup: map[string][]float64{"bare": {10, 12}},
+		},
+		"default": {
+			CPU:     map[string][]float64{"fib_iter": {10, 11}},
+			Startup: map[string][]float64{"bare": {20, 21}},
+		},
+	}
+	res := samplesToResults([]string{"reference", "default"}, ms)
+	rows, geo := bench.Compare(res, "reference", []string{"reference", "default"})
+	byName := map[string]bench.Row{}
+	for _, r := range rows {
+		byName[r.Benchmark] = r
+	}
+	fib := byName["fib_iter"]
+	if fib.Min["reference"] != 20e-9 || fib.Min["default"] != 10e-9 {
+		t.Fatalf("fib min_s = %+v", fib.Min)
+	}
+	if fib.Ratio["default"] != 2 {
+		t.Fatalf("fib ratio = %v, want 2 (faster)", fib.Ratio["default"])
+	}
+	st := byName["startup.bare"]
+	if st.Min["reference"] != 0.01 || st.Min["default"] != 0.02 {
+		t.Fatalf("startup min_s = %+v", st.Min)
+	}
+	if st.Ratio["default"] != 0.5 {
+		t.Fatalf("startup ratio = %v, want 0.5 (slower)", st.Ratio["default"])
+	}
+	if geo["default"] == 0 {
+		t.Fatal("geomean missing")
+	}
+}
