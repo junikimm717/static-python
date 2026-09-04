@@ -550,6 +550,7 @@ func hostRunner(e *core.Env, t config.Target) string {
 
 // compileLibatAtfork builds the lock-table replacement that registers
 // pthread_atfork. Compiled without -flto so WPA cannot drop the constructor.
+// The .c is spinlocks + child-only zero; see staticpy-traps LIBATOMIC_FORK.
 func (j *pyBuild) compileLibatAtfork(ctx context.Context, r *core.Runner, te *toolenv, work string) (string, error) {
 	if err := assets.WriteTo(work, "libat_atfork.c"); err != nil {
 		return "", err

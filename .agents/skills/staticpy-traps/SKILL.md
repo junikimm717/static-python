@@ -1,6 +1,6 @@
 ---
 name: staticpy-traps
-description: Symptom-to-cause catalogue for a static, cross-compiled, LTO'd CPython — builds that succeed while producing the wrong thing, configure guessing when it cannot run a test program, ctypes symbols that vanish, musl and libffi divergences, and the no-dlopen consequences that shape the whole design. Opens with the anti-overfit rule (do not park a class-wide bug under one triple or one package stanza). Carries the full bug write-ups for the musl fma sign-of-zero bug, the mips64 libffi closure bug, the qemu 11 SAHF bug, and the toolchain portability proof. Read before debugging anything that builds but misbehaves, before adding a source fixup or an [expect], and before trusting a green build. Every entry here cost real time to find.
+description: Symptom-to-cause catalogue for a static, cross-compiled, LTO'd CPython — builds that succeed while producing the wrong thing, configure guessing when it cannot run a test program, ctypes symbols that vanish, musl and libffi divergences, and the no-dlopen consequences that shape the whole design. Opens with the anti-overfit rule (do not park a class-wide bug under one triple or one package stanza). Carries the full bug write-ups for the musl fma sign-of-zero bug, the mips64 libffi closure bug, the qemu 11 SAHF bug, the libatomic fork hang, and the toolchain portability proof. Read before debugging anything that builds but misbehaves, before adding a source fixup or an [expect], and before trusting a green build. Every entry here cost real time to find.
 ---
 
 # staticpy traps
@@ -41,7 +41,7 @@ replaces gcc's lock table; Alpine qemu is pinned to 11.1.1 and Ubuntu
 
 ## The long write-ups, in `references/`
 
-Three findings needed more than a catalogue entry. The entries below link to
+Four findings needed more than a catalogue entry. The entries below link to
 them at the point where they bite:
 
 - **`references/MUSL_REPORT.md`** — musl's `fma` losing negative zero on
@@ -54,6 +54,10 @@ them at the point where they bite:
   upstream.
 - **`references/I386_QEMU_SAHF.md`** — qemu 11.0 SAHF/cc_op making i386 CPython
   compares take the wrong branch.
+- **`references/LIBATOMIC_FORK.md`** — gcc libatomic's mutex table has no
+  atfork; CPython `test_reinit_tls_after_fork` hangs on every triple whose
+  64-bit atomics take that table. The replacement is spinlocks + child-only
+  zero, not an `[expect]` and not `-march=armv7`.
 
 **When you corner a failure worth documenting, write it up here.** A paragraph
 is enough for most of them: add an entry to the matching section below,
@@ -492,15 +496,19 @@ workloads, so the numbers are comparable to nothing — not to native, and not t
 each other.
 
 **A hung forked child is libatomic, not qemu.** `test_threading` fails as
-*env changed* on arm-musleabi, riscv32 and i386 with children "still running
+*env changed* on arm-musleabi and riscv32 with children "still running
 after 300.5 seconds". The test is `ThreadJoinOnShutdown.test_reinit_tls_after_fork`.
 gcc `libatomic` serialises non-lock-free atomics on a 64-entry mutex table
 with no `pthread_atfork`. The recipe links `libat_atfork.o` *before*
-`-latomic` in `LIBS`, replacing the four `libat_lock_*` symbols so the
-child re-inits the table. If the hang returns, the `.o` is after `-latomic`
-(multiple-define or lock.o won) or was compiled with `-flto` (WPA dropped
-the constructor). Do not restore the three `[expect]` entries. Do not
-raise arm-eabi to armv7 — that is an ISA change and does not help rv32.
+`-latomic` in `LIBS`. The constructor is present (`.init_array`, no CFLAGS
+leak of `-flto`). The first replacement still hung on eabi/rv32 because
+`prepare` locked all 64 mutexes and deadlocked with CPython's
+stop-the-world; i386 and armhf passing was lock-free 8-byte (armhf) or a
+faster race (i386), not a qemu-arm pin. The `.c` is now 32-bit spinlocks
+and a child handler that only stores zero. See
+`references/LIBATOMIC_FORK.md`. If the hang returns, the `.o` is after
+`-latomic` or was compiled with `-flto`. Do not restore `[expect]`. Do
+not raise arm-eabi to armv7 — that is an ISA change and does not help rv32.
 
 **A toolchain that works on your box proves nothing about a foreign rootfs.**
 The requirement is that a tarball drops onto *any* Linux rootfs — glibc,

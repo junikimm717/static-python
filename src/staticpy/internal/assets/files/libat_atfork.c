@@ -1,17 +1,24 @@
-/* Drop-in replacement for gcc libatomic config/posix/lock.c that
- * registers pthread_atfork so the mutex table is not inherited mid-hold.
+/* Drop-in replacement for gcc libatomic config/posix/lock.c.
  *
- * libat_lock_1/unlock_1 are hidden in the toolchain's lock.o; defining
- * all four libat_lock_* symbols here keeps that member out of the link.
- * Hashing matches gcc 16.2.0: WATCH_SIZE 64, NLOCKS 64, cacheline pad.
+ * gcc's table is 64 pthread_mutex_t with no pthread_atfork: a child
+ * forked while another thread holds a slot hangs on its first 64-bit
+ * atomic. We keep the same hash (WATCH_SIZE 64, NLOCKS 64) so our
+ * four libat_lock_* symbols replace lock.o, but the slots are
+ * lock-free 32-bit spinlocks (atomic_uint is lock-free on every
+ * libatomic triple) and the child handler just zeros the table.
  *
- * Child handler re-inits rather than unlocks: after fork the child's
- * tid no longer matches the mutex owner word. musl's NORMAL mutex
- * unlock ignores owner, but init is well-defined and portable.
+ * prepare/parent are empty on purpose. Locking all 64 mutexes there
+ * deadlocks with CPython's stop-the-world: a thread paused mid-atomic
+ * still owns its slot. Re-init does not need the owner, and a store
+ * of zero is async-signal-safe (mutex_init is not).
+ *
+ * See staticpy-traps: "A hung forked child is libatomic, not qemu."
  */
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <sched.h>
 
 #ifndef PAGE_SIZE
 #define PAGE_SIZE 4096
@@ -23,61 +30,53 @@
 #define WATCH_SIZE CACHLINE_SIZE
 #endif
 
-struct lock {
-	pthread_mutex_t mutex;
-	char pad[sizeof(pthread_mutex_t) < CACHLINE_SIZE
-			 ? CACHLINE_SIZE - sizeof(pthread_mutex_t)
-			 : 0];
-};
-
 #define NLOCKS (PAGE_SIZE / WATCH_SIZE)
 
-static struct lock locks[NLOCKS] = {
-	[0 ... NLOCKS - 1].mutex = PTHREAD_MUTEX_INITIALIZER
-};
+static atomic_uint locks[NLOCKS];
 
 static inline uintptr_t addr_hash(void *ptr)
 {
 	return ((uintptr_t)ptr / WATCH_SIZE) % NLOCKS;
 }
 
-static void atfork_prepare(void)
+static void lock_one(size_t i)
 {
-	for (size_t i = 0; i < NLOCKS; i++)
-		pthread_mutex_lock(&locks[i].mutex);
+	unsigned expected;
+	for (;;) {
+		expected = 0;
+		if (atomic_compare_exchange_strong_explicit(&locks[i], &expected, 1u,
+							    memory_order_acquire,
+							    memory_order_relaxed))
+			return;
+		sched_yield();
+	}
 }
 
-static void atfork_parent(void)
+static void unlock_one(size_t i)
 {
-	for (size_t i = 0; i < NLOCKS; i++)
-		pthread_mutex_unlock(&locks[i].mutex);
+	atomic_store_explicit(&locks[i], 0u, memory_order_release);
 }
 
 static void atfork_child(void)
 {
 	for (size_t i = 0; i < NLOCKS; i++)
-		pthread_mutex_init(&locks[i].mutex, NULL);
-}
-
-static void install_atfork(void)
-{
-	pthread_atfork(atfork_prepare, atfork_parent, atfork_child);
+		atomic_store_explicit(&locks[i], 0u, memory_order_relaxed);
 }
 
 __attribute__((constructor))
 static void init(void)
 {
-	install_atfork();
+	pthread_atfork(NULL, NULL, atfork_child);
 }
 
 void libat_lock_1(void *ptr)
 {
-	pthread_mutex_lock(&locks[addr_hash(ptr)].mutex);
+	lock_one(addr_hash(ptr));
 }
 
 void libat_unlock_1(void *ptr)
 {
-	pthread_mutex_unlock(&locks[addr_hash(ptr)].mutex);
+	unlock_one(addr_hash(ptr));
 }
 
 void libat_lock_n(void *ptr, size_t n)
@@ -90,10 +89,10 @@ void libat_lock_n(void *ptr, size_t n)
 	if (__builtin_expect(h + nlocks > NLOCKS, 0)) {
 		size_t j = h + nlocks - NLOCKS;
 		for (; i < j; ++i)
-			pthread_mutex_lock(&locks[i].mutex);
+			lock_one(i);
 	}
 	for (; i < nlocks; ++i)
-		pthread_mutex_lock(&locks[h++].mutex);
+		lock_one(h++);
 }
 
 void libat_unlock_n(void *ptr, size_t n)
@@ -106,8 +105,8 @@ void libat_unlock_n(void *ptr, size_t n)
 	if (__builtin_expect(h + nlocks > NLOCKS, 0)) {
 		size_t j = h + nlocks - NLOCKS;
 		for (; i < j; ++i)
-			pthread_mutex_unlock(&locks[i].mutex);
+			unlock_one(i);
 	}
 	for (; i < nlocks; ++i)
-		pthread_mutex_unlock(&locks[h++].mutex);
+		unlock_one(h++);
 }
