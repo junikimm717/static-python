@@ -151,7 +151,7 @@ func TestBenchPinsArePresent(t *testing.T) {
 	if c.Bench.Pyperformance == "" || c.Bench.Pyperf == "" {
 		t.Errorf("bench pins empty: pyperformance=%q pyperf=%q", c.Bench.Pyperformance, c.Bench.Pyperf)
 	}
-	if c.Bench.Vendor["pyperformance"].SHA256 == "" || c.Bench.Vendor["pyperf"].SHA256 == "" {
+	if c.Bench.Vendor["pyperformance"].SHA256 == "" || c.Bench.Vendor["pyperf"].SHA256 == "" || c.Bench.Vendor["setuptools"].SHA256 == "" {
 		t.Errorf("bench vendor pins missing: %+v", c.Bench.Vendor)
 	}
 }

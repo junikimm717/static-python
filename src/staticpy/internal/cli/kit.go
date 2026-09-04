@@ -19,8 +19,9 @@ var cmdKit = &command{
 tarball a quiet machine can unzip and measure without a git checkout.
 
 A kit is not one Python. It is the comparison set: relocatable prefixes under
-python/<profile>/, vendored pyperformance/pyperf sdists, kit.json naming the
-lineup, and bin/staticpy-bench. ./run on the quiet box is:
+python/<profile>/, vendored pyperformance/pyperf sdists plus a setuptools
+wheel (PEP 517 isolated build), kit.json naming the lineup, and
+bin/staticpy-bench. ./run on the quiet box is:
 
   ./run                 every arm, kit baseline
   ./run --cpu 3         pin (sched_setaffinity, not isolcpus)

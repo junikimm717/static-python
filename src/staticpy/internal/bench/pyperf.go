@@ -217,7 +217,7 @@ func InstallRequirements(ctx context.Context, x Exec, v *Venv, c Case) error {
 
 	req := filepath.Join(c.Dir, "requirements.txt")
 	if _, err := os.Stat(req); err == nil {
-		if err := v.Pip(ctx, x, "reqs-"+c.Name,
+		if err := v.pipSoft(ctx, x, "reqs-"+c.Name,
 			"install", "--quiet", "--prefer-binary", "-r", req); err != nil {
 			return err
 		}
@@ -225,7 +225,7 @@ func InstallRequirements(ctx context.Context, x Exec, v *Venv, c Case) error {
 	// A vendored dependency is a directory pyperformance pip-installs by path.
 	vendor := filepath.Join(c.Dir, "vendor")
 	if fi, err := os.Stat(vendor); err == nil && fi.IsDir() {
-		if err := v.Pip(ctx, x, "vendor-"+c.Name, "install", "--quiet", "--prefer-binary", vendor); err != nil {
+		if err := v.pipSoft(ctx, x, "vendor-"+c.Name, "install", "--quiet", "--prefer-binary", vendor); err != nil {
 			return err
 		}
 	}

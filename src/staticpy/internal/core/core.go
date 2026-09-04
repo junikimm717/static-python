@@ -93,6 +93,11 @@ type Cmd struct {
 	Args []string
 	// Name labels the log file, e.g. "openssl-configure".
 	Name string
+	// SoftFail logs a non-zero exit as a warning, not an error. The caller
+	// still gets a CmdError; use it when failure is an expected skip
+	// (a C-extension requirement on a static interpreter) rather than
+	// a dead job.
+	SoftFail bool
 }
 
 // Set Dist to an absolute path: EnsureDirs will otherwise rewrite it, which is

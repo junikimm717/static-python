@@ -234,7 +234,11 @@ func (r *Runner) run(ctx context.Context, c Cmd, capture bool) (string, error) {
 			ce.ExitCode = -1
 			ce.Tail = strings.TrimRight(ce.Tail+"\n"+runErr.Error(), "\n")
 		}
-		r.log.Error("command failed", "step", step, "cmd", name, "exit", ce.ExitCode, "log", logPath)
+		if c.SoftFail {
+			r.log.Warn("command failed", "step", step, "cmd", name, "exit", ce.ExitCode, "log", logPath)
+		} else {
+			r.log.Error("command failed", "step", step, "cmd", name, "exit", ce.ExitCode, "log", logPath)
+		}
 		return "", ce
 	}
 	r.log.Debug("command ok", "step", step, "cmd", name, "duration", dur.Round(time.Millisecond))

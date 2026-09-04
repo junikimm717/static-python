@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -119,6 +120,7 @@ func (j *kitJob) KeyInputs() map[string]string {
 		"archive":        j.archiveName(),
 		"topdir":         j.topDir(),
 		"git_revision":   buildinfo.GitRevision,
+		"vendor":         vendorKey(j.cfg.Bench.Vendor),
 	}
 }
 
@@ -287,19 +289,31 @@ func kitFactors(cfg *config.Config, profile string, target config.Target) bench.
 	})
 }
 
+func vendorKey(v map[string]config.VendorPin) string {
+	names := make([]string, 0, len(v))
+	for n := range v {
+		names = append(names, n)
+	}
+	sort.Strings(names)
+	parts := make([]string, 0, len(names))
+	for _, n := range names {
+		p := v[n]
+		parts = append(parts, n+"="+p.File+":"+p.SHA256)
+	}
+	return strings.Join(parts, ",")
+}
+
 func vendorSuite(ctx context.Context, e *core.Env, cfg *config.Config, dir string) error {
-	for _, name := range []string{"pyperformance", "pyperf"} {
-		pin, ok := cfg.Bench.Vendor[name]
-		if !ok {
-			return fmt.Errorf("kit: missing [bench.vendor.%s]", name)
-		}
-		ver := cfg.Bench.Pyperformance
-		if name == "pyperf" {
-			ver = cfg.Bench.Pyperf
-		}
+	names := make([]string, 0, len(cfg.Bench.Vendor))
+	for name := range cfg.Bench.Vendor {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		pin := cfg.Bench.Vendor[name]
 		src := config.Source{
 			Name:    name,
-			Version: ver,
+			Version: pin.Version,
 			File:    pin.File,
 			SHA256:  pin.SHA256,
 			URLs:    pin.URLs,

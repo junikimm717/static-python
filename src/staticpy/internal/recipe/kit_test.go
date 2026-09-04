@@ -38,3 +38,22 @@ func TestPlanKitSmokeFansInPacks(t *testing.T) {
 		}
 	}
 }
+
+func TestKitKeyInputsHashVendor(t *testing.T) {
+	cfg := loadEmbedded(t)
+	bindFakeToolchain(t, testTriple)
+	jobs, err := Plan(cfg, defaultsAssets(t), PlanOptions{
+		Kit:     "smoke",
+		Host:    testTriple,
+		Targets: []string{testTriple},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	in := jobs[0].KeyInputs()
+	st := cfg.Bench.Vendor["setuptools"]
+	want := "setuptools=" + st.File + ":" + st.SHA256
+	if !strings.Contains(in["vendor"], want) {
+		t.Fatalf("vendor key %q does not contain %q", in["vendor"], want)
+	}
+}

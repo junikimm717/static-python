@@ -43,6 +43,8 @@ func PyperformanceSpecs(pyperformance, pyperf string) []string {
 
 // PipInstallArgs is the pip argv that installs the suite, still --no-deps:
 // pyperformance depends on psutil, a C extension that will not load here.
+// --no-deps does not skip PEP 517 build-system.requires; a --find-links
+// directory must also contain a setuptools wheel.
 func PipInstallArgs(pins Pins) []string {
 	return PipInstallArgsFrom(pins, "")
 }

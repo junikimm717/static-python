@@ -292,12 +292,15 @@ type BenchConfig struct {
 	Vendor        map[string]VendorPin `toml:"vendor"`
 }
 
-// VendorPin is a sha256-pinned sdist shipped inside a kit so the quiet box
-// can pip-install the suite without PyPI for those two packages.
+// VendorPin is a sha256-pinned archive shipped inside a kit so the quiet
+// box can pip-install the suite without PyPI. setuptools is a wheel
+// because the sdists declare it as a PEP 517 build-system requirement
+// and --no-deps does not skip that.
 type VendorPin struct {
-	File   string   `toml:"file"`
-	SHA256 string   `toml:"sha256"`
-	URLs   []string `toml:"urls"`
+	Version string   `toml:"version"`
+	File    string   `toml:"file"`
+	SHA256  string   `toml:"sha256"`
+	URLs    []string `toml:"urls"`
 }
 
 // Kit is a named comparison set: several profiles packed together with a

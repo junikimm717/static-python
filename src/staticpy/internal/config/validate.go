@@ -307,13 +307,13 @@ func (c *Config) validateKits() error {
 	if len(c.Kits) == 0 {
 		return nil
 	}
-	for _, name := range []string{"pyperformance", "pyperf"} {
+	for _, name := range []string{"pyperformance", "pyperf", "setuptools"} {
 		p, ok := c.Bench.Vendor[name]
 		if !ok {
 			return fmt.Errorf("kit: [bench.vendor.%s] is required so a kit can ship the suite offline", name)
 		}
-		if p.File == "" || !isSHA256(p.SHA256) || len(p.URLs) == 0 {
-			return fmt.Errorf("kit: [bench.vendor.%s] needs file, sha256 and at least one url", name)
+		if p.Version == "" || p.File == "" || !isSHA256(p.SHA256) || len(p.URLs) == 0 {
+			return fmt.Errorf("kit: [bench.vendor.%s] needs version, file, sha256 and at least one url", name)
 		}
 	}
 	for name, k := range c.Kits {

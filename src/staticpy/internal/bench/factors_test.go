@@ -117,6 +117,32 @@ func (f fakeExec) Output(context.Context, core.Cmd) (string, error) {
 	return f.out, f.err
 }
 
+type recordingExec struct {
+	cmds []core.Cmd
+}
+
+func (r *recordingExec) Run(_ context.Context, c core.Cmd) error {
+	r.cmds = append(r.cmds, c)
+	return nil
+}
+
+func (r *recordingExec) Output(context.Context, core.Cmd) (string, error) { return "", nil }
+
+func TestInstallRequirementsIsSoftFail(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "requirements.txt"), []byte("pyaes==1.6.1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	x := &recordingExec{}
+	v := &Venv{Label: "default", Python: "/nonexistent/python", Dir: dir}
+	if err := InstallRequirements(context.Background(), x, v, Case{Name: "bm_x", Dir: dir}); err != nil {
+		t.Fatal(err)
+	}
+	if len(x.cmds) != 1 || !x.cmds[0].SoftFail {
+		t.Fatalf("requirement pip SoftFail = %+v", x.cmds)
+	}
+}
+
 func TestInventoryPackagesParsesJSON(t *testing.T) {
 	x := fakeExec{out: `{"pyperformance": "1.14.0", "pyperf": "2.10.0"}`}
 	got, err := InventoryPackages(context.Background(), x, "/nonexistent/python")

@@ -246,6 +246,16 @@ whichever actually discriminates on the machine in front of it. Symptom: a
 `bench` run that reports `uniform` on a machine you know is not, or a menu where
 no core is ever marked slow.
 
+**`Could not find a version that satisfies the requirement setuptools>=61` on
+`./run`.** Kit `./run` is `--no-index --find-links vendor --no-deps`.
+`--no-deps` skips pyperformance's runtime deps (psutil), not PEP 517.
+Both sdists declare `requires = ["setuptools>=61"]`; isolated build sees
+only those two tarballs; 3.13 ensurepip no longer seeds setuptools. The
+fail is a one-second `install pyperformance`. Vendor a setuptools wheel
+in the same directory and hash the vendor pins into the kit key. Do not
+"fix" it with `--no-build-isolation` alone — the venv still has no
+setuptools.
+
 ## Host-built profiles: the shared-prefix build
 
 Everything here was found building `pyref` (`--profile reference`), the dynamic
