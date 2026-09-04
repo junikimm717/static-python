@@ -201,6 +201,51 @@ class SiteTests(unittest.TestCase):
         self.assertIn("pyperformance==1.14.0", page)
 
 
+class GitignoreTests(unittest.TestCase):
+    def test_gitignore_unignores_allowed_files(self):
+        text = (ROOT / "benchmarks" / ".gitignore").read_text(encoding="utf-8")
+        for name in mb.ALLOWED_FILES:
+            self.assertRegex(
+                text,
+                rf"(?m)^!\*\*/{re.escape(name)}$",
+                msg=f"benchmarks/.gitignore must un-ignore {name}",
+            )
+
+    def test_dump_junk_is_ignored_session_files_are_not(self):
+        probe = ROOT / "benchmarks" / "_probe_gitignore"
+        self.addCleanup(shutil.rmtree, probe, True)
+        if probe.exists():
+            shutil.rmtree(probe)
+        probe.mkdir()
+        (probe / "manifest.json").write_text("{}\n", encoding="utf-8")
+        (probe / "quiet.jsonl").write_text("x\n", encoding="utf-8")
+        (probe / "venv").mkdir()
+        (probe / "venv" / "junk").write_text("x\n", encoding="utf-8")
+        (probe / "raw").mkdir()
+        (probe / "raw" / "x.json").write_text("{}\n", encoding="utf-8")
+        (probe / "logs").mkdir()
+        (probe / "logs" / "run.log").write_text("x\n", encoding="utf-8")
+
+        def ignored(rel: str) -> bool:
+            r = subprocess.run(
+                ["git", "check-ignore", "--no-index", "-q", rel],
+                cwd=str(ROOT),
+                check=False,
+            )
+            self.assertIn(r.returncode, (0, 1), rel)
+            return r.returncode == 0
+
+        prefix = "benchmarks/_probe_gitignore"
+        self.assertFalse(ignored(f"{prefix}/manifest.json"))
+        self.assertTrue(ignored(f"{prefix}/quiet.jsonl"))
+        self.assertTrue(ignored(f"{prefix}/venv/junk"))
+        self.assertTrue(ignored(f"{prefix}/raw/x.json"))
+        self.assertTrue(ignored(f"{prefix}/logs/run.log"))
+        fixture = f"benchmarks/fixtures/{FIXTURE_ID}"
+        for name in mb.ALLOWED_FILES:
+            self.assertFalse(ignored(f"{fixture}/{name}"), name)
+
+
 class HelpTests(unittest.TestCase):
     def test_help_exits_zero(self):
         r = subprocess.run(

@@ -27,9 +27,3 @@ __pycache__
 # staticpy writes everything here: fetched sources, extracted trees, published
 # artifacts, logs, locks, and the binary the shim builds.
 dist/
-
-# Imported sessions must not pick up the measurement machine's venv, raw
-# pyperf JSON, or command logs. benchmarks/ itself is tracked.
-benchmarks/**/venv/
-benchmarks/**/raw/
-benchmarks/**/logs/

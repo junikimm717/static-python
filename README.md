@@ -122,6 +122,8 @@ suite writes the same files: `manifest.json`, `env.json`, `report.json`,
 it is still that same session, with `suite.name` set to `micro`.
 
 Commit a session with `./manage_benchmarks.py import dist/bench/<stamp>-<arch>`
-(see `benchmarks/README.md`). That copies the reviewable files, not `venv/`
-or `raw/`. GitHub Pages is built from `benchmarks/` by
-`.github/workflows/pages.yml`; CI does not run `./staticpy bench`.
+(see `benchmarks/README.md` for the accepted files and the remote/kit path).
+That copies the reviewable files, not `venv/` or `raw/`. A whole-session copy
+into `benchmarks/` is also fine: that tree's `.gitignore` is an allowlist.
+GitHub Pages is built from `benchmarks/` by `.github/workflows/pages.yml`;
+CI does not run `./staticpy bench`.
