@@ -1,0 +1,46 @@
+FROM ubuntu:24.04
+
+# glibc reference builds: this image's gcc and libc, not gccfactory and
+# not Alpine spython. Native only — no qemu, no binfmt.
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    curl \
+    git \
+    xz-utils \
+    unzip \
+    tar \
+    perl \
+    tcl \
+    jimsh \
+    busybox \
+    pkg-config \
+    python3 \
+    patch \
+    rsync \
+    flex \
+    bison \
+    patchelf \
+    make \
+  && rm -rf /var/lib/apt/lists/*
+
+# Ubuntu 24.04's golang is older than go.mod (1.23).
+ARG GO_VERSION=1.23.8
+RUN curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+    | tar -C /usr/local -xz
+ENV PATH=/usr/local/go/bin:$PATH
+
+# Hermetic PATH is dirname(busybox). Same layout as the Alpine image so
+# sqlite/openssl configure find tclsh, jimsh, perl, make, and GNU patch.
+RUN busybox --install -s /bin \
+ && for p in perl jimsh tclsh make patch; do \
+      [ -e "/bin/$p" ] || ln -sf "/usr/bin/$p" "/bin/$p"; \
+    done
+
+# Bind-mounted repo is owned by the host user; this image runs as root.
+# Without this, `git` and `go build`'s VCS probe die with exit 128.
+RUN git config --global --add safe.directory '*'
+
+WORKDIR /workspace

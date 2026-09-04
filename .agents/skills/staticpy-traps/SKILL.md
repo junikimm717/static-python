@@ -41,7 +41,7 @@ replaces gcc's lock table; Alpine qemu is pinned to 11.1.1 and Ubuntu
 
 ## The long write-ups, in `references/`
 
-Four findings needed more than a catalogue entry. The entries below link to
+Five findings needed more than a catalogue entry. The entries below link to
 them at the point where they bite:
 
 - **`references/MUSL_REPORT.md`** — musl's `fma` losing negative zero on
@@ -58,6 +58,11 @@ them at the point where they bite:
   gcc libatomic (C probe) and mimalloc `mi_lock_t` (CPython test on
   default eabi). Spinlocks + pid-steal, not an `[expect]`, not
   `-march=armv7`, not "skip mimalloc on eabi".
+- **`references/PYREF_RPATH.md`** — two host compilers wrote one pyref
+  prefix; Alpine `-lreadline` then opened a leftover glibc
+  `libncursesw` because `-rpath` named that prefix. Key the publish
+  path on hostcc. Shadow rpath is a separate isolation fix, not what
+  produced `@GLIBC`.
 
 **When you corner a failure worth documenting, write it up here.** A paragraph
 is enough for most of them: add an entry to the matching section below,
@@ -285,12 +290,23 @@ on `reference` is `--disable-database` so there is no terminfo path to rewrite.
 libpython in the original tree.
 
 **`ld` will not use `-L` to resolve a shared library's own `NEEDED` entries.**
-It uses `-rpath-link`, then the library's `RUNPATH`. In a rootfs build that
-RUNPATH is the published path, which does not exist while the build runs, so
-`configure` link tests against any library that needs a sibling fail and the
-module is dropped as "necessary bits not found" — a green build missing half its
-extension modules. Symptom: `checking for X in -lfoo... no` while
-`checking for foo.h... yes`.
+It uses the library's `RUNPATH`, then command-line `-rpath`, then
+`-rpath-link`. CPython's readline check is `-lreadline` only, so
+`libncursesw` is resolved through that walk; direct `-lncursesw`
+(initscr, `_curses`) uses `-L` and succeeds. Symptom: `checking for
+readline in -lreadline... no` while the header is yes and `initscr`
+linked. The crash we saw (`__memset_chk@GLIBC_2.3.4`) was a **glibc
+leftover** at `pyref_reference_x86_64-linux-musl` after the host became
+Alpine — two host compilers sharing `dist/` wrote the same prefix. A
+same-toolchain leftover at that rpath would have been musl and would
+have linked. Key the publish path on the hostcc (`_<12 hex>`) and refuse
+a prefix whose manifest toolchain does not match; that is what stops
+the mix. Host-built `-rpath` still names the shadow/view, not the
+published prefix: a rebuild's previous artifact is the wrong generation
+even when the libc matches (same SONAME, new symbol), and the shadow is
+still longer than `$ORIGIN` so the rewrite fits. Do not skip readline.
+Do not delete the published tree as the fix. Write-up:
+`references/PYREF_RPATH.md`.
 
 **gcc resolves `ld` off the command PATH, not `$LD`.** Leaving a provisioned
 musl toolchain first on a host build makes the host compiler link glibc objects

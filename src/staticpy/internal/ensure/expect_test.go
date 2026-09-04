@@ -37,3 +37,12 @@ func TestLookupExpectOmitsStaticScopeWhenDynamic(t *testing.T) {
 		t.Fatal("dynamic lookup dropped [expect.all] test_re")
 	}
 }
+
+func TestHostPublishTail(t *testing.T) {
+	if got := hostPublishTail("/dist/artifacts/pyref_reference_x86_64-linux-musl_aaaabbbbcccc"); got != "_aaaabbbbcccc" {
+		t.Fatalf("got %q", got)
+	}
+	if got := hostPublishTail("/dist/artifacts/pynative_default_x86_64-linux-musl"); got != "" {
+		t.Fatalf("static dir got tail %q", got)
+	}
+}

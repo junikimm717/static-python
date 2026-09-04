@@ -3,14 +3,84 @@ package recipe
 import (
 	"context"
 	"debug/elf"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/junikimm717/static-python/src/staticpy/internal/config"
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
+
+func TestHostPublishPathsDoNotCollide(t *testing.T) {
+	a := ToolchainID{Source: toolchainHost, Key: "aaaabbbbccccdddd"}
+	b := ToolchainID{Source: toolchainHost, Key: "ffffeeee11112222"}
+	if hostPublishSuffix(a) == hostPublishSuffix(b) {
+		t.Fatal("different host keys share a suffix")
+	}
+	if hostPublishSuffix(ToolchainID{Source: toolchainVerified, Key: a.Key}) != "" {
+		t.Fatal("provisioned toolchain got a host suffix")
+	}
+	e := &core.Env{Dist: t.TempDir()}
+	ja := &pyRef{profile: "reference", target: config.Target{Triple: "x86_64-linux-musl"}, tc: a}
+	jb := &pyRef{profile: "reference", target: config.Target{Triple: "x86_64-linux-musl"}, tc: b}
+	if ja.ArtifactDir(e) == jb.ArtifactDir(e) {
+		t.Fatal("two hostccs share ArtifactDir")
+	}
+	if !strings.HasSuffix(ja.ArtifactDir(e), hostPublishSuffix(a)) {
+		t.Fatalf("ArtifactDir missing host suffix: %s", ja.ArtifactDir(e))
+	}
+}
+
+func TestRejectForeignHostPrefix(t *testing.T) {
+	dir := t.TempDir()
+	if err := rejectForeignHostPrefix(dir, "aaaabbbbccccdddd"); err != nil {
+		t.Fatalf("empty dir: %v", err)
+	}
+	m := &core.Manifest{Inputs: map[string]string{"toolchain": "ffffeeee11112222"}}
+	b, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, core.ManifestName), b, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := rejectForeignHostPrefix(dir, "aaaabbbbccccdddd"); err == nil {
+		t.Fatal("accepted a prefix from another hostcc")
+	}
+	if err := rejectForeignHostPrefix(dir, "ffffeeee11112222"); err != nil {
+		t.Fatalf("same hostcc: %v", err)
+	}
+}
+
+func TestHostBuiltRpathUsesViewNotPublished(t *testing.T) {
+	te := &toolenv{
+		res:       config.Resolved{Toolchain: config.ToolchainHost},
+		prefix:    "/published/rootfs",
+		view:      []string{"/shadow/rootfs"},
+		pcSysroot: "/shadow",
+	}
+	got := strings.Join(te.ldflags(), "\n")
+	if !strings.Contains(got, "-Wl,-rpath,/shadow/rootfs/lib") {
+		t.Fatalf("missing view rpath:\n%s", got)
+	}
+	if strings.Contains(got, "-Wl,-rpath,/published/") {
+		t.Fatalf("rpath still names the published prefix:\n%s", got)
+	}
+}
+
+func TestHostBuiltRpathFallsBackToPrefixWithoutView(t *testing.T) {
+	te := &toolenv{
+		res:    config.Resolved{Toolchain: config.ToolchainHost},
+		prefix: "/published/rootfs",
+	}
+	got := strings.Join(te.ldflags(), "\n")
+	if !strings.Contains(got, "-Wl,-rpath,/published/rootfs/lib") {
+		t.Fatalf("missing prefix fallback rpath:\n%s", got)
+	}
+}
 
 func TestOriginRunpath(t *testing.T) {
 	for _, tt := range []struct {

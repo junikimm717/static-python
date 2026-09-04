@@ -9,12 +9,13 @@ import (
 	"strings"
 )
 
-// After a host-built install, every ELF still names the published prefix in
-// DT_RPATH/DT_RUNPATH — that path is what make and libtool were configured
-// with. It is always longer than an $ORIGIN-relative spelling, so shrinking
-// in place does not move the dynamic section. The in-tree build binary is
-// left alone; only the installed tree is rewritten, so `make` still sees the
-// absolute rpath plus LD_LIBRARY_PATH.
+// After a host-built install, every ELF still names the staged view in
+// DT_RPATH/DT_RUNPATH — that is what we bake so a rebuild does not
+// search the previous prefix (staticpy-traps PYREF_RPATH). It is always
+// longer than an $ORIGIN-relative spelling, so shrinking in place does not
+// move the dynamic section. The in-tree build binary is left alone; only
+// the installed tree is rewritten, so `make` still sees the absolute rpath
+// plus LD_LIBRARY_PATH.
 func rewriteRootfsRpaths(root string) error {
 	return filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {

@@ -239,7 +239,11 @@ func (r *Runner) run(ctx context.Context, c Cmd, capture bool) (string, error) {
 		} else {
 			r.log.Error("command failed", "step", step, "cmd", name, "exit", ce.ExitCode, "log", logPath)
 		}
-		return "", ce
+		outStr := ""
+		if buf != nil {
+			outStr = buf.String()
+		}
+		return outStr, ce
 	}
 	r.log.Debug("command ok", "step", step, "cmd", name, "duration", dur.Round(time.Millisecond))
 	if capture {

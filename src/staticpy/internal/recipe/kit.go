@@ -125,7 +125,15 @@ func (j *kitJob) KeyInputs() map[string]string {
 }
 
 func (j *kitJob) ArtifactDir(e *core.Env) string {
-	return e.Path(core.DirOut, "kit", j.name, j.target.Triple)
+	dir := e.Path(core.DirOut, "kit", j.name, j.target.Triple)
+	for _, a := range j.arms {
+		if p, ok := a.pack.(*pack); ok {
+			if ref, ok := p.interp.(*pyRef); ok {
+				return dir + hostPublishSuffix(ref.tc)
+			}
+		}
+	}
+	return dir
 }
 
 func (j *kitJob) topDir() string {

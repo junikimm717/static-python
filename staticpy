@@ -49,7 +49,10 @@ build_binary() {
         ldflags="-X github.com/junikimm717/static-python/src/staticpy/internal/buildinfo.GitRevision=$rev"
     fi
     # CGO off so the result is static and runs wherever the tarballs do.
-    ( cd "$ROOT/src/staticpy" && CGO_ENABLED=0 go build -ldflags "$ldflags" -o "$BIN" . )
+    # -buildvcs=false: we stamp GitRevision ourselves. go's git probe dies
+    # with exit 128 on a bind-mounted repo whose owner is not the container
+    # user (Ubuntu reference loop, same class on the next Alpine rebuild).
+    ( cd "$ROOT/src/staticpy" && CGO_ENABLED=0 go build -buildvcs=false -ldflags "$ldflags" -o "$BIN" . )
     printf '%s\n' "$rev" > "$BIN.rev"
 }
 

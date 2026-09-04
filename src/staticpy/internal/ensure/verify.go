@@ -120,7 +120,7 @@ func testSetHash(level Level) string {
 }
 
 func (j *Job) ArtifactDir(e *core.Env) string {
-	return e.Path(core.DirArtifact, pathSlug(j.Slug()))
+	return e.Path(core.DirArtifact, pathSlug(j.Slug())+hostPublishTail(j.interp.ArtifactDir(e)))
 }
 
 func SkipRequested() bool { return os.Getenv(SkipEnv) == "1" }
@@ -261,6 +261,27 @@ func pathSlug(slug string) string {
 		}
 	}
 	return string(out)
+}
+
+// Matches recipe.hostPublishSuffix: a host-built interpreter dir ends in
+// _<12 hex>. Verify must not share a report directory across host compilers.
+func hostPublishTail(interpDir string) string {
+	base := filepath.Base(interpDir)
+	i := strings.LastIndex(base, "_")
+	if i < 0 || i+1 == len(base) {
+		return ""
+	}
+	tail := base[i+1:]
+	if len(tail) != 12 {
+		return ""
+	}
+	for _, c := range tail {
+		hex := c >= '0' && c <= '9' || c >= 'a' && c <= 'f'
+		if !hex {
+			return ""
+		}
+	}
+	return "_" + tail
 }
 
 var _ core.Job = (*Job)(nil)

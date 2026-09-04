@@ -78,7 +78,11 @@ func (j *pack) KeyInputs() map[string]string {
 }
 
 func (j *pack) ArtifactDir(e *core.Env) string {
-	return e.Path(core.DirOut, j.profile, j.target.Triple)
+	dir := e.Path(core.DirOut, j.profile, j.target.Triple)
+	if p, ok := j.interp.(*pyRef); ok {
+		return dir + hostPublishSuffix(p.tc)
+	}
+	return dir
 }
 
 func (j *pack) topDir() string {
