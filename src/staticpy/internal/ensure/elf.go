@@ -149,14 +149,16 @@ func InspectELF(path string) (*ELFInfo, error) {
 	return info, nil
 }
 
-// CheckELF asserts that path is the fully static executable the target asked
-// for. Symbols are checked only when the binary carries a .symtab; a stripped
-// binary reports those checks as skipped.
+// CheckELF asserts that path is the ELF the profile asked for. wantDynamic is
+// the host-built reference: shared libpython, a PT_INTERP, no staticapi table
+// in the executable. A static profile still requires no PT_INTERP / PT_DYNAMIC.
+// Symbols are checked only when the binary carries a .symtab; a stripped
+// binary (or a dynamic one) reports those checks as skipped.
 //
-// There is deliberately no .dynsym check here: a correct staticpy interpreter
+// There is deliberately no .dynsym check here: a correct static interpreter
 // is static and stripped, so an empty dynamic symbol table is the expected
 // state, not evidence of anything.
-func CheckELF(rep *Report, path string, t config.Target, wantSymbols []string) *ELFInfo {
+func CheckELF(rep *Report, path string, t config.Target, wantSymbols []string, wantDynamic bool) *ELFInfo {
 	info, err := InspectELF(path)
 	if err != nil {
 		rep.Fail("elf:readable", err, "%s must be a readable ELF executable", path)
@@ -164,9 +166,14 @@ func CheckELF(rep *Report, path string, t config.Target, wantSymbols []string) *
 	}
 	rep.Pass("elf:readable", "%s", info)
 
-	if info.Static() {
+	switch {
+	case wantDynamic && info.Static():
+		rep.Failf("elf:dynamic", "%s is fully static; the reference profile must be a shared interpreter", path)
+	case wantDynamic:
+		rep.Pass("elf:dynamic", "PT_INTERP %s DT_NEEDED %s", info.Interp, strings.Join(info.Needed, ", "))
+	case info.Static():
 		rep.Pass("elf:static", "no PT_INTERP, no PT_DYNAMIC")
-	} else {
+	default:
 		var why []string
 		if info.HasInterp {
 			why = append(why, "PT_INTERP is "+info.Interp)
@@ -205,6 +212,8 @@ func CheckELF(rep *Report, path string, t config.Target, wantSymbols []string) *
 	for _, sym := range wantSymbols {
 		name := "elf:symbol:" + sym
 		switch {
+		case wantDynamic:
+			rep.Skip(name, "dynamic interpreter: ctypes.pythonapi uses libpython, not a static table")
 		case info.Stripped:
 			rep.Skip(name, "%s has no .symtab (stripped); symbol presence cannot be checked", path)
 		case info.HasSymbol(sym):

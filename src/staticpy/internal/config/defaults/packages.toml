@@ -57,6 +57,10 @@ configure = [
   "--without-progs",
   # readline links against termcap names.
   "--enable-termcap",
+  # TIC_PATH=true, so no terminfo database is installed. Baking the path
+  # from --prefix would point at nothing (and, after per-dep LTO, become
+  # a contiguous string the sysroot composer refuses). Same as reference.
+  "--disable-database",
 ]
 provides = ["lib/libncursesw.a"]
 
@@ -228,9 +232,10 @@ configure = [
 
 [package.libffi.profile.reference]
 configure = ["--disable-static", "--enable-shared"]
-# libffi installs into lib64 whatever --libdir says: that is its own
-# toolexeclibdir convention, and its .pc file agrees.
-provides = ["lib64/libffi.so"]
+# libffi 3.5's toolexeclibdir is lib/, not lib64, on both glibc and musl
+# x86_64. The .pc file agrees. A stale lib64 pin fails assertProvides after
+# a green configure.
+provides = ["lib/libffi.so"]
 
 [package.xz.profile.reference]
 configure = ["--disable-static", "--enable-shared"]

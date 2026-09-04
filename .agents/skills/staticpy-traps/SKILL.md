@@ -1,6 +1,6 @@
 ---
 name: staticpy-traps
-description: Symptom-to-cause catalogue for a static, cross-compiled, LTO'd CPython — builds that succeed while producing the wrong thing, configure guessing when it cannot run a test program, ctypes symbols that vanish, musl and libffi divergences, and the no-dlopen consequences that shape the whole design. Carries the full bug write-ups for the musl fma sign-of-zero bug, the mips64 libffi closure bug, and the toolchain portability proof. Read before debugging anything that builds but misbehaves, before adding a source fixup, and before trusting a green build. Every entry here cost real time to find.
+description: Symptom-to-cause catalogue for a static, cross-compiled, LTO'd CPython — builds that succeed while producing the wrong thing, configure guessing when it cannot run a test program, ctypes symbols that vanish, musl and libffi divergences, and the no-dlopen consequences that shape the whole design. Opens with the anti-overfit rule (do not park a class-wide bug under one triple or one package stanza). Carries the full bug write-ups for the musl fma sign-of-zero bug, the mips64 libffi closure bug, the qemu 11 SAHF bug, and the toolchain portability proof. Read before debugging anything that builds but misbehaves, before adding a source fixup or an [expect], and before trusting a green build. Every entry here cost real time to find.
 ---
 
 # staticpy traps
@@ -8,6 +8,36 @@ description: Symptom-to-cause catalogue for a static, cross-compiled, LTO'd CPyt
 Ordered by how long each took to corner, not by area. The common thread: on a
 cross build almost nothing fails loudly, so the default failure mode is a
 successful build of the wrong artifact.
+
+## Do not overfit the last failure
+
+Agent time is cheap. A verify+pack sweep is not. An `[expect.<this-triple>]`
+or `[package.X.profile.this]` that makes *this* run green is how the next
+target, the next package, or the next qemu version pays the compile again.
+
+Catch the **class** of the bug before you write the parking ticket:
+
+1. Reproduce on a second arm (native x86_64 static, another qemu, host qemu
+   vs the container's qemu). If it fails there too, the scope is the class,
+   not the triple that happened to be last in the log.
+2. Name the layer: recipe invariant, emulator *version*, ABI, or one
+   library's configure. Hunt until you can state the complete fix in one
+   sentence. An ignore is allowed only when that sentence is "unfixable,
+   and here is the experiment that proves it."
+3. Do not scope an ignore to one triple to avoid re-keying already-packed
+   verifies. That is a lie to the next `status --target all`.
+4. `[expect.qemu]` / `:qemu` is for emulator gaps you have seen pass
+   *natively*. It is not a bin for "qemu 11.0.1 on this laptop." If the
+   fix is a newer qemu, pin the qemu and delete the ignores.
+5. A second `[package.X.profile.seplto]` stanza for a prefix baked into an
+   `.a` means the recipe has no policy. The next library fails the same
+   sysroot check. Fix the class.
+
+Those overnight parking tickets now have complete fixes. Do not put them
+back: Linux getpath reads `/proc/self/exe`; per-dep LTO deps configure
+with `/usr` and the recipe rewrites `.pc`/`.la`; `libat_atfork.c`
+replaces gcc's lock table; Alpine qemu is pinned to 11.1.1 and Ubuntu
+`*-binfmt-P` names are shimmed to Alpine's qemu.
 
 ## The long write-ups, in `references/`
 
@@ -22,6 +52,8 @@ them at the point where they bite:
   half of the return slot for narrow integers on big-endian mips n32/n64.
   Root-caused to `src/mips/n32.S`, fixed by a target-scoped patch, unreported
   upstream.
+- **`references/I386_QEMU_SAHF.md`** — qemu 11.0 SAHF/cc_op making i386 CPython
+  compares take the wrong branch.
 
 **When you corner a failure worth documenting, write it up here.** A paragraph
 is enough for most of them: add an entry to the matching section below,
@@ -44,6 +76,132 @@ months this way, with `/bin/sh: exec-prefix=...: not found` sitting in a 2.4 MB
 log nobody read. Symptom: a library builds, links, and is subtly wrong.
 Countermeasure: staticpy's Runner checks every exit code and writes one log per
 command; never reintroduce a path where output is only inspectable in aggregate.
+
+**`expr: not found`, then `fcntl: No file descriptors available`.** Hermetic
+PATH is the toolchain plus `dirname(busybox)`. Alpine's busybox binary lives
+in `/bin` but most applets (`expr`, `awk`, `tr`, `basename`) are only linked
+under `/usr/bin`, so a hermetic `./configure` cannot see them. libffi's
+configure retries `expr` until the container's default 1024 nofile is gone,
+and the job dies on an FD error that hides the real cause. `busybox
+--install -s /bin` (in the Dockerfile) puts the applets on the hermetic PATH;
+raise `nofile` in compose as well. Do not "fix" this with `--no-hermetic`.
+
+**`env: can't execute 'perl'` on openssl Configure.** OpenSSL's `Configure` is
+`#!/usr/bin/env perl`. Doctor already treats perl as the one irreducible host
+tool, but hermetic PATH never includes `/usr/bin`, so `env` cannot find it.
+Symlink it next to busybox (`ln -sf /usr/bin/perl /bin/perl`). Invoking
+`perl ./Configure` from the recipe would also work — Go's LookPath uses the
+parent PATH — but the shebang path is what we actually run today.
+
+**riscv64 core verify: ten files fail with `FileNotFoundError: …/bin/python3`.**
+Smoke probes pass (staticpy prefixes `qemu-riscv64`). Anything that
+`exec`s `sys.executable` dies with ENOENT. Host `qemu-user-binfmt`
+registers `/usr/libexec/qemu-binfmt/<arch>-binfmt-P`, which Alpine does
+not ship. The Dockerfile now symlinks those names to `/usr/bin/qemu-<arch>`.
+If the shims are missing (image not rebuilt, or a new arch), re-exec is
+ENOENT again. Not an `[expect]` candidate.
+
+**`test_subprocess.test_executable_without_cwd` fails with missing encodings.**
+`Popen(["somethingyoudonthave"], executable=sys.executable)` leaves argv[0]
+as a fake name. Linux `getpath.c` used to leave `real_executable` as None
+and fall back to the compile-time PREFIX. The python patch fills that
+slot from `readlink("/proc/self/exe")`, the same slot Windows/macOS
+already fill. If this returns after a CPython bump, the patch failed to
+apply; do not add `[expect.static]`.
+
+**i386 core verify: `test_divmod` / `test_math` / `test_struct` fail under qemu.**
+qemu 11.0 TCG leaves `cc_op` stale after `SAHF` (`da7649c6`, GitLab #3537).
+Fixed in 11.0.4 / 11.1. The spython image pins qemu-user **11.1.1** from
+Alpine edge. If those methods fail again, the image is still on 11.0.x —
+upgrade qemu, do not restore the `:qemu` ignores. `*MathTests.testSinh*`
+is the real x87 1-ulp ABI issue and stays on `[expect.i386-linux-musl]`.
+Write-up: `references/I386_QEMU_SAHF.md`.
+
+**`suite:test_os` unexpected fail under qemu: `test_fork_warns_when_non_python_thread_exists`.**
+CPython reads `/proc/self/stat` field 20 (`num_threads`). qemu < 9.1
+(host Ubuntu 8.2.2) leaves that field as `0`. qemu 9.1+ implements it.
+The IndexError was host 8.2.2 reached through binfmt because the
+`*-binfmt-P` path was missing in Alpine. With the Dockerfile shims,
+re-exec stays on Alpine qemu and the warning fires. Do not restore
+`[expect.qemu]` for this.
+
+**sqlite configure: `s390x-binfmt-P: Could not open '/lib/ld-musl-s390x.so.1'`.**
+sqlite's configure builds a bootstrap `jimsh0` with the *target* CC and then
+runs it. Host binfmt (needed for CPython's suite re-exec) intercepts the
+cross ELF; qemu-user then looks for a musl loader that is not at `/lib`.
+The recipe already sets `B.cc=@BUILD_CC@` for the later make helpers;
+configure never sees that. A host `jimsh` on PATH (`apk add jimtcl` in
+Alpine, `apt-get install jimsh` on the Ubuntu sidecar) skips the
+bootstrap. Without it the message is often `./jimsh0: not found` then
+`No working C compiler found` — the compiler is fine; the bootstrap
+binary is a musl ELF the host cannot exec. Do not "fix" this by making
+qemu able to run configure tests — that is how a cross build silently
+takes the wrong AC_RUN_IFELSE branch.
+
+**`suite:test_bytes` unexpected pass on a reference arm.** `expect.static`
+skips `test_bytes` because `_testlimitedcapi` cannot be a builtin or a
+dlopen. LookupExpect used to merge that scope for every interpreter.
+A host-built reference *can* dlopen, so the file passes and an unexpected
+pass fails the run. Merge `expect.static` only when the profile is not
+host-built.
+
+**`elf:static` / missing Py_GetVersion on a published reference.** Verify
+assumed every interpreter was fully static. A host-built reference has
+PT_INTERP and keeps the C API in libpython.so; those checks must be
+skipped (or inverted) when the profile is host-built.
+
+**`verify: bin/python3 is not a file` on a reference arm.** pyref publishes
+`rootfs/bin/python3`; pynative publishes `bin/python3`. Pack and bench already
+unwrap `rootfs/`. Verify did not, so a published reference interpreter failed
+core as if it were missing. Unwrap `rootfs/` the same way.
+
+**`lto1: Cannot open Modules/_cursesmodule.o` on a cross LTO link.** `make -j2`
+LTO-links `python` and `Programs/_testembed` at once against the same slim
+objects. gcc 16's lto1 then fails to open one of them. Remaining CPython
+jobs should use `-j 1` for that link; deps can stay parallel.
+
+**seplto python link: `multiple definition of BZ2_*` / `lzma_*`.**
+`materializeArchives` LTO-rels each `.a` into one relocatable, then used
+`ar rcs` to *add* that member. The original IR objects stayed, so the
+python link saw `lib_libbz2.a.o` and `bzlib.o`. Slim LTO hid this because
+WPA merged the duplicates. Replace the archive; do not append.
+
+**`lib64/libcrypto.a records a dependency prefix` on seplto (or any new
+library with a baked LOCALEDIR / ICU_DATA).**
+`lto_mode = per-dep` materializes `--prefix` strings in the `.a`. The
+recipe configures every non-host per-dep dep with `/usr`, hoists
+`DESTDIR+/usr`, and rewrites `.pc`/`.la`/`*-config` back to the artifact
+path. OpenSSL's cert dir is `--openssldir=/etc/ssl` on every static
+build, not a seplto stanza. Do not add `[package.X.profile.seplto]` and
+do not byte-replace OPENSSLDIR (different length corrupts `.rodata`).
+`--disable-database` on base ncurses is the terminfo-specific extra, not
+the generic lever.
+
+**`lib/libncursesw.a records a dependency prefix inside a binary file` on seplto.**
+Same class as openssl: per-dep LTO makes the terminfo path contiguous.
+Base ncurses is `--disable-database` (TIC_PATH=true, nothing to bake).
+The prefix policy above is what stops the next package.
+
+**`libformw.so needs libncursesw.so.6 but has no RUNPATH`.** The $ORIGIN
+rewrite only shrinks an existing DT_RPATH/DT_RUNPATH; it cannot add one.
+ncurses' sibling libs (form, menu, panel) NEEDED libncursesw and were
+linked with `-rpath-link` only. Host-built LDFLAGS now also bake
+`-Wl,-rpath,<prefix>/lib` so the rewrite has something longer than
+`$ORIGIN` to overwrite.
+
+**`libffi built without producing lib64/libffi.so` on Alpine.** The
+reference profile is host-gcc + glibc. Inside the Alpine spython image,
+`cc` is musl and libffi's toolexeclibdir is `lib/`, not `lib64`. That
+failure is the tell you are measuring Alpine, not the machine. Build
+`reference*` on the glibc host (or an Ubuntu sidecar sharing `dist/`).
+
+**pyref libffi: `Something went wrong bootstrapping makefile fragments`.**
+Host-built profiles compose PATH as `/bin` only (no toolchain, so gcc cannot
+pick up a musl `ld`). GNU make lives at `/usr/bin/make`. Without a `/bin/make`
+symlink, configure finds no GNU make (`checking whether make sets $(MAKE)...
+no`) and config.status dies on dependency-tracking fragments. Same for
+`patch`. Symlink the real tools next to busybox; do not put `/usr/bin` on
+the hermetic PATH.
 
 **A `sed` fixup silently does nothing.** `sed -i '/anchor/...'` on a source tree
 is a no-op when the anchor moves, and exits 0. Upstream reformats one line on a
@@ -324,27 +482,15 @@ workloads, so the numbers are comparable to nothing — not to native, and not t
 each other.
 
 **A hung forked child is libatomic, not qemu.** `test_threading` fails as
-*env changed* on arm-musleabi and riscv32 with four children "still running
-after 300.5 seconds". The test is `ThreadJoinOnShutdown.test_reinit_tls_after_fork`,
-which forks 16 children from 16 threads. Where a target has no native 64-bit
-atomic instruction gcc routes `__atomic_*` through libatomic, which serialises
-on a static lock table that nothing reinitialises across `fork`; a child forked
-while another thread held one of those locks hangs on its first atomic.
-
-Three things make this worth reading before you reach for an expectation entry.
-It is **not the emulator** — a 30-line C program with four threads doing
-`__atomic_fetch_add` on a `uint64` and sixteen forking threads hangs the same
-way, so it would hang on real hardware. It is **not the allocator**, though it
-looks like one: the naive fork-from-thread repro passes, and only allocator
-*contention* opens the window. And it **tracks `libatomic = true` in
-targets.toml exactly** — arm-musleabi, riscv32 and i386 hang, arm-musleabihf
-and aarch64 do not. i386 hangs in C but passes the suite, because CPython never
-reaches the locked path there; it is a latent hazard rather than a failure.
-
-The load average in regrtest's own progress line is what rules load in or out
-before you go looking (`load avg: 0.54` here). An identical-looking i386
-`test_threading` failure hours earlier *was* load — a machine in OOM thrash —
-and recording that one would have permanently masked a passing test.
+*env changed* on arm-musleabi, riscv32 and i386 with children "still running
+after 300.5 seconds". The test is `ThreadJoinOnShutdown.test_reinit_tls_after_fork`.
+gcc `libatomic` serialises non-lock-free atomics on a 64-entry mutex table
+with no `pthread_atfork`. The recipe links `libat_atfork.o` *before*
+`-latomic` in `LIBS`, replacing the four `libat_lock_*` symbols so the
+child re-inits the table. If the hang returns, the `.o` is after `-latomic`
+(multiple-define or lock.o won) or was compiled with `-flto` (WPA dropped
+the constructor). Do not restore the three `[expect]` entries. Do not
+raise arm-eabi to armv7 — that is an ISA change and does not help rv32.
 
 **A toolchain that works on your box proves nothing about a foreign rootfs.**
 The requirement is that a tarball drops onto *any* Linux rootfs — glibc,

@@ -1,0 +1,32 @@
+--- a/Modules/getpath.c
++++ b/Modules/getpath.c
+@@ -21,6 +21,10 @@
+ #  include <mach-o/dyld.h>
+ #endif
+ 
++#ifdef __linux__
++#  include <unistd.h>             // readlink()
++#endif
++
+ /* Reference the precompiled getpath.py */
+ #include "Python/frozen_modules/getpath.h"
+ 
+@@ -794,6 +798,18 @@
+         PyMem_RawFree(path);
+         break;
+     }
++#elif defined(__linux__)
++    /* argv[0] is caller-controlled (Popen(executable=...), exec -a, login
++       shells). /proc/self/exe is the binary that is actually running.
++       getpath.py already uses real_executable as the fallback when
++       executable cannot be resolved from argv[0]; Windows and macOS
++       already fill this slot. */
++    char path[MAXPATHLEN + 1];
++    ssize_t n = readlink("/proc/self/exe", path, MAXPATHLEN);
++    if (n > 0 && (size_t)n < MAXPATHLEN && path[0] == SEP) {
++        path[n] = '\0';
++        return decode_to_dict(dict, key, path);
++    }
+ #endif
+     return PyDict_SetItemString(dict, key, Py_None) == 0;
+ }

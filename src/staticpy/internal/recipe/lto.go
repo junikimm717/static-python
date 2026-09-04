@@ -40,9 +40,15 @@ func (j *depJob) materializeArchives(ctx context.Context, r *core.Runner, te *to
 			ltoRelocArgs(te.tools.CC, rel, ar, flags), nil)); err != nil {
 			return err
 		}
+		// ar rcs *adds* a member. The original IR objects stay, so the
+		// python link sees every symbol twice (lib_libbz2.a.o and bzlib.o).
+		replaced := ar + ".rel"
 		if err := r.Run(ctx, te.cmd(j.name+"-lto-ar", filepath.Dir(ar),
-			[]string{te.tools.AR, "rcs", ar, rel}, nil)); err != nil {
+			[]string{te.tools.AR, "rcs", replaced, rel}, nil)); err != nil {
 			return err
+		}
+		if err := os.Rename(replaced, ar); err != nil {
+			return fmt.Errorf("recipe: replacing %s with the LTO relocatable: %w", ar, err)
 		}
 	}
 	return nil

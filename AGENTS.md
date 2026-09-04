@@ -219,6 +219,17 @@ Don't write overly verbose comments.
   writing a paragraph, the explanation probably belongs in the
   `staticpy-traps` skill (see below) and the comment can just point there.
 
+## Do not overfit a sweep
+
+Agent investigation is cheap; a verify+pack across eleven targets is not.
+Do not park a failure under `[expect.<this-triple>]` or a one-package
+`[package.X.profile.<this>]` so the current run goes green. Reproduce on
+a second arm, name the layer (recipe, emulator version, ABI), and hunt
+until you can state the complete fix. An ignore is allowed only when that
+fix is "unfixable" plus the experiment that proves it. The rule, with
+the overnight counterexamples, is **Do not overfit the last failure** in
+`.agents/skills/staticpy-traps/SKILL.md`.
+
 ## Findings go in the `staticpy-traps` skill
 
 Anything you discover that is more than a one-line comment's worth of

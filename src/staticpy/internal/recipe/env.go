@@ -424,6 +424,15 @@ func (te *toolenv) ldflags() []string {
 		out = append(out, "-Wl,-rpath-link,"+filepath.Join(v, "lib"),
 			"-Wl,-rpath-link,"+filepath.Join(v, "lib64"))
 	}
+	// Host-built .so files must carry a DT_RUNPATH or rewriteRootfsRpaths
+	// cannot shrink them to $ORIGIN. ncurses' libformw.so needs libncursesw
+	// and ships with neither rpath; the published prefix is always longer
+	// than $ORIGIN, so this is safe to overwrite in place.
+	if te.res.HostBuilt() && te.prefix != "" {
+		out = append(out,
+			"-Wl,-rpath,"+filepath.Join(te.prefix, "lib"),
+			"-Wl,-rpath,"+filepath.Join(te.prefix, "lib64"))
+	}
 	if te.dir == "" {
 		// Joining an empty dir would produce a relative -L that silently
 		// resolves against the build cwd.

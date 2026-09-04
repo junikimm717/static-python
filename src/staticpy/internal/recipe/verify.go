@@ -24,8 +24,13 @@ func Verify(cfg *config.Config, _ fs.FS, target config.Target, profile, level st
 	if ensure.IsNativeTarget(target) {
 		runner = ensure.RunnerNative
 	}
-	expect := ensure.LookupExpect(cfg.Expect, target.Triple, runner)
+	res, err := resolveScope(cfg, profile, config.ScopePython)
+	if err != nil {
+		return nil, err
+	}
+	expect := ensure.LookupExpect(cfg.Expect, target.Triple, runner, !res.HostBuilt())
 	return ensure.NewJob(dep, target, profile, lvl, expect, ensure.Options{
 		WantVersion: src.Version,
+		WantDynamic: res.HostBuilt(),
 	}), nil
 }
