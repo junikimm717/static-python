@@ -21,14 +21,17 @@ type obs struct {
 	Wall float64
 }
 
-// DurationPrior is typical wall seconds per pyperformance benchmark,
-// relative lengths of the suite rather than a recording of last night's
-// kit. A quiet-box kit run has no previous session and a different
-// lineup; what transfers is that bm_bpe_tokeniser is ~30x bm_argparse.
+// DurationPrior is typical wall seconds for the pyperformance benchmarks
+// we actually measure. It is not the full upstream suite — several
+// benches never install, and some die at import — and a quiet-box kit
+// has no previous session anyway. What transfers is the shape of the
+// names we do run: bm_bpe_tokeniser is ~30x bm_argparse.
 //
-// The numbers are mean ok-cell walls (wall_s >= 1) from the committed
-// benchmarks/ timelines. Rebuild the file when the pyperformance pin
-// moves. This run's elapsed / completed-weight is the only scale.
+// A name that is not in the table is a new or newly-runnable bench, not
+// a missing scale factor. It must not enter elapsed/weight, or one
+// surprise ten-minute script would blow up every remaining estimate.
+// Rebuild eta_weights.json from a timeline when the pin moves and the
+// newly-run names have been timed.
 type DurationPrior struct {
 	weight map[string]float64
 	median float64
@@ -60,22 +63,19 @@ func (p DurationPrior) Describe() string {
 	if p.empty() {
 		return "none (count-average)"
 	}
-	return fmt.Sprintf("%d bench weights (embedded)", len(p.weight))
+	return fmt.Sprintf("%d known benches (not all of pyperformance)", len(p.weight))
 }
 
-func (p DurationPrior) of(bench string) float64 {
-	if v := p.weight[bench]; v > 0 {
-		return v
-	}
-	if p.median > 0 {
-		return p.median
-	}
-	return 0
+func (p DurationPrior) known(bench string) (float64, bool) {
+	v, ok := p.weight[bench]
+	return v, ok && v > 0
 }
 
-// Remaining estimates wall time still to run: this run's seconds-per-
-// weight times the weight of every leftover cell. Without weights it
-// is elapsed/done × remaining, which is what used to be printed always.
+// Remaining estimates wall time still to run. Scale is elapsed/weight
+// over cells whose names are in the table only. An unknown leftover
+// cell uses this run's mean for that bench if we have started it,
+// otherwise the median known weight — so a new benchmark is a local
+// guess, not a rewrite of the pace.
 func (p DurationPrior) Remaining(observed []obs, remaining []cellKey, elapsed time.Duration) time.Duration {
 	nRem := len(remaining)
 	if nRem == 0 {
@@ -87,19 +87,45 @@ func (p DurationPrior) Remaining(observed []obs, remaining []cellKey, elapsed ti
 		}
 		return 0
 	}
-	var wDone float64
+
+	var wKnown, elapsedKnown float64
+	byBench := map[string][]float64{}
 	for _, o := range observed {
-		wDone += p.of(o.Bench)
+		byBench[o.Bench] = append(byBench[o.Bench], o.Wall)
+		if w, ok := p.known(o.Bench); ok {
+			wKnown += w
+			elapsedKnown += o.Wall
+		}
 	}
 	scale := 1.0
-	if wDone > 0 && elapsed > 0 {
-		scale = elapsed.Seconds() / wDone
+	if wKnown > 0 && elapsedKnown > 0 {
+		scale = elapsedKnown / wKnown
 	}
+
 	var sum float64
 	for _, r := range remaining {
-		sum += p.of(r.Bench) * scale
+		if w, ok := p.known(r.Bench); ok {
+			sum += w * scale
+			continue
+		}
+		if xs := byBench[r.Bench]; len(xs) > 0 {
+			sum += meanFloat(xs)
+			continue
+		}
+		sum += p.median * scale
 	}
 	return time.Duration(sum * float64(time.Second))
+}
+
+func meanFloat(xs []float64) float64 {
+	if len(xs) == 0 {
+		return 0
+	}
+	var s float64
+	for _, x := range xs {
+		s += x
+	}
+	return s / float64(len(xs))
 }
 
 func medianFloat(xs []float64) float64 {

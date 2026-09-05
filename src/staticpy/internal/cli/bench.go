@@ -102,11 +102,13 @@ SUITES
   fingerprint identity + telemetry), skipped.json, and timeline.jsonl --
   one record per measurement with its wall time, load average and the busy
   fraction of the pinned core's SMT sibling. The progress ETA weights each
-  leftover cell by that benchmark's typical length (embedded from earlier
-  pyperformance runs; the suite is alphabetical and a few benches take ten
-  minutes) and scales by this run's elapsed / completed-weight, so a one-shot
-  kit with a new lineup still gets a usable remaining time. pyperformance
-  also keeps the unaggregated pyperf JSON under raw/.
+  leftover cell by that benchmark's typical length. The table is the benches
+  we actually measure, not all of pyperformance (several never install;
+  some die at import). A name that is not in the table is a new or
+  newly-runnable bench: it is guessed at the median and kept out of the
+  pace, so one surprise ten-minute script does not rewrite every remaining
+  estimate. Scale is this run's elapsed / completed-weight over known
+  names only. pyperformance also keeps the unaggregated pyperf JSON under raw/.
 
 MEASUREMENT
   The run is confined to one logical CPU with sched_setaffinity, inherited by

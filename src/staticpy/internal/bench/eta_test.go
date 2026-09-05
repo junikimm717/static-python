@@ -71,6 +71,34 @@ func TestRemainingUnknownBenchUsesMedianWeight(t *testing.T) {
 	}
 }
 
+func TestRemainingUnknownBenchDoesNotPoisonScale(t *testing.T) {
+	// We do not run every pyperformance bench. A newly-runnable ten-minute
+	// script must not rewrite the pace of the names we already know.
+	p := newPrior(map[string]float64{"a": 10, "b": 20})
+	observed := []obs{
+		{cellKey{"x", "a"}, 10},
+		{cellKey{"x", "bm_new_monster"}, 500},
+	}
+	remaining := []cellKey{{"x", "b"}}
+	got := p.Remaining(observed, remaining, 510*time.Second)
+	if math.Abs(got.Seconds()-20) > 0.01 {
+		t.Fatalf("Remaining = %s, want 20s (scale from a only)", got)
+	}
+}
+
+func TestRemainingUnknownUsesThisRunOnceSeen(t *testing.T) {
+	p := newPrior(map[string]float64{"a": 10})
+	observed := []obs{
+		{cellKey{"x", "a"}, 10},
+		{cellKey{"x", "bm_new"}, 80},
+	}
+	remaining := []cellKey{{"y", "bm_new"}}
+	got := p.Remaining(observed, remaining, 90*time.Second)
+	if math.Abs(got.Seconds()-80) > 0.01 {
+		t.Fatalf("Remaining = %s, want 80s (this-run mean of the new bench)", got)
+	}
+}
+
 func TestDefaultPriorReplaysCommittedTimeline(t *testing.T) {
 	dir, err := filepath.Abs("../../../../benchmarks")
 	if err != nil {
