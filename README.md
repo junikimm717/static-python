@@ -1,8 +1,10 @@
 # Python with Static + Cross + LTO (Rewritten in Go)
 
 Building a (mostly) functional cross-compiled python interpreter with zero
-shared libraries and full link-time optimization (-O3 -flto). We gain up to
-**20% geomean speedup** on pyperf over dynamically linked python on glibc (!!)
+shared libraries and full link-time optimization (-O3 -flto). On a Ryzen 5 3600
+that is a **1.45× geomean** (about 45%) on pyperformance versus a dynamically
+linked build of the same CPython on glibc (!!) — see the
+[benchmark pages](https://junikimm717.github.io/static-python/).
 
 **Warning:** this project is exclusively as a hobby. For basically all intents
 and purposes, you should use your standard dynamically linked python
