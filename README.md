@@ -48,7 +48,7 @@ docker compose up -d
 That container also registers qemu in binfmt, which is why it runs privileged.
 
 Otherwise, `./staticpy doctor` says what your machine is missing. It is a short
-list -- go, perl, patch, busybox, cURL, tar, and a qemu-user for whichever
+list -- go, perl, patch, cURL, tar, and a qemu-user for whichever
 target you want to verify.
 
 ## The build system

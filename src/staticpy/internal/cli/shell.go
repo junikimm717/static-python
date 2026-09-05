@@ -24,9 +24,9 @@ by hand: the log's ` + "`# cmd:`" + ` line is a copy-pasteable argv.
 
 The environment is recovered from the job's latest attempt under
 dist/logs/jobs/<slug>/ - its commands.sh, or the header of a step log - so it
-works long after the process that ran the job is gone. A restricted-PATH job
-recorded a PATH of the toolchain and dirname(busybox); that is reproduced as
-written, which is the point, so expect the host's tools to be absent.
+works long after the process that ran the job is gone. A job recorded a PATH
+with the toolchain first and the process PATH after; that is reproduced as
+written.
 
 The build tree lives in dist/work/<slug>.<pid>.<rand>/ and is deleted when a job
 succeeds. If it is gone, rebuild with ` + "`staticpy build --keep-work`" + ` to keep it.
@@ -106,7 +106,7 @@ type recordedEnv struct {
 
 // A replaced environment is honoured as recorded, plus the few variables an
 // interactive shell is unusable without - inheriting the rest would quietly
-// undo the restricted PATH we came here to reproduce.
+// undo the recorded PATH we came here to reproduce.
 func (r recordedEnv) environ(slug string) []string {
 	var out []string
 	if !r.replaced {

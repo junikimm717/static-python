@@ -52,7 +52,7 @@ dist/                    everything generated; gitignored, safe to delete
 | a shell in a job's exact environment | `staticpy shell <slug>` (add `--step NAME`, or `--print` to just see the env). Recovered from the recorded attempt, so it works long after the process is gone |
 | what invalidates a rebuild | a job's Merkle key: its `KeyInputs` (recipe version, source sha256s, decision flags, triples, resolved profile) plus every dependency's key. Not timestamps. `staticpy status` calls the difference `stale` |
 | what would a build do right now | `staticpy status [--todo]` — pass the same `--verify`/`--pack` you would pass to `build`, or you are not looking at the same plan |
-| what this machine is missing | `staticpy doctor`. `perl` is the one irreducible host dependency (OpenSSL's Configure); busybox covers `sh`/`awk`/`sed`/`patch` |
+| what this machine is missing | `staticpy doctor`. `perl` is the one irreducible host dependency (OpenSSL's Configure); `patch` applies the pinned diffs |
 | a resolved value, for a script | `staticpy print <key>` — `python-version`, `python-abi`, `host`, `targets{,-all,-proven}`, `dist`, `recipe-version`, `version:<src>`, `sha256:<src>` |
 | pack a benchmark kit | the `staticpy-kit` skill — commit first, then stamp from a clean tree so `kit.json` is not `*-dirty` |
 | ship packed tarballs to GitHub | the `staticpy-release` skill — `scripts/gh-release.sh check\|stage\|publish\|verify`; do not invent the asset list |
@@ -145,11 +145,9 @@ that tree, so `find` sees it.
    and artifacts built by a compiler nobody can name any more keep being served
    across a gccfactory re-publish.
 5. **The shim provisions, the binary consumes.** staticpy never fetches a
-   toolchain, a busybox or a qemu; it is handed paths and fails loudly when one
-   is missing. That is what lets the same binary run against a volume mount, a
-   gccfactory checkout or a musl.cc unpack — and busybox specifically is never
-   downloaded, because an unpinned binary on the build PATH would undercut the
-   checksums everything else depends on.
+   toolchain or a qemu; it is handed paths and fails loudly when one is
+   missing. That is what lets the same binary run against a volume mount, a
+   gccfactory checkout or a musl.cc unpack.
 6. **Content-anchored edits assert their match count.** `Edit.MustMatch` (zero
    meaning exactly once) makes a moved anchor a loud failure instead of a silent
    no-op or a double application. Edits are the exception; `patches/` holds real

@@ -35,8 +35,8 @@ benchmarking is the `reference` profile's own artifact,
 
 The dev container is still the easiest way to get a clean host, and its
 `/workspace` is a bind mount of the repo. Job PATH is the fetched toolchain
-plus `dirname(busybox)`; perl, make, and the few other host tools that have
-to sit next to busybox are still load-bearing.
+first, then the process PATH. perl and patch are host tools; static and
+cross still compile with gccfactory.
 Use `tmux` *on the host* (the container image does not ship `tmux`) to keep
 long-running build jobs alive.
 

@@ -183,9 +183,6 @@ func runBench(g *Global, args []string) error {
 		if !g.flagGiven("dist") {
 			g.Dist = filepath.Join(*kitDir, "results", ".staticpy")
 		}
-		if !g.flagGiven("restrict-path") && !g.flagGiven("hermetic") {
-			g.hostPath = true
-		}
 	}
 
 	cfg, err := g.load()

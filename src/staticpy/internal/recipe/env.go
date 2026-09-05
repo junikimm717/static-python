@@ -514,8 +514,8 @@ func (te *toolenv) vars() map[string]string {
 		"PKG_CONFIG_LIBDIR":      pc,
 		"PKG_CONFIG_PATH":        pc,
 		"PKG_CONFIG_SYSROOT_DIR": te.pcSysroot,
-		// The Runner substitutes the restricted PATH; composing one here would
-		// reintroduce whatever the developer has installed.
+		// The Runner substitutes PATH (toolchain first); composing one here
+		// would put the host gcc ahead of gccfactory.
 		//
 		// A host-built profile names no target, which is what keeps the
 		// provisioned toolchain's bin off the PATH. It has to: gcc resolves `ld`

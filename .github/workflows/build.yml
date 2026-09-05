@@ -38,13 +38,12 @@ jobs:
         with:
           go-version: stable
 
-      # busybox supplies sh/awk/sed on a restricted PATH; qemu-user runs the
-      # cross-built interpreter so --verify has something to verify on.
+      # qemu-user runs the cross-built interpreter so --verify has something
+      # to verify on. perl is OpenSSL's Configure; patch applies the pins.
       - name: Install host tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y busybox-static qemu-user perl patch
-          sudo ln -sf /bin/busybox /usr/local/bin/busybox
+          sudo apt-get install -y qemu-user perl patch
 
       # Toolchains are fetched by the ./staticpy shim from gccfactory; nothing
       # is compiled here except CPython and its dependencies.

@@ -86,22 +86,15 @@ log nobody read. Symptom: a library builds, links, and is subtly wrong.
 Countermeasure: staticpy's Runner checks every exit code and writes one log per
 command; never reintroduce a path where output is only inspectable in aggregate.
 
-**`expr: not found`, then `fcntl: No file descriptors available`.** Restricted
-PATH is toolchain + `dirname(busybox)`, which is not a closed toolbox.
-Alpine keeps `expr`/`awk`/`tr`/`basename` under `/usr/bin` only; CI's
-`/usr/local/bin/busybox` has none of them. The Dockerfile
-`busybox --install -s /bin` plus compose `nofile` is image provisioning,
-not the class. Materialize `dist/.bin/jobpath/` (`busybox --install -s`
-plus LookPath symlinks) and put **that** dir on PATH — not `/usr/bin`,
-not `dirname(busybox)`. Doctor must resolve `expr` on the composed
-restricted PATH. Do not "fix" this with `--host-path`.
+**`expr: not found`, then `fcntl: No file descriptors available`.** configure
+looks up `expr` on PATH. A missing applet plus the default 1024 nofile is
+what exhausts fds retrying. Compose `nofile` and make sure `expr`/`awk`/`tr`
+are on the process PATH (the image's `busybox --install -s /bin` is one
+way). Do not invent a second PATH policy.
 
 **`env: can't execute 'perl'` on openssl Configure.** Same class as
-`expr`. `#!/usr/bin/env perl` looks up `perl` on the restricted PATH; doctor
-LookPaths the parent PATH and reports green while Configure dies. A
-`/bin/perl` symlink is the Alpine layout, not the class. Symlink
-LookPath(perl) into the jobpath bin. `perl ./Configure` is a local
-extra, not a substitute.
+`expr`. `#!/usr/bin/env perl` looks up `perl` on the job PATH. Doctor
+already requires it. `perl ./Configure` is a local extra, not a substitute.
 
 **riscv64 core verify: ten files fail with `FileNotFoundError: …/bin/python3`.**
 Smoke probes pass (staticpy prefixes `qemu-riscv64`). Anything that
@@ -157,10 +150,9 @@ script SIGSEGVs there, give it the same define, not a per-triple ignore.
 **sqlite configure: `s390x-binfmt-P: Could not open '/lib/ld-musl-s390x.so.1'`.**
 sqlite's configure builds a bootstrap `jimsh0` with the *target* CC and
 then runs it. Host binfmt intercepts the cross ELF. `B.cc=@BUILD_CC@`
-is make-only; configure never sees it. A host `jimsh` on the *restricted*
-PATH skips the bootstrap — `/bin/jimsh` in the Dockerfile is the
-layout, same class as `expr`/`perl`. Put LookPath(jimsh) in the jobpath
-bin. Without it the message is often `./jimsh0: not found` then `No
+is make-only; configure never sees it. A host `jimsh` on PATH skips the
+bootstrap — `/bin/jimsh` in the Dockerfile is the same class as
+`expr`/`perl`. Without it the message is often `./jimsh0: not found` then `No
 working C compiler found`. Do not make qemu able to run configure tests.
 
 **pyref sqlite configure: `Cannot find a tclsh to use for code generation`.**
@@ -238,13 +230,9 @@ whatever `hostcc` fingerprints — do not refuse musl, do not treat
 docs, not a recipe refuse.
 
 **pyref libffi: `Something went wrong bootstrapping makefile fragments`.**
-Same restricted-PATH class as `expr`. Host-built PATH names no toolchain,
-so it is `dirname(busybox)` only. GNU make lives at `/usr/bin/make`.
-`/bin/make` in the Dockerfile is the restricted-PATH layout; usr-merge
-makes `dirname(/usr/bin/busybox)` equal `/usr/bin` and accidentally
-puts gcc/ld on PATH. Put LookPath(GNU make) and
-LookPath(GNU patch) in the jobpath bin (overwrite busybox's `patch`
-applet). Do not put `/usr/bin` on the restricted PATH.
+libffi's bootstrap needs GNU make on PATH. Install it; the image already
+does. Do not put a musl toolchain first on a host-built job — gcc
+resolves `ld` from PATH, not `$LD`.
 
 **A `sed` fixup silently does nothing.** `sed -i '/anchor/...'` on a source tree
 is a no-op when the anchor moves, and exits 0. Upstream reformats one line on a

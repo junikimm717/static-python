@@ -113,15 +113,9 @@ type Env struct {
 	Toolchains string
 	Overrides  map[string]string
 
-	// Busybox and Qemu are absolute paths to binaries the shim supplied. Qemu is
-	// keyed by target triple.
-	Busybox string
-	Qemu    map[string]string
-
-	// RestrictPath composes PATH from Busybox plus the selected toolchain and
-	// nothing else. Off means the process PATH is appended, so the host gcc
-	// can win a name lookup. This is not a sandbox.
-	RestrictPath bool
+	// Qemu is keyed by target triple. Absolute paths the shim supplied;
+	// staticpy never fetches these.
+	Qemu map[string]string
 
 	// Host is the build machine's triple. Recipes need it to reach a compiler
 	// whose output runs here, for packages that build a helper and then execute
