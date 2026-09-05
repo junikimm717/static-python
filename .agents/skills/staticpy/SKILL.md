@@ -54,6 +54,7 @@ dist/                    everything generated; gitignored, safe to delete
 | what would a build do right now | `staticpy status [--todo]` — pass the same `--verify`/`--pack` you would pass to `build`, or you are not looking at the same plan |
 | what this machine is missing | `staticpy doctor`. `perl` is the one irreducible host dependency (OpenSSL's Configure); busybox covers `sh`/`awk`/`sed`/`patch` |
 | a resolved value, for a script | `staticpy print <key>` — `python-version`, `python-abi`, `host`, `targets{,-all,-proven}`, `dist`, `recipe-version`, `version:<src>`, `sha256:<src>` |
+| ship packed tarballs to GitHub | the `staticpy-release` skill — `scripts/gh-release.sh check\|stage\|publish\|verify`; do not invent the asset list |
 | what the flags actually resolve to | `staticpy config show [--profile N] [--scope S]`, which also names the file each layer came from |
 | why a built interpreter misbehaves | the `staticpy-traps` skill — symptom first. Read **Do not overfit the last failure** before adding an `[expect]` or a one-package stanza |
 | a verify method failed on one triple | reproduce on native x86_64 static and on a second qemu before writing `[expect.<triple>]`. Agent time is cheap; the sweep is not |
