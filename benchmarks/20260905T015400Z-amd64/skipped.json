@@ -1,0 +1,10 @@
+[
+  "bm_dask (dependencies would not install for default)",
+  "bm_dulwich_log (dependencies would not install for default)",
+  "bm_fastapi (dependencies would not install for default)",
+  "bm_hg_startup (dependencies would not install for default)",
+  "bm_sqlalchemy_declarative (dependencies would not install for default)",
+  "bm_sqlalchemy_imperative (dependencies would not install for default)",
+  "bm_django_template (failed at runtime on default, nomimalloc, nolto, nolto-nomimalloc, seplto, seplto-nomimalloc, reference, reference-nolto, reference-mimalloc, reference-nolto-mimalloc: ModuleNotFoundError: No module named 'distutils')",
+  "bm_sympy (failed at runtime on default, nomimalloc, nolto, nolto-nomimalloc, seplto, seplto-nomimalloc, reference, reference-nolto, reference-mimalloc, reference-nolto-mimalloc: ModuleNotFoundError: No module named 'distutils')"
+]
