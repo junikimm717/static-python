@@ -198,15 +198,9 @@ libc.
 `${PIPESTATUS[0]}` — not `tee`'s 0. Poll the log and `staticpy status`;
 do not attach.
 
-**Pack from a clean tree.** The `./staticpy` shim stamps
-`HEAD` plus `-dirty` when `git status --porcelain` is non-empty into
-`buildinfo.GitRevision`. That string is a kit key input and is copied
-into `kit.json` and `bin/staticpy-bench`. Interpreters built or kitted
-while the upgrade is still uncommitted will advertise a dirty
-static-python revision. Commit the pin/recipe work first, confirm
-`git status` is empty, then pack and kit. If you packed while dirty,
-restamp: rebuild `dist/.bin/staticpy` (or pass `STATICPY_GIT_REVISION`)
-and re-run `staticpy kit --name default --verify core` on ubuntu.
+**Pack from a clean tree.** See `staticpy-kit`: whenever possible, commit
+the work and then stamp the kit at a non-dirty version. A kit packed from
+a dirty tree advertises `HEAD-dirty` in `kit.json` and `staticpy-bench`.
 
 Done when: `staticpy status --target all --verify core --pack` is 0 stale
 / 0 missing on every static profile; ubuntu status is the same for each

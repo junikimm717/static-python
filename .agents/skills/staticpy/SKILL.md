@@ -54,6 +54,7 @@ dist/                    everything generated; gitignored, safe to delete
 | what would a build do right now | `staticpy status [--todo]` — pass the same `--verify`/`--pack` you would pass to `build`, or you are not looking at the same plan |
 | what this machine is missing | `staticpy doctor`. `perl` is the one irreducible host dependency (OpenSSL's Configure); busybox covers `sh`/`awk`/`sed`/`patch` |
 | a resolved value, for a script | `staticpy print <key>` — `python-version`, `python-abi`, `host`, `targets{,-all,-proven}`, `dist`, `recipe-version`, `version:<src>`, `sha256:<src>` |
+| pack a benchmark kit | the `staticpy-kit` skill — commit first, then stamp from a clean tree so `kit.json` is not `*-dirty` |
 | ship packed tarballs to GitHub | the `staticpy-release` skill — `scripts/gh-release.sh check\|stage\|publish\|verify`; do not invent the asset list |
 | what the flags actually resolve to | `staticpy config show [--profile N] [--scope S]`, which also names the file each layer came from |
 | why a built interpreter misbehaves | the `staticpy-traps` skill — symptom first. Read **Do not overfit the last failure** before adding an `[expect]` or a one-package stanza |
@@ -283,6 +284,8 @@ Honest inventory, because the code reads more finished than it is:
   misbehaves, and write what you find there.**
 - `staticpy-bump` — pin edits, and the overnight matrix-upgrade rules
   (preemptive fuzz, class-wide hunt, full-matrix done-when, clean-tree kit).
+- `staticpy-kit` — pack `staticpy kit`. Commit first, then stamp at a
+  non-dirty revision.
 - `staticpy-add-target` — adding and proving a new triple.
 - `comment-hygiene` — this repo's comment rule: say *why*, not *what*; no stale
   framing; no baked-in numbers unless the number is the point. Anything longer
