@@ -1,6 +1,6 @@
 ---
 name: staticpy-bump
-description: Upgrade a pinned dependency — openssl, sqlite, ncurses, readline, libffi, xz, zlib, bzip2, util-linux/libuuid, or CPython itself — and survive the sharp corners: where the checksum must come from, why a patch that stops applying is the outcome you wanted, and the packages whose version is encoded in more than one place. Also the overnight matrix-upgrade rules (preemptive grok fuzz, class-wide hunt, full matrix failed=0, pack from a clean tree). Use whenever changing a version in config/sources.toml or running a CPython/dep sweep.
+description: Upgrade a pinned dependency — openssl, sqlite, ncurses, readline, libffi, xz, zlib, bzip2, util-linux/libuuid, or CPython itself — and survive the sharp corners: where the checksum must come from, why a patch that stops applying is the outcome you wanted, and the packages whose version is encoded in more than one place. Also the overnight matrix-upgrade rules (preemptive fuzz, class-wide hunt, full matrix failed=0, pack from a clean tree). Use whenever changing a version in config/sources.toml or running a CPython/dep sweep.
 ---
 
 # Bumping a pinned dependency
@@ -167,16 +167,17 @@ and profiles move. Do not stop until every cell is packed and its verify
 artifact has `failed=0`.
 
 **Fuzz before you compile.** A class-wide ABI, Setup, thread, or
-configure-guess hole costs more than an hour at verify, per cell. Spend
-minutes of grok 4.6 subagents on the codebase first: stable-ABI /
-`staticapi` macros, `Setup` vs `Modules/Setup.stdlib.in`, fork/atomics,
-new `AC_RUN_IFELSE` tests the ABI probe does not cover. Always do this
-preemptively, even when the last bump was "just a patch release".
+configure-guess hole costs more than an hour at verify, per cell. Agent
+time is cheap next to that: send cheap parallel passes at the codebase
+first — stable-ABI / `staticapi` macros, `Setup` vs
+`Modules/Setup.stdlib.in`, fork/atomics, new `AC_RUN_IFELSE` tests the
+ABI probe does not cover. Always do this preemptively, even when the
+last bump was "just a patch release".
 
 **Hunt the class, do not green-wash.** Getting the matrix to build is not
-the goal; the build has to stay reproducible. When a cell fails, deploy a
-subagent and demand evidence (repro on a second arm, the layer, the
-complete fix). Parking the last failure under `[expect.<this-triple>]` or
+the goal; the build has to stay reproducible. When a cell fails, spin a
+separate investigation and demand evidence (repro on a second arm, the
+layer, the complete fix). Parking the last failure under `[expect.<this-triple>]` or
 a one-package profile stanza is forbidden — that is the
 `staticpy-traps` rule **Do not overfit the last failure**. Write the
 finding there.
