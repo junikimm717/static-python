@@ -209,6 +209,10 @@ class SiteTests(unittest.TestCase):
         self.assertIn("mimalloc", page)
         self.assertIn("pyperformance==1.14.0", page)
         self.assertNotIn("<th>packages</th>", page)
+        self.assertIn('class="ratio win"', page)
+        self.assertIn('class="ratio lose"', page)
+        self.assertIn("--t:", page)
+        self.assertIn("clipped at 0.5× and 2×", page)
 
     def test_site_badges_fixtures(self):
         tmp = Path(tempfile.mkdtemp())
@@ -224,6 +228,26 @@ class SiteTests(unittest.TestCase):
         page = (out / "run" / FIXTURE_ID / "index.html").read_text(encoding="utf-8")
         self.assertIn("Fixture / demo", page)
         self.assertIn("<h1>pyperformance comparison</h1>", page)
+
+
+class RatioTintTests(unittest.TestCase):
+    def test_neutral_band_and_clip(self):
+        self.assertEqual(mb._ratio_tint(1.0), ("", 0.0))
+        self.assertEqual(mb._ratio_tint(1.01), ("", 0.0))
+        self.assertEqual(mb._ratio_tint(0.99), ("", 0.0))
+        kind, t = mb._ratio_tint(2.0)
+        self.assertEqual(kind, "win")
+        self.assertAlmostEqual(t, 1.0)
+        kind, t = mb._ratio_tint(0.5)
+        self.assertEqual(kind, "lose")
+        self.assertAlmostEqual(t, 1.0)
+        kind, t = mb._ratio_tint(3.27)
+        self.assertEqual(kind, "win")
+        self.assertAlmostEqual(t, 1.0)
+        kind, t = mb._ratio_tint(1.25)
+        self.assertEqual(kind, "win")
+        self.assertGreater(t, 0.4)
+        self.assertLess(t, 0.7)
 
 
 class GitignoreTests(unittest.TestCase):

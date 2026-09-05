@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import math
 import re
 import shutil
 import sys
@@ -484,8 +485,12 @@ a{color:#2b6cb0}
 table{border-collapse:collapse;width:100%;margin:1rem 0}
 th,td{border:1px solid #cbd5e0;padding:.35rem .55rem;text-align:right;vertical-align:top}
 th:first-child,td:first-child{text-align:left}
-td.fast{color:#276749;font-weight:600}
-td.slow{color:#c53030;font-weight:600}
+table.ratios{font-variant-numeric:tabular-nums}
+td.ratio.win{background:color-mix(in srgb,#31a354 calc(var(--t)*58%),transparent);font-weight:600}
+td.ratio.lose{background:color-mix(in srgb,#e53e3e calc(var(--t)*58%),transparent);font-weight:600}
+.scale{color:#4a5568;font-size:.9rem;margin:.4rem 0 0}
+.scale.swatches{display:flex;gap:.35rem;flex-wrap:wrap;margin:.45rem 0 .2rem;align-items:center}
+.scale .swatch{display:inline-block;padding:.1rem .45rem;border:1px solid #cbd5e0;border-radius:4px;font-variant-numeric:tabular-nums}
 .env{background:#f7fafc;padding:.75rem 1rem;border-radius:6px}
 .env dt{font-weight:600;float:left;clear:left;width:9rem}
 .env dd{margin-left:9.5rem}
@@ -507,8 +512,10 @@ a{color:#63b3ed}
 .lede,.meta{color:#a0aec0}
 .skip{color:#f6ad55}
 th,td{border-color:#4a5568}
-td.fast{color:#68d391}
-td.slow{color:#fc8181}
+td.ratio.win{background:color-mix(in srgb,#38a169 calc(var(--t)*48%),transparent)}
+td.ratio.lose{background:color-mix(in srgb,#fc8181 calc(var(--t)*42%),transparent)}
+.scale{color:#a0aec0}
+.scale .swatch{border-color:#4a5568}
 .env,.empty,.panel{background:#2d3748;border-color:#4a5568}
 .banner{background:#744210;border-color:#d69e2e;color:#fefcbf}
 }
@@ -637,12 +644,45 @@ def _interpreters_html(manifest: dict) -> str:
     return "".join(parts)
 
 
-def _ratio_class(v: float) -> str:
-    if v > 1.02:
-        return "fast"
-    if v < 0.98:
-        return "slow"
-    return ""
+# ±2% is treated as flat. Intensity is |log2(ratio)|, clipped at 2× / 0.5×
+# so a 3× outlier saturates instead of stretching the rest of the scale.
+_RATIO_FLAT = math.log2(1.02)
+_RATIO_CLIP = 1.0  # log2(2)
+
+
+def _ratio_tint(v: float) -> tuple[str, float]:
+    if v <= 0 or math.isnan(v) or math.isinf(v):
+        return "", 0.0
+    mag = math.log2(v)
+    if abs(mag) < _RATIO_FLAT:
+        return "", 0.0
+    t = min(abs(mag) / _RATIO_CLIP, 1.0)
+    # sqrt so a 1.25× cell is readable instead of almost empty.
+    return ("win" if mag > 0 else "lose", math.sqrt(t))
+
+
+def _ratio_td(v: float) -> str:
+    kind, t = _ratio_tint(v)
+    if kind:
+        return (
+            f'<td class="ratio {kind}" style="--t:{t:.3f}">{v:.2f}x</td>'
+        )
+    return f"<td>{v:.2f}x</td>"
+
+
+def _ratio_scale_html() -> str:
+    stops = (0.5, 0.8, 1.0, 1.25, 2.0)
+    chips = []
+    for v in stops:
+        kind, t = _ratio_tint(v)
+        cls = f"swatch ratio {kind}".strip() if kind else "swatch"
+        style = f' style="--t:{t:.3f}"' if kind else ""
+        chips.append(f'<span class="{cls}"{style}>{v:g}×</span>')
+    return (
+        '<p class="scale">Fill is log<sub>2</sub> of the ratio vs baseline, '
+        "clipped at 0.5× and 2×. Green is faster.</p>\n"
+        f'<p class="scale swatches">{"".join(chips)}</p>\n'
+    )
 
 
 def _ratio_table_html(report: dict, order: list[str]) -> str:
@@ -650,7 +690,8 @@ def _ratio_table_html(report: dict, order: list[str]) -> str:
     if not isinstance(rows, list) or not rows or not order:
         return ""
     parts = [
-        '<div class="table-wrap"><table class="ratios">\n<thead><tr><th>benchmark</th>'
+        _ratio_scale_html(),
+        '<div class="table-wrap"><table class="ratios">\n<thead><tr><th>benchmark</th>',
     ]
     for a in order:
         parts.append(f"<th>{_esc(a)}</th>")
@@ -666,9 +707,7 @@ def _ratio_table_html(report: dict, order: list[str]) -> str:
         for a in order:
             v = ratios.get(a)
             if isinstance(v, (int, float)) and not isinstance(v, bool):
-                cls = _ratio_class(float(v))
-                attr = f' class="{cls}"' if cls else ""
-                parts.append(f"<td{attr}>{float(v):.2f}x</td>")
+                parts.append(_ratio_td(float(v)))
             else:
                 parts.append("<td>-</td>")
         parts.append("</tr>\n")
