@@ -60,6 +60,7 @@ dist/                    everything generated; gitignored, safe to delete
 | why a built interpreter misbehaves | the `staticpy-traps` skill — symptom first. Read **Do not overfit the last failure** before adding an `[expect]` or a one-package stanza |
 | a verify method failed on one triple | reproduce on native x86_64 static and on a second qemu before writing `[expect.<triple>]`. Agent time is cheap; the sweep is not |
 | what a bench session writes | always the same seven files, regardless of `--suite`: `manifest.json`, `env.json`, `report.json`, `report.md`, `report.html`, `skipped.json`, `timeline.jsonl`. `suite.name` is `pyperformance` or `micro`. A kit session copies `kit.json` onto `manifest.kit` and promotes `python_version` / `git_revision` / `triple`. `venv/`, `raw/`, `logs/` stay on the machine |
+| bench ETA weights | `src/staticpy/internal/bench/eta_weights.json` — typical seconds per **benchmark name we actually time**, not all of pyperformance and not last night's kit. Restamp after a newly-run name has been timed (see **Bench ETA weights** below). A missing name must not break the ETA; it is a local guess and stays out of the pace |
 
 ## The DAG
 
@@ -274,6 +275,54 @@ Honest inventory, because the code reads more finished than it is:
   benchmark's requirements; `--suite micro` selects the old stdlib-only suite,
   which is the offline path. What a static interpreter genuinely cannot do is
   load a C extension, which is a per-benchmark limit, not a suite-wide one.
+
+## Bench ETA weights
+
+The progress-line ETA is `this-run scale × leftover weight`. The weights are
+embedded in `src/staticpy/internal/bench/eta_weights.json`: mean `wall_s` of
+ok cells (`wall_s >= 1`) from committed `benchmarks/*/timeline.jsonl`. Scale
+uses **only names already in that file**. We do not run every pyperformance
+benchmark (several never install; some die at import). A new or newly-runnable
+name is guessed at the median until this run has measured it; it must not
+enter `elapsed/weight`, or one surprise ten-minute script rewrites every
+remaining estimate.
+
+A kit is measured once, on a quiet box, with no previous session and a
+different lineup. Do not look up last night's `(arm, benchmark)` cells.
+
+**Maintain the table.** The ETA stays honest without a restamp. Restamping is
+how a newly-timed name joins the *shape*, so the next run does not spend the
+first arm of that bench on a median guess. Do it when:
+
+- `config/bench.toml` / `DefaultPyperformance` moves, and a session has timed
+  the new suite
+- a bench that used to skip or fail starts running (`skipped.json` shrinks)
+- a committed `benchmarks/` timeline contains names the JSON does not
+
+```sh
+# from the repo root, after the new session is under benchmarks/
+python3 -c '
+import json, statistics
+from collections import defaultdict
+from pathlib import Path
+d = defaultdict(list)
+for p in Path("benchmarks").glob("*/timeline.jsonl"):
+    for line in p.read_text().splitlines():
+        if not line.strip():
+            continue
+        e = json.loads(line)
+        if e.get("ok") and e.get("wall_s", 0) >= 1:
+            d[e["benchmark"]].append(e["wall_s"])
+out = {k: round(statistics.mean(v), 3) for k, v in sorted(d.items())}
+Path("src/staticpy/internal/bench/eta_weights.json").write_text(
+    json.dumps(out, indent=2) + "\n")
+print(len(out), "weights")
+'
+```
+
+Then `go test ./internal/bench/` in the spython container (the package is
+Linux-only). The replay test fails if the table regresses toward
+count-average.
 
 ## Related
 
