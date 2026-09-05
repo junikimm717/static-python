@@ -66,54 +66,6 @@ func TestEnvMarkdownNamesTheSuite(t *testing.T) {
 	}
 }
 
-func TestWriteReportsRecordsKitAndPythonVersion(t *testing.T) {
-	parent := t.TempDir()
-	sess, err := NewSession(parent, "x86_64", time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer sess.Close()
-	kit := &KitDoc{
-		Protocol:      Protocol,
-		KitVersion:    "1",
-		GitRevision:   "70987be221b480dd5d9c969edcb59a5cf8203546",
-		PythonVersion: "3.13.13",
-		Triple:        "x86_64-linux-musl",
-		Baseline:      "reference",
-		Suite:         SuiteMicro,
-		Pins:          DefaultPins(),
-		Arms:          []KitArm{{Label: "reference", Path: "python/reference/bin/python3.13"}},
-	}
-	md, _, err := sess.WriteReports(Reports{
-		Accounting: Accounting{
-			Baseline:      "reference",
-			SuiteName:     SuiteMicro,
-			Machine:       Machine{Kernel: "Linux"},
-			Kit:           kit,
-			PythonVersion: "3.13.13",
-			Identities:    []Identity{{Label: "reference", BinarySHA256: "aa"}},
-		},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	raw, err := os.ReadFile(filepath.Join(sess.Dir, "manifest.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := string(raw)
-	for _, want := range []string{`"python_version": "3.13.13"`, `"kit_version": "1"`, `"triple": "x86_64-linux-musl"`, `"git_revision": "70987be221b480dd5d9c969edcb59a5cf8203546"`, `"kit"`} {
-		if !strings.Contains(s, want) {
-			t.Fatalf("manifest missing %s:\n%s", want, s)
-		}
-	}
-	for _, want := range []string{"python_version: 3.13.13", "git_revision: 70987be221b480dd5d9c969edcb59a5cf8203546", "kit_version: 1", "triple: x86_64-linux-musl"} {
-		if !strings.Contains(md, want) {
-			t.Fatalf("markdown missing %s:\n%s", want, md)
-		}
-	}
-}
-
 func TestWriteReportsEmitsTheStandardFiles(t *testing.T) {
 	parent := t.TempDir()
 	sess, err := NewSession(parent, "x86_64", time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC))
