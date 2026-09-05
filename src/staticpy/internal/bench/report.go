@@ -11,16 +11,48 @@ import (
 // SuiteReport is everything the markdown and HTML reports share, so the
 // two cannot drift on environment, pins, or identity the way they used to.
 type SuiteReport struct {
-	SuiteName  string
-	Baseline   string
-	Order      []string
-	Rows       []Row
-	Geomean    map[string]float64
-	Machine    Machine
-	Protocol   int
-	Pins       Pins
-	Identities []Identity
-	Skipped    int
+	SuiteName     string
+	Baseline      string
+	Order         []string
+	Rows          []Row
+	Geomean       map[string]float64
+	Machine       Machine
+	Protocol      int
+	Pins          Pins
+	Identities    []Identity
+	Skipped       int
+	Kit           *KitDoc
+	PythonVersion string
+}
+
+// Experiment is the packed lineup identity: which CPython, which
+// staticpy commit, which kit layout, which triple. Kit runs fill this
+// from kit.json; a local bench fills python_version from the pin.
+type Experiment struct {
+	PythonVersion string
+	GitRevision   string
+	KitVersion    string
+	Triple        string
+}
+
+func (e Experiment) withGit() Experiment {
+	if e.GitRevision == "" {
+		e.GitRevision = buildinfo.GitRevision
+	}
+	return e
+}
+
+func (r SuiteReport) experiment() Experiment {
+	e := Experiment{PythonVersion: r.PythonVersion}
+	if k := r.Kit; k != nil {
+		if e.PythonVersion == "" {
+			e.PythonVersion = k.PythonVersion
+		}
+		e.KitVersion = k.KitVersion
+		e.Triple = k.Triple
+		e.GitRevision = k.GitRevision
+	}
+	return e.withGit()
 }
 
 func (r SuiteReport) pins() Pins {
@@ -45,8 +77,42 @@ func (r SuiteReport) title() string {
 	return r.suiteName() + " comparison"
 }
 
+func writeExperimentMarkdown(b *strings.Builder, e Experiment) {
+	if e.PythonVersion != "" {
+		fmt.Fprintf(b, "- python_version: %s\n", e.PythonVersion)
+	}
+	if e.GitRevision != "" {
+		fmt.Fprintf(b, "- git_revision: %s\n", e.GitRevision)
+	}
+	if e.KitVersion != "" {
+		fmt.Fprintf(b, "- kit_version: %s\n", e.KitVersion)
+	}
+	if e.Triple != "" {
+		fmt.Fprintf(b, "- triple: %s\n", e.Triple)
+	}
+}
+
+func writeExperimentHTML(b *strings.Builder, row func(k, v string) string, e Experiment) {
+	if e.PythonVersion != "" {
+		b.WriteString(row("python_version", e.PythonVersion))
+	}
+	if e.GitRevision != "" {
+		b.WriteString(row("git_revision", e.GitRevision))
+	}
+	if e.KitVersion != "" {
+		b.WriteString(row("kit_version", e.KitVersion))
+	}
+	if e.Triple != "" {
+		b.WriteString(row("triple", e.Triple))
+	}
+}
+
 // EnvMarkdown is the provenance block every suite's report shares.
 func EnvMarkdown(m Machine, protocol int, pins Pins, suiteName string) string {
+	return envMarkdown(m, protocol, pins, suiteName, Experiment{}.withGit())
+}
+
+func envMarkdown(m Machine, protocol int, pins Pins, suiteName string, exp Experiment) string {
 	if protocol == 0 {
 		protocol = Protocol
 	}
@@ -54,9 +120,7 @@ func EnvMarkdown(m Machine, protocol int, pins Pins, suiteName string) string {
 	var b strings.Builder
 	b.WriteString("## Environment\n\n")
 	fmt.Fprintf(&b, "- protocol: %d\n", protocol)
-	if rev := buildinfo.GitRevision; rev != "" {
-		fmt.Fprintf(&b, "- git_revision: %s\n", rev)
-	}
+	writeExperimentMarkdown(&b, exp.withGit())
 	fmt.Fprintf(&b, "- suite: %s\n", SuiteLabel(suiteName, pins))
 	fmt.Fprintf(&b, "- kernel: %s\n", dash(m.Kernel))
 	fmt.Fprintf(&b, "- cpu: %s\n", dash(m.CPUModel))
@@ -127,7 +191,7 @@ func pgoCell(pgo bool) string {
 func (r SuiteReport) Markdown() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# %s\n\n", r.title())
-	b.WriteString(EnvMarkdown(r.Machine, r.protocol(), r.pins(), r.suiteName()))
+	b.WriteString(envMarkdown(r.Machine, r.protocol(), r.pins(), r.suiteName(), r.experiment()))
 	fmt.Fprintf(&b, "- baseline: %s\n", r.Baseline)
 	fmt.Fprintf(&b, "- rows: %d\n", len(r.Rows))
 	if r.Skipped > 0 {
@@ -195,8 +259,8 @@ table{border-collapse:collapse;width:100%;margin:1rem 0}
 th,td{border:1px solid #cbd5e0;padding:.35rem .6rem;text-align:right}
 th:first-child,td:first-child{text-align:left}
 .env{background:#f7fafc;padding:.75rem 1rem;border-radius:6px}
-.env dt{font-weight:600;float:left;clear:left;width:9rem}
-.env dd{margin-left:9.5rem}
+.env dt{font-weight:600;float:left;clear:left;width:11rem}
+.env dd{margin-left:11.5rem}
 .skip{color:#744210}
 svg{max-width:100%}
 </style>
@@ -240,9 +304,7 @@ func (r SuiteReport) envHTML() string {
 	var b strings.Builder
 	b.WriteString(`<dl class="env">` + "\n")
 	b.WriteString(row("protocol", fmt.Sprintf("%d", r.protocol())))
-	if rev := buildinfo.GitRevision; rev != "" {
-		b.WriteString(row("git_revision", rev))
-	}
+	writeExperimentHTML(&b, row, r.experiment())
 	b.WriteString(row("suite", SuiteLabel(r.suiteName(), pins)))
 	b.WriteString(row("kernel", dash(m.Kernel)))
 	b.WriteString(row("cpu", dash(m.CPUModel)))

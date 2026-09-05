@@ -184,7 +184,7 @@
       "shmem_bytes": 3919872,
       "cur_khz": "3599494",
       "affinity": "pinned to cpu3",
-      "topology": "12 logical cpus, hybrid (6×4.21GHz, 6×capacity=0)",
+      "topology": "12 logical cpus, hybrid (6\u00d74.21GHz, 6\u00d7capacity=0)",
       "loadavg_1m": "0.29",
       "loadavg_5m": "0.09",
       "loadavg_15m": "0.04",
@@ -914,6 +914,10 @@
     }
   ],
   "protocol": 2,
+  "python_version": "3.13.13",
+  "git_revision": "70987be221b480dd5d9c969edcb59a5cf8203546",
+  "kit_version": "1",
+  "triple": "x86_64-linux-musl",
   "skipped": [
     "bm_dask (dependencies would not install for default)",
     "bm_dulwich_log (dependencies would not install for default)",
@@ -931,5 +935,146 @@
     "pyperformance": "1.14.0"
   },
   "suite_root": "/home/juni/bench2/staticpy-kit-3.13.13-x86_64-linux-musl/results/20260905T015400Z-amd64/venv/default/lib/python3.13/site-packages/pyperformance/data-files/benchmarks",
-  "venv": true
+  "venv": true,
+  "kit": {
+    "protocol": 2,
+    "kit_version": "1",
+    "git_revision": "70987be221b480dd5d9c969edcb59a5cf8203546",
+    "python_version": "3.13.13",
+    "triple": "x86_64-linux-musl",
+    "baseline": "reference",
+    "suite": "pyperformance",
+    "pins": {
+      "pyperformance": "1.14.0",
+      "pyperf": "2.10.0"
+    },
+    "arms": [
+      {
+        "label": "default",
+        "path": "python/default/bin/python3.13",
+        "artifact_key": "8a79f70aa7852ea9c7e9ed65b58cf3704928aa5cc3eb04f735bb565fd56fe543",
+        "binary_sha256": "80e2586cce4b459b076a57075e1c7cb6d962d04992011309c9fab7f5b5ffbaa8",
+        "factors": {
+          "linkage": "static",
+          "libc": "musl",
+          "lto": "whole-graph",
+          "allocator": "mimalloc",
+          "pgo": true
+        }
+      },
+      {
+        "label": "nomimalloc",
+        "path": "python/nomimalloc/bin/python3.13",
+        "artifact_key": "e9803fa5596d8948f91ecc44d1495c1401ae2577b5973e2dad82c2192502e796",
+        "binary_sha256": "6785eabe8fa1c91dd238af825515efd91f7484b307bfc5428272f70abff4f055",
+        "factors": {
+          "linkage": "static",
+          "libc": "musl",
+          "lto": "whole-graph",
+          "allocator": "musl",
+          "pgo": true
+        }
+      },
+      {
+        "label": "nolto",
+        "path": "python/nolto/bin/python3.13",
+        "artifact_key": "451ce95d566ed99e95131a26032cbbef6e3da8a48203a87d35783849f61e658b",
+        "binary_sha256": "19705ac748696cdee7e7c82f4b7306eeb172b1cf71ec59a5ab414abf7ff78e94",
+        "factors": {
+          "linkage": "static",
+          "libc": "musl",
+          "lto": "none",
+          "allocator": "mimalloc",
+          "pgo": true
+        }
+      },
+      {
+        "label": "nolto-nomimalloc",
+        "path": "python/nolto-nomimalloc/bin/python3.13",
+        "artifact_key": "6b7b3c8c12c57979134d105a927fda6a97c643a454b8f584339fa10262c7656d",
+        "binary_sha256": "8a2e4ceb06e64ae181ce85f1157b651298feafce64d5302cb1e00ba16b4d4301",
+        "factors": {
+          "linkage": "static",
+          "libc": "musl",
+          "lto": "none",
+          "allocator": "musl",
+          "pgo": true
+        }
+      },
+      {
+        "label": "seplto",
+        "path": "python/seplto/bin/python3.13",
+        "artifact_key": "08f8d4f0c00a3eeae3e9fed3fbb4dcbfbc5ef43adf7c31340cd6858fcd2d651b",
+        "binary_sha256": "b0d73a1e98353f97e0e7b4721164e53d598f9a672a1c017300150e6d2ae08dae",
+        "factors": {
+          "linkage": "static",
+          "libc": "musl",
+          "lto": "per-dep",
+          "allocator": "mimalloc",
+          "pgo": true
+        }
+      },
+      {
+        "label": "seplto-nomimalloc",
+        "path": "python/seplto-nomimalloc/bin/python3.13",
+        "artifact_key": "56ec96eedd4b14b14acbc7706d1ce32e0093fa474b491c0880af53b1d9e83407",
+        "binary_sha256": "27183f51f3705d13caa38166ba2f2dcbd1b9252df2342501a7d37021ed312ae3",
+        "factors": {
+          "linkage": "static",
+          "libc": "musl",
+          "lto": "per-dep",
+          "allocator": "musl",
+          "pgo": true
+        }
+      },
+      {
+        "label": "reference",
+        "path": "python/reference/bin/python3.13",
+        "binary_sha256": "b7be5741f69a05e4cfa22deac0793cc27e364927722b4ace4ad6beca79509278",
+        "factors": {
+          "linkage": "dynamic",
+          "libc": "glibc",
+          "lto": "whole-graph",
+          "allocator": "glibc",
+          "pgo": true
+        }
+      },
+      {
+        "label": "reference-nolto",
+        "path": "python/reference-nolto/bin/python3.13",
+        "binary_sha256": "060bd2f7037d164aab6c00eba1716c5f706e14666ab3bff8e2ec05cced28c244",
+        "factors": {
+          "linkage": "dynamic",
+          "libc": "glibc",
+          "lto": "none",
+          "allocator": "glibc",
+          "pgo": true
+        }
+      },
+      {
+        "label": "reference-mimalloc",
+        "path": "python/reference-mimalloc/bin/python3.13",
+        "binary_sha256": "5dff6c9fe828d395d1f71b6ba82f13930623c86ea699529ae7f7a036377fa906",
+        "factors": {
+          "linkage": "dynamic",
+          "libc": "glibc",
+          "lto": "whole-graph",
+          "allocator": "mimalloc",
+          "pgo": true
+        }
+      },
+      {
+        "label": "reference-nolto-mimalloc",
+        "path": "python/reference-nolto-mimalloc/bin/python3.13",
+        "binary_sha256": "fade9896a773084791579ec31444ae739882b5234c2927754a0a3c2dbc7251f5",
+        "factors": {
+          "linkage": "dynamic",
+          "libc": "glibc",
+          "lto": "none",
+          "allocator": "mimalloc",
+          "pgo": true
+        }
+      }
+    ]
+  }
 }

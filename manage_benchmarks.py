@@ -257,9 +257,11 @@ def index_entry(run: dict) -> dict:
         "stale_protocol": run["stale_protocol"],
         "fixture": run["fixture"],
     }
-    rev = (run.get("_manifest") or {}).get("git_revision")
-    if isinstance(rev, str) and rev:
-        entry["git_revision"] = rev
+    man = run.get("_manifest") or {}
+    for key in ("git_revision", "python_version", "kit_version", "triple"):
+        val = man.get(key)
+        if isinstance(val, str) and val:
+            entry[key] = val
     return entry
 
 
@@ -563,8 +565,8 @@ table.ratios{font-variant-numeric:tabular-nums}
 #arm-tip{position:fixed;z-index:20;max-width:22rem;padding:.55rem .75rem;border-radius:6px;background:#1a202c;color:#f7fafc;font-size:.85rem;line-height:1.4;box-shadow:0 4px 16px rgba(0,0,0,.35);pointer-events:none}
 #arm-tip[hidden]{display:none}
 .env{background:#f7fafc;padding:.75rem 1rem;border-radius:6px}
-.env dt{font-weight:600;float:left;clear:left;width:9rem}
-.env dd{margin-left:9.5rem}
+.env dt{font-weight:600;float:left;clear:left;width:11rem}
+.env dd{margin-left:11.5rem}
 .env::after{content:"";display:block;clear:both}
 .env pre{white-space:pre-wrap;font-size:.85rem;overflow:auto;margin:.25rem 0;float:none}
 .banner{background:#fefcbf;border:1px solid #d69e2e;padding:.75rem 1rem;border-radius:6px;margin:1rem 0}
@@ -657,7 +659,7 @@ def _run_table(runs: list[dict], *, rel_prefix: str) -> str:
         return ""
     parts = [
         "<table>\n<thead><tr>"
-        "<th>id</th><th>suite</th><th>baseline</th>"
+        "<th>id</th><th>python</th><th>suite</th><th>baseline</th>"
         "<th>headline vs baseline</th><th>skipped</th><th>cpu</th>"
         "</tr></thead>\n<tbody>\n"
     ]
@@ -665,8 +667,10 @@ def _run_table(runs: list[dict], *, rel_prefix: str) -> str:
         stale = ' <span class="stale">stale protocol</span>' if r["stale_protocol"] else ""
         href = f"{rel_prefix}run/{_esc(r['id'])}/index.html"
         cpu = (r.get("machine") or {}).get("cpu_model") or ""
+        py = r.get("python_version") or (r.get("_manifest") or {}).get("python_version") or ""
         parts.append(
             f'<tr><td><a href="{href}">{_esc(r["id"])}</a>{stale}</td>'
+            f'<td>{_esc(py)}</td>'
             f'<td>{_esc(_suite_label(r.get("suite")))}</td>'
             f'<td>{_esc(r["baseline"])}</td>'
             f'<td>{_esc(_headline_geo(r))}</td>'
@@ -939,12 +943,7 @@ def _run_page_body(run: dict) -> str:
         )
     parts.append(f"<h1>{_esc(title)}</h1>\n")
     parts.append(f'<p class="lede">{_esc(" · ".join(lede))}</p>\n')
-    rev = manifest.get("git_revision")
-    if isinstance(rev, str) and rev:
-        parts.append(
-            f'<p class="meta">git_revision of the <code>staticpy</code> '
-            f"executable: <code>{_esc(rev)}</code></p>\n"
-        )
+    parts.append(_experiment_html(manifest))
     svg = geomean_svg(run)
     if svg:
         heading = f"Geomean vs {baseline}" if baseline else "Geomean vs baseline"
@@ -968,9 +967,60 @@ def _run_page_body(run: dict) -> str:
             parts.append(_body_inner(report_html.read_text(encoding="utf-8")))
     parts.append(_interpreters_html(manifest))
     parts.append(_packages_html(manifest))
+    parts.append(_kit_html(manifest))
     parts.append(_machine_html(env))
     parts.append(_skipped_html(run))
     return "".join(parts)
+
+
+def _experiment_fields(manifest: dict) -> list[tuple[str, str]]:
+    kit = manifest.get("kit") if isinstance(manifest.get("kit"), dict) else {}
+    rows = []
+    for key, label in (
+        ("python_version", "python_version"),
+        ("git_revision", "git_revision"),
+        ("kit_version", "kit_version"),
+        ("triple", "triple"),
+    ):
+        val = manifest.get(key)
+        if not (isinstance(val, str) and val):
+            val = kit.get(key)
+        if isinstance(val, str) and val:
+            rows.append((label, val))
+    suite = manifest.get("suite") if isinstance(manifest.get("suite"), dict) else {}
+    pins = kit.get("pins") if isinstance(kit.get("pins"), dict) else {}
+    pyperf = suite.get("pyperformance") or pins.get("pyperformance")
+    pyperf_lib = suite.get("pyperf") or pins.get("pyperf")
+    if isinstance(pyperf, str) and pyperf:
+        rows.append(("pin pyperformance", pyperf))
+    if isinstance(pyperf_lib, str) and pyperf_lib:
+        rows.append(("pin pyperf", pyperf_lib))
+    return rows
+
+
+def _experiment_html(manifest: dict) -> str:
+    rows = _experiment_fields(manifest)
+    if not rows:
+        return ""
+    parts = ['<dl class="env experiment">\n']
+    for key, val in rows:
+        parts.append(f"<dt>{_esc(key)}</dt><dd><code>{_esc(val)}</code></dd>\n")
+    parts.append("</dl>\n")
+    return "".join(parts)
+
+
+def _kit_html(manifest: dict) -> str:
+    kit = manifest.get("kit")
+    if not isinstance(kit, dict) or not kit:
+        return ""
+    return (
+        '<details class="panel"><summary>Kit</summary>\n'
+        "<p>Pack-time <code>kit.json</code>. Arm hashes and kit-relative "
+        "paths here are what was shipped; <code>interpreters</code> is what "
+        "the quiet box actually ran.</p>\n"
+        f'<div class="env"><pre>{_esc(json.dumps(kit, indent=2))}</pre></div>\n'
+        "</details>\n"
+    )
 
 
 def _short_sha(v) -> str:
@@ -1054,6 +1104,7 @@ def cmd_list(root: Path) -> None:
             f"stamp={r['stamp'] or '-'}",
             f"arch={r['arch'] or '-'}",
             f"protocol={r['protocol']}",
+            f"python={r.get('python_version') or '-'}",
             f"suite={_suite_label(r.get('suite'))}",
             f"baseline={r['baseline'] or '-'}",
             f"arms={','.join(r['arms']) or '-'}",

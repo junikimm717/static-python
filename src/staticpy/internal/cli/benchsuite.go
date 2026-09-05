@@ -17,7 +17,7 @@ import (
 // runPyperfSuite drives the pyperformance suite across the selected arms and
 // writes a session directory that can be re-read long after the run.
 func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, paths map[string]string,
-	baseline, suiteRoot, pyperfHint string, useVenv bool, noPin bool, cpu int, timeout time.Duration, offline bool, pins bench.Pins, sessionParent, findLinks, outPath string) error {
+	baseline, suiteRoot, pyperfHint string, useVenv bool, noPin bool, cpu int, timeout time.Duration, offline bool, pins bench.Pins, sessionParent, findLinks, outPath string, kit *bench.KitDoc) error {
 
 	var skipped []string
 	pin, topo, err := choosePin(noPin, cpu)
@@ -152,12 +152,14 @@ func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, 
 	// place a runtime failure can appear, since it is not known until then.
 	writeAccounting := func() error {
 		return sess.WriteAccounting(bench.Accounting{
-			Baseline:   baseline,
-			SuiteName:  bench.SuitePyperformance,
-			Pins:       pins,
-			Identities: ids,
-			Skipped:    skipped,
-			Machine:    machine,
+			Baseline:      baseline,
+			SuiteName:     bench.SuitePyperformance,
+			Pins:          pins,
+			Identities:    ids,
+			Skipped:       skipped,
+			Machine:       machine,
+			Kit:           kit,
+			PythonVersion: pinnedPythonVersion(cfg),
 			Extra: map[string]any{
 				"suite_root":       suiteRoot,
 				"venv":             useVenv,
@@ -188,12 +190,14 @@ func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, 
 	rows, geo := bench.Compare(res, baseline, order)
 	md, report, err := sess.WriteReports(bench.Reports{
 		Accounting: bench.Accounting{
-			Baseline:   baseline,
-			SuiteName:  bench.SuitePyperformance,
-			Pins:       pins,
-			Identities: ids,
-			Skipped:    skipped,
-			Machine:    machine,
+			Baseline:      baseline,
+			SuiteName:     bench.SuitePyperformance,
+			Pins:          pins,
+			Identities:    ids,
+			Skipped:       skipped,
+			Machine:       machine,
+			Kit:           kit,
+			PythonVersion: pinnedPythonVersion(cfg),
 			Extra: map[string]any{
 				"suite_root":       suiteRoot,
 				"venv":             useVenv,

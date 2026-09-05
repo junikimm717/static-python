@@ -11,7 +11,11 @@ description: >-
 A kit is not one Python. It is the comparison set in `[kit.default]` (or
 `--name smoke`): relocatable prefixes under `python/<profile>/`, vendored
 pyperformance/pyperf/setuptools, `kit.json`, and `bin/staticpy-bench`.
-`./run` on the quiet box is `staticpy-bench bench --kit .`.
+`./run` on the quiet box is `staticpy-bench bench --kit .`. The quiet
+box has no checkout. The session copies `kit.json` onto `manifest.kit`
+and promotes `python_version`, `kit_version`, `triple`, and
+`git_revision` so the experiment can be retraced without the tarball.
+Do not expect a git probe at measure time.
 
 ```sh
 docker compose exec -T spython sh -c 'cd /workspace && ./staticpy kit --name default --verify core'

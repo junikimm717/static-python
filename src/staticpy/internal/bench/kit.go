@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	"github.com/junikimm717/static-python/src/staticpy/internal/buildinfo"
 )
 
 // KitDoc is kit.json: the lineup a quiet machine measures without a checkout.
@@ -52,6 +54,44 @@ func LoadKit(dir string) (*KitDoc, error) {
 		return nil, fmt.Errorf("kit: %s has no baseline", path)
 	}
 	return &doc, nil
+}
+
+// AdoptKitRevision copies kit.json's pack-time SHA into buildinfo when the
+// running binary has none. ./run on a quiet box has no git repo and does
+// not pass --git-revision; the only experiment identity that survives
+// unpack is kit.json. An explicit --git-revision already in buildinfo wins.
+func AdoptKitRevision(kit *KitDoc) {
+	if kit == nil || kit.GitRevision == "" || buildinfo.GitRevision != "" {
+		return
+	}
+	buildinfo.GitRevision = kit.GitRevision
+}
+
+// ApplyKitToManifest copies every kit.json field onto the session so a
+// later reader can recover the packed experiment without the tarball.
+// The full document lives under "kit"; python_version, kit_version,
+// triple, and git_revision are also promoted to the top level because
+// the site and index look for them there. Existing top-level values win.
+func ApplyKitToManifest(man map[string]any, kit *KitDoc) {
+	if kit == nil || man == nil {
+		return
+	}
+	man["kit"] = kit
+	promote := func(key, val string) {
+		if val == "" {
+			return
+		}
+		if cur, ok := man[key]; ok {
+			if s, ok := cur.(string); ok && s != "" {
+				return
+			}
+		}
+		man[key] = val
+	}
+	promote("python_version", kit.PythonVersion)
+	promote("kit_version", kit.KitVersion)
+	promote("triple", kit.Triple)
+	promote("git_revision", kit.GitRevision)
 }
 
 // ResolveArms turns kit-relative paths into absolute interpreter binaries.

@@ -154,6 +154,8 @@ func SuiteLabel(name string, pins Pins) string {
 
 // Manifest is the session accounting file. Protocol and the suite object live
 // here so a later reader can refuse stale numbers without re-reading the report.
+// A kit run also stores kit.json under "kit" and promotes python_version,
+// kit_version, triple, and git_revision to the top level.
 func Manifest(stamp, baseline string, pins Pins, ids []Identity, skipped []string) map[string]any {
 	return ManifestSuite(stamp, baseline, SuitePyperformance, pins, ids, skipped)
 }

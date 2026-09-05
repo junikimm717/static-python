@@ -25,9 +25,12 @@ or `report.json`. `.gitignore` is the same allowlist, so a whole-session dump
 (venv, raw, logs, quiet.jsonl, …) will not be committed.
 
 Required to compare later: `manifest.protocol == 2`, a host `fingerprint` /
-`fingerprint_sha256`, `git_revision` of the `staticpy` that produced the
-session, and each interpreter as `{label, binary_sha256, artifact_key,
-factors, packages}`. A profile name is not a stable description of the binary.
+`fingerprint_sha256`, `python_version`, `git_revision` of the packed
+experiment (from `kit.json` on a kit run), and each interpreter as
+`{label, binary_sha256, artifact_key, factors, packages}`. A kit session
+also stores the full `kit.json` under `manifest.kit` so pins, the triple,
+and pack-time arm hashes survive without the tarball. A profile name is
+not a stable description of the binary.
 
 ## Paths in
 

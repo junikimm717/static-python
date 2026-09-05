@@ -59,7 +59,7 @@ dist/                    everything generated; gitignored, safe to delete
 | what the flags actually resolve to | `staticpy config show [--profile N] [--scope S]`, which also names the file each layer came from |
 | why a built interpreter misbehaves | the `staticpy-traps` skill — symptom first. Read **Do not overfit the last failure** before adding an `[expect]` or a one-package stanza |
 | a verify method failed on one triple | reproduce on native x86_64 static and on a second qemu before writing `[expect.<triple>]`. Agent time is cheap; the sweep is not |
-| what a bench session writes | always the same seven files, regardless of `--suite`: `manifest.json`, `env.json`, `report.json`, `report.md`, `report.html`, `skipped.json`, `timeline.jsonl`. `suite.name` is `pyperformance` or `micro`. `venv/`, `raw/`, `logs/` stay on the machine |
+| what a bench session writes | always the same seven files, regardless of `--suite`: `manifest.json`, `env.json`, `report.json`, `report.md`, `report.html`, `skipped.json`, `timeline.jsonl`. `suite.name` is `pyperformance` or `micro`. A kit session copies `kit.json` onto `manifest.kit` and promotes `python_version` / `git_revision` / `triple`. `venv/`, `raw/`, `logs/` stay on the machine |
 
 ## The DAG
 

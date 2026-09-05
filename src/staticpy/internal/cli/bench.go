@@ -67,7 +67,10 @@ LINEUP
   (staticpy kit) already lists every arm in kit.json, so ./run on the quiet
   box passes --kit and nothing else. --interp still adds or overrides an
   arm. Results write to DIR/results/ rather than dist/bench/. --cpu is the
-  same pin as without a kit.
+  same pin as without a kit. The session manifest copies kit.json in
+  full (python_version, pins, pack-time arm hashes, git_revision) so the
+  experiment can be retraced without the tarball. git_revision also
+  comes from kit.json when the runner itself was not stamped.
 
   Each arm runs inside its own venv, so the arms differ only in the
   interpreter. Without one, a system python drags in distro site-packages --
@@ -224,6 +227,7 @@ func runBench(g *Global, args []string) error {
 		if kitDoc.Triple != "" && kitDoc.Triple != host {
 			return fmt.Errorf("kit is for %s; this machine is %s", kitDoc.Triple, host)
 		}
+		bench.AdoptKitRevision(kitDoc)
 		sessionParent = filepath.Join(*kitDir, "results")
 		if vendor := filepath.Join(*kitDir, "vendor"); isDir(vendor) {
 			findLinks = vendor
@@ -343,9 +347,17 @@ func runBench(g *Global, args []string) error {
 	// A --pyperformance directory names the suite as surely as --suite does.
 	if *suite == "pyperformance" || *suiteRoot != "" {
 		return runPyperfSuite(g, cfg, e, order, paths, baseline, *suiteRoot, *pyperfSrc,
-			!*noVenv, *noPin, *cpu, *timeout, g.Offline, pins, sessionParent, findLinks, *out)
+			!*noVenv, *noPin, *cpu, *timeout, g.Offline, pins, sessionParent, findLinks, *out, kitDoc)
 	}
-	return runMicroSuite(g, cfg, e, order, paths, baseline, *noPin, *cpu, *iters, *repeat, pins, sessionParent, *out)
+	return runMicroSuite(g, cfg, e, order, paths, baseline, *noPin, *cpu, *iters, *repeat, pins, sessionParent, *out, kitDoc)
+}
+
+func pinnedPythonVersion(cfg *config.Config) string {
+	s, err := lookupSource(cfg, "python")
+	if err != nil {
+		return ""
+	}
+	return s.Version
 }
 
 func publishSession(sess *bench.Session, md string, report map[string]any, out string, asJSON bool) error {
@@ -369,7 +381,7 @@ func publishSession(sess *bench.Session, md string, report map[string]any, out s
 }
 
 func runMicroSuite(g *Global, cfg *config.Config, e *core.Env, order []string, paths map[string]string,
-	baseline string, noPin bool, cpu, iters, repeat int, pins bench.Pins, sessionParent, outPath string) error {
+	baseline string, noPin bool, cpu, iters, repeat int, pins bench.Pins, sessionParent, outPath string, kit *bench.KitDoc) error {
 
 	tmpDir, err := os.MkdirTemp("", "staticpy-bench-")
 	if err != nil {
@@ -408,12 +420,14 @@ func runMicroSuite(g *Global, cfg *config.Config, e *core.Env, order []string, p
 		ids = append(ids, id)
 	}
 	acc := bench.Accounting{
-		Baseline:   baseline,
-		SuiteName:  bench.SuiteMicro,
-		Pins:       pins,
-		Identities: ids,
-		Skipped:    []string{},
-		Machine:    machine,
+		Baseline:      baseline,
+		SuiteName:     bench.SuiteMicro,
+		Pins:          pins,
+		Identities:    ids,
+		Skipped:       []string{},
+		Machine:       machine,
+		Kit:           kit,
+		PythonVersion: pinnedPythonVersion(cfg),
 	}
 	if err := sess.WriteAccounting(acc); err != nil {
 		return err

@@ -3,7 +3,10 @@
 ## Environment
 
 - protocol: 2
+- python_version: 3.13.13
 - git_revision: 446a7d30c960582def7b42be0b5f6f558f891b05-dirty
+- kit_version: 1
+- triple: x86_64-linux-musl
 - suite: pyperformance 1.14.0, pyperf 2.10.0
 - kernel: Linux 6.12.94+deb13-amd64
 - cpu: AMD Ryzen 5 3600 6-Core Processor

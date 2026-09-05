@@ -42,7 +42,11 @@
         "memory_bytes": 67355471872
       },
       "stale_protocol": false,
-      "fixture": false
+      "fixture": false,
+      "git_revision": "70987be221b480dd5d9c969edcb59a5cf8203546",
+      "python_version": "3.13.13",
+      "kit_version": "1",
+      "triple": "x86_64-linux-musl"
     },
     {
       "id": "20260904T143118Z-amd64",
@@ -86,7 +90,10 @@
       },
       "stale_protocol": false,
       "fixture": false,
-      "git_revision": "446a7d30c960582def7b42be0b5f6f558f891b05-dirty"
+      "git_revision": "446a7d30c960582def7b42be0b5f6f558f891b05-dirty",
+      "python_version": "3.13.13",
+      "kit_version": "1",
+      "triple": "x86_64-linux-musl"
     }
   ]
 }

@@ -8,13 +8,15 @@ import (
 // Accounting is the session sidecar every suite writes before (and after)
 // the numbers exist: what ran, on what host, which binaries.
 type Accounting struct {
-	Baseline   string
-	SuiteName  string
-	Pins       Pins
-	Identities []Identity
-	Skipped    []string
-	Machine    Machine
-	Extra      map[string]any
+	Baseline      string
+	SuiteName     string
+	Pins          Pins
+	Identities    []Identity
+	Skipped       []string
+	Machine       Machine
+	Kit           *KitDoc
+	PythonVersion string
+	Extra         map[string]any
 }
 
 // Reports is the full session: accounting plus the comparison table.
@@ -31,6 +33,12 @@ func (s *Session) WriteAccounting(a Accounting) error {
 		a.Skipped = []string{}
 	}
 	man := ManifestSuite(s.Stamp, a.Baseline, a.SuiteName, a.Pins, a.Identities, a.Skipped)
+	if a.PythonVersion != "" {
+		if _, ok := man["python_version"]; !ok {
+			man["python_version"] = a.PythonVersion
+		}
+	}
+	ApplyKitToManifest(man, a.Kit)
 	for k, v := range a.Extra {
 		man[k] = v
 	}
@@ -65,16 +73,18 @@ func (s *Session) WriteReports(r Reports) (string, map[string]any, error) {
 		return "", nil, err
 	}
 	rep := SuiteReport{
-		SuiteName:  r.SuiteName,
-		Baseline:   r.Baseline,
-		Order:      r.Order,
-		Rows:       r.Rows,
-		Geomean:    r.Geomean,
-		Machine:    r.Machine,
-		Protocol:   Protocol,
-		Pins:       r.Pins,
-		Identities: r.Identities,
-		Skipped:    len(r.Skipped),
+		SuiteName:     r.SuiteName,
+		Baseline:      r.Baseline,
+		Order:         r.Order,
+		Rows:          r.Rows,
+		Geomean:       r.Geomean,
+		Machine:       r.Machine,
+		Protocol:      Protocol,
+		Pins:          r.Pins,
+		Identities:    r.Identities,
+		Skipped:       len(r.Skipped),
+		Kit:           r.Kit,
+		PythonVersion: r.PythonVersion,
 	}
 	md := rep.Markdown()
 	if err := os.WriteFile(filepath.Join(s.Dir, "report.md"), []byte(md), 0o644); err != nil {
