@@ -34,8 +34,9 @@ benchmarking is the `reference` profile's own artifact,
 `dist/artifacts/pyref_reference_<triple>/rootfs/bin/python3.14`.
 
 The dev container is still the easiest way to get a clean host, and its
-`/workspace` is a bind mount of the repo, but staticpy builds hermetically
-against a fetched toolchain and busybox, so the host is no longer load-bearing.
+`/workspace` is a bind mount of the repo. Job PATH is the fetched toolchain
+plus `dirname(busybox)`; perl, make, and the few other host tools that have
+to sit next to busybox are still load-bearing.
 Use `tmux` *on the host* (the container image does not ship `tmux`) to keep
 long-running build jobs alive.
 

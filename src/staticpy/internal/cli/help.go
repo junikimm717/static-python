@@ -40,11 +40,11 @@ const globalHelp = `GLOBAL FLAGS (accepted before or after the command)
   --toolchain T=PATH  use this tree for triple T. Repeatable. Wins over
                       --toolchains, for testing one target against a hand-built
                       compiler.
-  --busybox PATH      busybox binary supplying sh/awk/sed to hermetic builds.
-                      Defaults to whatever is on PATH; the shim passes the one
-                      it found. It is deliberately never downloaded: fetching an
-                      unpinned binary onto a build PATH would undercut the
-                      checksums the rest of the system depends on.
+  --busybox PATH      busybox binary whose directory is put on a restricted
+                      PATH. Defaults to whatever is on PATH; the shim passes
+                      the one it found. It is deliberately never downloaded:
+                      fetching an unpinned binary onto a build PATH would
+                      undercut the checksums the rest of the system depends on.
   --qemu T=PATH       qemu-user binary for running triple T's binaries.
                       Repeatable. Only verification needs it. Without one, the
                       target's qemu name from targets.toml is looked up on PATH.
@@ -62,11 +62,13 @@ const globalHelp = `GLOBAL FLAGS (accepted before or after the command)
   --offline           never touch the network; only sources already verified in
                       dist/src may be used. Fails immediately instead of hanging
                       on a mirror that is not there.
-  --hermetic          compose PATH from busybox and the selected toolchain only.
-                      On by default when a busybox is available, because that is
-                      what makes an artifact reproducible on another machine.
-  --no-hermetic       let the host PATH through: friendlier on a dev box,
-                      reproducible nowhere.
+  --restrict-path     PATH is the selected toolchain's bin and dirname(busybox)
+                      only. On by default when a busybox is available. Stops
+                      the host gcc from winning the name lookup; it is not a
+                      sandbox. --hermetic is a deprecated alias.
+  --host-path         append the process PATH after that. Friendlier on a bare
+                      machine; host tools can leak into configure.
+                      --no-hermetic is a deprecated alias.
   --keep-work         keep dist/work/<job>/ after a job succeeds, so
                       ` + "`staticpy shell <slug>`" + ` has a build tree to land in.
   -v, --verbose       mirror every command's output to the terminal as it runs.

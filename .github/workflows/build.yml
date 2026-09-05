@@ -38,7 +38,7 @@ jobs:
         with:
           go-version: stable
 
-      # busybox supplies sh/awk/sed to the hermetic builds; qemu-user runs the
+      # busybox supplies sh/awk/sed on a restricted PATH; qemu-user runs the
       # cross-built interpreter so --verify has something to verify on.
       - name: Install host tools
         run: |

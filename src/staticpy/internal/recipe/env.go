@@ -514,7 +514,7 @@ func (te *toolenv) vars() map[string]string {
 		"PKG_CONFIG_LIBDIR":      pc,
 		"PKG_CONFIG_PATH":        pc,
 		"PKG_CONFIG_SYSROOT_DIR": te.pcSysroot,
-		// The Runner substitutes the hermetic PATH; composing one here would
+		// The Runner substitutes the restricted PATH; composing one here would
 		// reintroduce whatever the developer has installed.
 		//
 		// A host-built profile names no target, which is what keeps the

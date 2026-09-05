@@ -46,14 +46,14 @@ type Global struct {
 	Workers int
 	Jobs    int
 
-	Offline     bool
-	hermetic    bool
-	noHermetic  bool
-	KeepWork    bool
-	Verbose     bool
-	JSON        bool
-	ColorWhen   string
-	GitRevision string
+	Offline      bool
+	restrictPath bool
+	hostPath     bool
+	KeepWork     bool
+	Verbose      bool
+	JSON         bool
+	ColorWhen    string
+	GitRevision  string
 
 	repoRoot   string
 	resolved   bool
@@ -226,7 +226,7 @@ func (g *Global) register(fs *flag.FlagSet) {
 	fs.Var(kvFlag{&g.Overrides, "triple"}, "toolchain",
 		"<triple>=<path> for one hand-built toolchain tree; repeatable, wins over --toolchains")
 	fs.StringVar(&g.Busybox, "busybox", g.Busybox,
-		"busybox binary supplying sh/awk/sed to hermetic builds (default: whatever is on PATH)")
+		"busybox binary whose directory is put on a restricted PATH (default: whatever is on PATH)")
 	fs.Var(kvFlag{&g.Qemu, "triple"}, "qemu",
 		"<triple>=<path> to a qemu-user binary for running that target's binaries; repeatable")
 	fs.StringVar(&g.Profile, "profile", g.Profile,
@@ -241,10 +241,14 @@ func (g *Global) register(fs *flag.FlagSet) {
 		"-j handed to each job's make (default: CPUs divided by --workers)")
 	fs.BoolVar(&g.Offline, "offline", g.Offline,
 		"never touch the network; only sources already verified in dist/src may be used")
-	fs.BoolVar(&g.hermetic, "hermetic", g.hermetic,
-		"compose PATH from busybox and the selected toolchain only (default when a busybox is available)")
-	fs.BoolVar(&g.noHermetic, "no-hermetic", g.noHermetic,
-		"let the host PATH through: friendlier on a dev box, reproducible nowhere")
+	fs.BoolVar(&g.restrictPath, "restrict-path", g.restrictPath,
+		"PATH is the selected toolchain's bin and dirname(busybox) only (default when a busybox is available)")
+	fs.BoolVar(&g.restrictPath, "hermetic", g.restrictPath,
+		"deprecated alias for --restrict-path")
+	fs.BoolVar(&g.hostPath, "host-path", g.hostPath,
+		"append the process PATH after the toolchain and busybox")
+	fs.BoolVar(&g.hostPath, "no-hermetic", g.hostPath,
+		"deprecated alias for --host-path")
 	fs.BoolVar(&g.KeepWork, "keep-work", g.KeepWork,
 		"keep dist/work/<job> after a job succeeds, so `staticpy shell <slug>` has a tree to land in")
 	fs.BoolVar(&g.Verbose, "v", g.Verbose,
@@ -359,8 +363,8 @@ func (g *Global) resolve() error {
 		return nil
 	}
 	setColor(g.ColorWhen)
-	if g.hermetic && g.noHermetic {
-		return usagef("--hermetic and --no-hermetic contradict each other")
+	if g.restrictPath && g.hostPath {
+		return usagef("--restrict-path and --host-path contradict each other")
 	}
 	g.repoRoot = findRepoRoot()
 	if g.Dist == "" {
@@ -625,33 +629,33 @@ func (g *Global) newEnv(cfg *config.Config, runLog bool) (*core.Env, func(), err
 	// Env, it just cannot build a package that needs a build-machine compiler.
 	host, _ := g.HostTriple(cfg)
 
-	hermetic := g.Busybox != ""
-	if g.hermetic {
-		hermetic = true
+	restrict := g.Busybox != ""
+	if g.restrictPath {
+		restrict = true
 	}
-	if g.noHermetic {
-		hermetic = false
+	if g.hostPath {
+		restrict = false
 	}
-	if hermetic && g.Busybox == "" {
+	if restrict && g.Busybox == "" {
 		log.Close()
-		return nil, nil, fmt.Errorf("--hermetic composes PATH from busybox and the toolchain alone, but no busybox was found on PATH and --busybox was not given.\nInstall busybox, pass --busybox <path>, or build with --no-hermetic and accept the host's tools")
+		return nil, nil, fmt.Errorf("--restrict-path composes PATH from busybox and the toolchain alone, but no busybox was found on PATH and --busybox was not given.\nInstall busybox, pass --busybox <path>, or build with --host-path and accept the host's tools")
 	}
 
 	workers, jobs := defaultParallelism(g.Workers, g.Jobs)
 	e := &core.Env{
-		Dist:       g.Dist,
-		RepoRoot:   g.repoRoot,
-		Toolchains: g.Toolchains,
-		Overrides:  g.Overrides,
-		Busybox:    g.Busybox,
-		Qemu:       g.qemuMap(cfg),
-		Hermetic:   hermetic,
-		Host:       host,
-		Offline:    g.Offline,
-		Jobs:       jobs,
-		MaxWorkers: workers,
-		KeepWork:   g.KeepWork,
-		Log:        log,
+		Dist:         g.Dist,
+		RepoRoot:     g.repoRoot,
+		Toolchains:   g.Toolchains,
+		Overrides:    g.Overrides,
+		Busybox:      g.Busybox,
+		Qemu:         g.qemuMap(cfg),
+		RestrictPath: restrict,
+		Host:         host,
+		Offline:      g.Offline,
+		Jobs:         jobs,
+		MaxWorkers:   workers,
+		KeepWork:     g.KeepWork,
+		Log:          log,
 	}
 	return e, func() { log.Close() }, nil
 }

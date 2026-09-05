@@ -19,10 +19,11 @@ const (
 
 // PathSentinel is what a recipe puts in Cmd.EnvAdd["PATH"] (or in a "PATH="
 // entry of a wholesale Cmd.Env) to have the Runner substitute Env.PathFor. A
-// recipe must not compose PATH itself: in hermetic mode the whole point is that
-// only the Env decides which directories a command can see, and a recipe that
-// pasted in os.Getenv("PATH") would silently reintroduce host tools. Append a
-// target triple to name the toolchain the command should see.
+// recipe must not compose PATH itself: with RestrictPath the whole point is
+// that only the Env decides which directories a command can see, and a
+// recipe that pasted in os.Getenv("PATH") would silently reintroduce host
+// tools. Append a target triple to name the toolchain the command should
+// see.
 const PathSentinel = "\x00staticpy-path\x00"
 
 var distSubdirs = []string{
@@ -155,10 +156,10 @@ func isDir(path string) bool {
 	return err == nil && fi.IsDir()
 }
 
-// Hermetic mode lists exactly the selected toolchain and busybox, so nothing a
-// developer happens to have installed can leak into an artifact and change it.
-// Without it the host's PATH follows, which is friendlier on a dev box and
-// reproducible nowhere.
+// RestrictPath lists exactly the selected toolchain and dirname(busybox), so
+// the host gcc does not win the name lookup. It is not a closed toolbox:
+// perl, make, and the rest have to live next to busybox or configure dies.
+// Without it the process PATH is appended.
 //
 // A named target that will not resolve is an error, never a silent omission:
 // dropping it would hand the build the host compiler under a target triple, or
@@ -179,11 +180,11 @@ func (e *Env) PathFor(target string) ([]string, error) {
 	if e.Busybox != "" {
 		out = append(out, filepath.Dir(e.Busybox))
 	}
-	if !e.Hermetic {
+	if !e.RestrictPath {
 		out = append(out, filepath.SplitList(os.Getenv("PATH"))...)
 	}
 	if len(out) == 0 {
-		return nil, fmt.Errorf("core: hermetic build has an empty PATH; --busybox is unset and no target was named")
+		return nil, fmt.Errorf("core: restricted PATH is empty; --busybox is unset and no target was named")
 	}
 	return out, nil
 }

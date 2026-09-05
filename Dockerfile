@@ -53,7 +53,7 @@ RUN chmod +x /tmp/fetch-qemu-user.sh \
 COPY scripts/docker/binfmt /usr/local/bin/binfmt
 RUN chmod +x /usr/local/bin/binfmt
 
-# Hermetic PATH is dirname(busybox). Put the applets configure looks up
+# Restricted PATH is dirname(busybox). Put the applets configure looks up
 # next to it so sqlite/openssl find tclsh, jimsh, perl, make, and GNU patch.
 RUN busybox --install -s /bin \
  && for p in perl jimsh tclsh make patch; do \

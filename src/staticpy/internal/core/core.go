@@ -118,10 +118,10 @@ type Env struct {
 	Busybox string
 	Qemu    map[string]string
 
-	// Hermetic composes PATH from Busybox plus the selected toolchain and
-	// nothing else. Off means host tools are visible, which is friendlier on a
-	// dev box and reproducible nowhere.
-	Hermetic bool
+	// RestrictPath composes PATH from Busybox plus the selected toolchain and
+	// nothing else. Off means the process PATH is appended, so the host gcc
+	// can win a name lookup. This is not a sandbox.
+	RestrictPath bool
 
 	// Host is the build machine's triple. Recipes need it to reach a compiler
 	// whose output runs here, for packages that build a helper and then execute

@@ -28,8 +28,9 @@ WHAT IS CHECKED
             either builds or is handed by the shim, but no toolchain ships a
             perl and busybox has no perl applet.
   patch     applies the pinned diffs to the source trees. busybox provides one.
-  busybox   supplies sh/awk/sed to a hermetic build. Without it, builds fall
-            back to the host's tools and stop being reproducible elsewhere.
+  busybox   supplies sh/awk/sed on a restricted PATH. Without it, builds
+            append the process PATH (--host-path behaviour) and the host
+            gcc can win a name lookup.
   toolchain one <triple>-cross or <triple>-native tree per target, under
             --toolchains. staticpy never fetches these; the shim does.
   qemu      needed to RUN a non-native target's binaries, so only verification
@@ -123,7 +124,7 @@ func doctorReport(g *Global) error {
 	}
 	busybox := toolCheck{Name: "busybox", OK: g.Busybox != "", Detail: g.Busybox}
 	if !busybox.OK {
-		busybox.Detail = "not found on PATH; builds will fall back to the host's tools (--no-hermetic behaviour) and will not be reproducible elsewhere"
+		busybox.Detail = "not found on PATH; builds will append the process PATH (--host-path behaviour) and the host gcc can win a name lookup"
 	}
 	tools = append(tools, busybox)
 
