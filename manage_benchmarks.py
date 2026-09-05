@@ -420,6 +420,65 @@ def _fmt_geo(geo: dict) -> str:
     return ",".join(parts) if parts else "-"
 
 
+# Factor *values* from the session protocol, not profile names.
+_LTO_WORDS = {
+    "whole-graph": "whole-program LTO",
+    "per-dep": "per-library LTO",
+    "none": "no LTO",
+}
+
+
+def _interp_tip(item: dict, *, baseline: str = "") -> str:
+    if not isinstance(item, dict):
+        return ""
+    label = str(item.get("label") or "")
+    factors = item.get("factors") if isinstance(item.get("factors"), dict) else {}
+    linkage = factors.get("linkage") or item.get("linkage") or ""
+    libc = factors.get("libc") or ""
+    who = " ".join(p for p in (linkage, libc) if p)
+    if who:
+        who = who[0].upper() + who[1:] + " interpreter"
+    lto = _LTO_WORDS.get(factors.get("lto", ""), factors.get("lto") or "")
+    alloc = factors.get("allocator") or ""
+    if alloc and alloc != "mimalloc":
+        alloc = alloc + " malloc"
+    pgo = factors.get("pgo")
+    bits = [p for p in (lto, alloc, "PGO" if pgo is True else ("no PGO" if pgo is False else "")) if p]
+    if who and bits:
+        head = f"{who} with {', '.join(bits)}"
+    else:
+        head = who or ", ".join(bits)
+    parts = [p for p in (head,) if p]
+    if baseline and label == baseline:
+        parts.append("Baseline for the ratios")
+    key = _short_sha(item.get("artifact_key"))
+    if key:
+        parts.append("artifact " + key)
+    if not parts:
+        return label
+    text = ". ".join(parts)
+    return text if text.endswith(".") else text + "."
+
+
+def _interp_tips(manifest: dict) -> dict[str, str]:
+    tips: dict[str, str] = {}
+    interps = manifest.get("interpreters")
+    if not isinstance(interps, list):
+        return tips
+    baseline = manifest.get("baseline") if isinstance(manifest.get("baseline"), str) else ""
+    for item in interps:
+        if isinstance(item, dict) and item.get("label"):
+            tips[str(item["label"])] = _interp_tip(item, baseline=baseline)
+    return tips
+
+
+def _tipped(label: str, tips: dict[str, str]) -> str:
+    tip = tips.get(label)
+    if not tip:
+        return _esc(label)
+    return f'<span data-tip="{_esc(tip)}">{_esc(label)}</span>'
+
+
 def geomean_svg(run: dict) -> str:
     geo = run.get("geomean_vs_baseline") or {}
     baseline = run.get("baseline") or ""
@@ -447,13 +506,16 @@ def geomean_svg(run: dict) -> str:
         f'aria-label="geomean vs {_esc(baseline)}">',
         f'<rect width="{width}" height="{height}" fill="transparent"/>',
     ]
+    tips = _interp_tips(run.get("_manifest") or {})
     for i, (label, val) in enumerate(zip(labels, vals)):
         y = top + i * (bar_h + gap)
         bw = (val / max_v * bar_max) if max_v > 0 else 0
         fill = "#4a5568" if label == baseline else "#2b6cb0"
+        tip = tips.get(label, "")
+        tip_attr = f' data-tip="{_esc(tip)}"' if tip else ""
         parts.append(
             f'<text x="{left + label_w - 8}" y="{y + bar_h - 5}" text-anchor="end" '
-            f'font-size="12" fill="currentColor">{_esc(label)}</text>'
+            f'font-size="12" fill="currentColor"{tip_attr}>{_esc(label)}</text>'
         )
         parts.append(
             f'<rect x="{left + label_w}" y="{y}" width="{bw:.1f}" height="{bar_h}" '
@@ -486,11 +548,20 @@ table{border-collapse:collapse;width:100%;margin:1rem 0}
 th,td{border:1px solid #cbd5e0;padding:.35rem .55rem;text-align:right;vertical-align:top}
 th:first-child,td:first-child{text-align:left}
 table.ratios{font-variant-numeric:tabular-nums}
-td.ratio.win{background:color-mix(in srgb,#31a354 calc(var(--t)*58%),transparent);font-weight:600}
-td.ratio.lose{background:color-mix(in srgb,#e53e3e calc(var(--t)*58%),transparent);font-weight:600}
+.ratio{font-weight:600}
+.ratio.lose3{background:#d55e00;color:#fff}
+.ratio.lose2{background:#e69f00;color:#1a202c}
+.ratio.lose1{background:#f0e442;color:#1a202c}
+.ratio.win1{background:#56b4e9;color:#1a202c}
+.ratio.win2{background:#0072b2;color:#fff}
+.ratio.win3{background:#cc79a7;color:#1a202c}
 .scale{color:#4a5568;font-size:.9rem;margin:.4rem 0 0}
-.scale.swatches{display:flex;gap:.35rem;flex-wrap:wrap;margin:.45rem 0 .2rem;align-items:center}
-.scale .swatch{display:inline-block;padding:.1rem .45rem;border:1px solid #cbd5e0;border-radius:4px;font-variant-numeric:tabular-nums}
+.scale.swatches{display:flex;gap:.4rem;flex-wrap:wrap;margin:.55rem 0 .3rem;align-items:center}
+.scale .swatch{display:inline-block;padding:.2rem .55rem;border:1px solid #cbd5e0;border-radius:4px;font-variant-numeric:tabular-nums}
+.scale .swatch:not(.ratio){background:#edf2f7;color:#4a5568}
+[data-tip]{cursor:help;border-bottom:1px dotted currentColor}
+#arm-tip{position:fixed;z-index:20;max-width:22rem;padding:.55rem .75rem;border-radius:6px;background:#1a202c;color:#f7fafc;font-size:.85rem;line-height:1.4;box-shadow:0 4px 16px rgba(0,0,0,.35);pointer-events:none}
+#arm-tip[hidden]{display:none}
 .env{background:#f7fafc;padding:.75rem 1rem;border-radius:6px}
 .env dt{font-weight:600;float:left;clear:left;width:9rem}
 .env dd{margin-left:9.5rem}
@@ -512,13 +583,45 @@ a{color:#63b3ed}
 .lede,.meta{color:#a0aec0}
 .skip{color:#f6ad55}
 th,td{border-color:#4a5568}
-td.ratio.win{background:color-mix(in srgb,#38a169 calc(var(--t)*48%),transparent)}
-td.ratio.lose{background:color-mix(in srgb,#fc8181 calc(var(--t)*42%),transparent)}
+.ratio.lose3{background:#d55e00;color:#fff}
+.ratio.lose2{background:#e69f00;color:#1a202c}
+.ratio.lose1{background:#b7791f;color:#1a202c}
+.ratio.win1{background:#56b4e9;color:#1a202c}
+.ratio.win2{background:#0072b2;color:#fff}
+.ratio.win3{background:#cc79a7;color:#1a202c}
 .scale{color:#a0aec0}
 .scale .swatch{border-color:#4a5568}
+.scale .swatch:not(.ratio){background:#2d3748;color:#a0aec0}
 .env,.empty,.panel{background:#2d3748;border-color:#4a5568}
 .banner{background:#744210;border-color:#d69e2e;color:#fefcbf}
+#arm-tip{background:#f7fafc;color:#1a202c}
 }
+"""
+
+
+_TIP_JS = """
+<script>
+(function(){
+  var box = document.getElementById("arm-tip");
+  if (!box) return;
+  function hide(){ box.hidden = true; }
+  document.addEventListener("pointerover", function(e){
+    var t = e.target.closest("[data-tip]");
+    if (!t) { hide(); return; }
+    box.textContent = t.getAttribute("data-tip");
+    box.hidden = false;
+    var r = t.getBoundingClientRect();
+    var x = Math.min(r.left, innerWidth - box.offsetWidth - 8);
+    var y = r.bottom + 8;
+    if (y + box.offsetHeight > innerHeight - 8) y = r.top - box.offsetHeight - 8;
+    box.style.left = Math.max(8, x) + "px";
+    box.style.top = Math.max(8, y) + "px";
+  });
+  document.addEventListener("pointerout", function(e){
+    if (!e.relatedTarget || !e.relatedTarget.closest("[data-tip]")) hide();
+  });
+})();
+</script>
 """
 
 
@@ -528,7 +631,9 @@ def _page(title: str, body: str) -> str:
         "<meta charset=\"utf-8\">\n"
         "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n"
         f"<title>{_esc(title)}</title>\n"
-        f"<style>{CSS}</style>\n</head>\n<body>\n{body}\n</body>\n</html>\n"
+        f"<style>{CSS}</style>\n</head>\n<body>\n{body}\n"
+        '<div id="arm-tip" hidden></div>\n'
+        f"{_TIP_JS}</body>\n</html>\n"
     )
 
 
@@ -627,9 +732,10 @@ def _interpreters_html(manifest: dict) -> str:
         if not isinstance(item, dict):
             continue
         factors = item.get("factors") if isinstance(item.get("factors"), dict) else {}
+        label = str(item.get("label", ""))
         parts.append(
             "<tr>"
-            f'<td>{_esc(item.get("label", ""))}</td>'
+            f'<td>{_tipped(label, {label: _interp_tip(item)})}</td>'
             f'<td><code>{_esc(_short_sha(item.get("binary_sha256") or item.get("sha256")))}</code></td>'
             f'<td><code>{_esc(_short_sha(item.get("artifact_key")))}</code></td>'
             f'<td>{_esc(factors.get("linkage", item.get("linkage", "")))}</td>'
@@ -644,57 +750,66 @@ def _interpreters_html(manifest: dict) -> str:
     return "".join(parts)
 
 
-# ±2% is treated as flat. Intensity is |log2(ratio)|, clipped at 2× / 0.5×
-# so a 3× outlier saturates instead of stretching the rest of the scale.
-_RATIO_FLAT = math.log2(1.02)
-_RATIO_CLIP = 1.0  # log2(2)
-
-
-def _ratio_tint(v: float) -> tuple[str, float]:
+# Discrete bands. A one-hue opacity ramp made every win look the same.
+def _ratio_band(v: float) -> str:
     if v <= 0 or math.isnan(v) or math.isinf(v):
-        return "", 0.0
-    mag = math.log2(v)
-    if abs(mag) < _RATIO_FLAT:
-        return "", 0.0
-    t = min(abs(mag) / _RATIO_CLIP, 1.0)
-    # sqrt so a 1.25× cell is readable instead of almost empty.
-    return ("win" if mag > 0 else "lose", math.sqrt(t))
+        return ""
+    if v < 0.75:
+        return "lose3"
+    if v < 0.90:
+        return "lose2"
+    if v < 0.98:
+        return "lose1"
+    if v <= 1.02:
+        return ""
+    if v < 1.20:
+        return "win1"
+    if v < 1.50:
+        return "win2"
+    return "win3"
 
 
 def _ratio_td(v: float) -> str:
-    kind, t = _ratio_tint(v)
-    if kind:
-        return (
-            f'<td class="ratio {kind}" style="--t:{t:.3f}">{v:.2f}x</td>'
-        )
+    band = _ratio_band(v)
+    if band:
+        return f'<td class="ratio {band}">{v:.2f}x</td>'
     return f"<td>{v:.2f}x</td>"
 
 
 def _ratio_scale_html() -> str:
-    stops = (0.5, 0.8, 1.0, 1.25, 2.0)
+    stops = (
+        (0.5, "<0.75×"),
+        (0.8, "0.75–0.90×"),
+        (0.95, "0.90–0.98×"),
+        (1.0, "±2%"),
+        (1.10, "1.02–1.20×"),
+        (1.35, "1.20–1.50×"),
+        (2.0, "≥1.50×"),
+    )
     chips = []
-    for v in stops:
-        kind, t = _ratio_tint(v)
-        cls = f"swatch ratio {kind}".strip() if kind else "swatch"
-        style = f' style="--t:{t:.3f}"' if kind else ""
-        chips.append(f'<span class="{cls}"{style}>{v:g}×</span>')
+    for v, label in stops:
+        band = _ratio_band(v)
+        cls = f"swatch ratio {band}".strip() if band else "swatch"
+        chips.append(f'<span class="{cls}">{_esc(label)}</span>')
     return (
-        '<p class="scale">Fill is log<sub>2</sub> of the ratio vs baseline, '
-        "clipped at 0.5× and 2×. Green is faster.</p>\n"
+        '<p class="scale">Sky = small, blue = large, magenta = outlier. '
+        "Yellow / orange / vermillion are the same steps slower.</p>\n"
         f'<p class="scale swatches">{"".join(chips)}</p>\n'
     )
 
 
-def _ratio_table_html(report: dict, order: list[str]) -> str:
+def _ratio_table_html(report: dict, order: list[str], tips: dict[str, str] | None = None) -> str:
     rows = report.get("rows")
     if not isinstance(rows, list) or not rows or not order:
         return ""
+    tips = tips or {}
     parts = [
         _ratio_scale_html(),
+        '<p class="scale">Hover an arm name for what that binary is.</p>\n',
         '<div class="table-wrap"><table class="ratios">\n<thead><tr><th>benchmark</th>',
     ]
     for a in order:
-        parts.append(f"<th>{_esc(a)}</th>")
+        parts.append(f"<th>{_tipped(a, tips)}</th>")
     parts.append("</tr></thead>\n<tbody>\n")
     for row in rows:
         if not isinstance(row, dict):
@@ -844,7 +959,7 @@ def _run_page_body(run: dict) -> str:
         f"Per-benchmark ratio vs {baseline}" if baseline else "Per-benchmark ratio"
     )
     parts.append(f"<h2>{_esc(ratio_heading)}</h2>\n")
-    table = _ratio_table_html(report, run.get("arms") or [])
+    table = _ratio_table_html(report, run.get("arms") or [], _interp_tips(manifest))
     if table:
         parts.append(table)
     else:

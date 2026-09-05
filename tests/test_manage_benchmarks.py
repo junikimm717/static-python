@@ -209,10 +209,16 @@ class SiteTests(unittest.TestCase):
         self.assertIn("mimalloc", page)
         self.assertIn("pyperformance==1.14.0", page)
         self.assertNotIn("<th>packages</th>", page)
-        self.assertIn('class="ratio win"', page)
-        self.assertIn('class="ratio lose"', page)
-        self.assertIn("--t:", page)
-        self.assertIn("clipped at 0.5× and 2×", page)
+        self.assertIn('class="ratio win1"', page)
+        self.assertIn('class="ratio win3"', page)
+        self.assertIn('class="ratio lose3"', page)
+        self.assertIn("magenta = outlier", page)
+        self.assertIn('class="swatch ratio lose3"', page)
+        self.assertIn('class="swatch ratio win3"', page)
+        self.assertIn("data-tip=", page)
+        self.assertIn("whole-program LTO", page)
+        self.assertIn("Baseline for the ratios", page)
+        self.assertIn("Hover an arm name", page)
 
     def test_site_badges_fixtures(self):
         tmp = Path(tempfile.mkdtemp())
@@ -230,24 +236,48 @@ class SiteTests(unittest.TestCase):
         self.assertIn("<h1>pyperformance comparison</h1>", page)
 
 
+class InterpTipTests(unittest.TestCase):
+    def test_tip_is_from_factors_not_the_label(self):
+        tip = mb._interp_tip(
+            {
+                "label": "some-future-arm",
+                "artifact_key": "abcd1234eeee",
+                "factors": {
+                    "linkage": "static",
+                    "libc": "musl",
+                    "lto": "per-dep",
+                    "allocator": "jemalloc",
+                    "pgo": False,
+                },
+            }
+        )
+        self.assertIn("Static musl interpreter", tip)
+        self.assertIn("per-library LTO", tip)
+        self.assertIn("jemalloc malloc", tip)
+        self.assertIn("no PGO", tip)
+        self.assertIn("artifact abcd1234eeee", tip)
+        self.assertNotIn("some-future-arm", tip)
+
+    def test_baseline_flag_uses_session_label(self):
+        tip = mb._interp_tip(
+            {"label": "whatever", "factors": {"linkage": "dynamic", "pgo": True}},
+            baseline="whatever",
+        )
+        self.assertIn("Baseline for the ratios", tip)
+
+
 class RatioTintTests(unittest.TestCase):
-    def test_neutral_band_and_clip(self):
-        self.assertEqual(mb._ratio_tint(1.0), ("", 0.0))
-        self.assertEqual(mb._ratio_tint(1.01), ("", 0.0))
-        self.assertEqual(mb._ratio_tint(0.99), ("", 0.0))
-        kind, t = mb._ratio_tint(2.0)
-        self.assertEqual(kind, "win")
-        self.assertAlmostEqual(t, 1.0)
-        kind, t = mb._ratio_tint(0.5)
-        self.assertEqual(kind, "lose")
-        self.assertAlmostEqual(t, 1.0)
-        kind, t = mb._ratio_tint(3.27)
-        self.assertEqual(kind, "win")
-        self.assertAlmostEqual(t, 1.0)
-        kind, t = mb._ratio_tint(1.25)
-        self.assertEqual(kind, "win")
-        self.assertGreater(t, 0.4)
-        self.assertLess(t, 0.7)
+    def test_bands(self):
+        self.assertEqual(mb._ratio_band(1.0), "")
+        self.assertEqual(mb._ratio_band(1.02), "")
+        self.assertEqual(mb._ratio_band(0.98), "")
+        self.assertEqual(mb._ratio_band(0.5), "lose3")
+        self.assertEqual(mb._ratio_band(0.8), "lose2")
+        self.assertEqual(mb._ratio_band(0.95), "lose1")
+        self.assertEqual(mb._ratio_band(1.10), "win1")
+        self.assertEqual(mb._ratio_band(1.35), "win2")
+        self.assertEqual(mb._ratio_band(2.0), "win3")
+        self.assertEqual(mb._ratio_band(3.27), "win3")
 
 
 class GitignoreTests(unittest.TestCase):
