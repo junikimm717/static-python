@@ -10,29 +10,13 @@ services:
     # docker keeps read-only unless the container is privileged. The table is
     # the host kernel's, so this is registering for the machine, not the
     # container -- drop both lines if that is not a trade you want. On a host
-    # that already has an arch registered, `docker compose logs` shows a red
-    # "Failed to register" for it; that one means "already there".
+    # that already has an arch registered, `docker compose logs` shows
+    # "already registered" for it; that one means "already there".
     privileged: true
     # Default docker nofile is 1024; parallel configure/LTO links blow through it.
     ulimits:
       nofile:
         soft: 1048576
         hard: 1048576
-    entrypoint: /bin/sh -c "binfmt start; trap 'exit 0' SIGTERM; while :; do sleep 1; done"
-    tty: true
-
-  # glibc hostcc for --profile reference*. Shares dist/ with spython;
-  # hostcc-keyed publish paths keep the two libcs from sharing a prefix.
-  ubuntu:
-    image: static-python-ubuntu:24.04
-    build:
-      context: .
-      dockerfile: Dockerfile.ubuntu
-    volumes:
-      - .:/workspace
-    ulimits:
-      nofile:
-        soft: 1048576
-        hard: 1048576
-    entrypoint: /bin/sh -c "trap 'exit 0' SIGTERM; while :; do sleep 1; done"
+    entrypoint: /bin/sh -c "binfmt start; trap 'exit 0' TERM; while :; do sleep 1; done"
     tty: true

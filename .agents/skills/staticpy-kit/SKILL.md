@@ -14,9 +14,7 @@ pyperformance/pyperf/setuptools, `kit.json`, and `bin/staticpy-bench`.
 `./run` on the quiet box is `staticpy-bench bench --kit .`.
 
 ```sh
-# ubuntu: reference* arms are host-built glibc. spython would rebuild them
-# against musl and the baseline would be the wrong libc.
-docker compose exec -T ubuntu sh -c 'cd /workspace && ./staticpy kit --name default --verify core'
+docker compose exec -T spython sh -c 'cd /workspace && ./staticpy kit --name default --verify core'
 ```
 
 Native only, same reason as `bench`. The tarball lands under

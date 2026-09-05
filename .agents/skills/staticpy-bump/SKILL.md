@@ -187,11 +187,10 @@ without exploding RSS — LTO is the peak, so measure before trusting the
 worker default. earlyoom is a backstop, not a plan. Fail-fast: one flake
 abandons the queue, so re-run rather than reading a partial sweep.
 
-**Docker, not the host.** `spython` for every static / cross cell.
-`ubuntu` for host-built `reference*` arms (hostcc-keyed prefixes; Alpine
-and glibc must not share a directory). `staticpy kit` for the lineup in
-`[kit.default]` also belongs on `ubuntu`, or the baseline is the wrong
-libc.
+**Docker, not the host.** One container (`spython`) for every cell:
+static, cross, `reference*`, and `staticpy kit`. The image is Ubuntu, so
+`reference*` is glibc; static/cross still link gccfactory musl. Do not
+stand up a second container to "keep the libcs apart".
 
 **Tmux on the host.** The container has no tmux. Detach a session that
 `docker compose exec`s, tees the log, and writes `EXIT_CODE=` from
@@ -203,7 +202,6 @@ the work and then stamp the kit at a non-dirty version. A kit packed from
 a dirty tree advertises `HEAD-dirty` in `kit.json` and `staticpy-bench`.
 
 Done when: `staticpy status --target all --verify core --pack` is 0 stale
-/ 0 missing on every static profile; ubuntu status is the same for each
-`reference*`; every verify report has `failed=0`; every tarball sha256
-matches its sidecar; the kit, if you shipped one, has a clean
-`git_revision`.
+/ 0 missing on every static profile and each `reference*`; every verify
+report has `failed=0`; every tarball sha256 matches its sidecar; the
+kit, if you shipped one, has a clean `git_revision`.

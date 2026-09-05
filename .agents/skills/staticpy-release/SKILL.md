@@ -71,7 +71,7 @@ asks to replace that release.
 ## Which tarball is "the" reference
 
 Host-built prefixes are keyed on hostcc (`pack.go` / `hostPublishSuffix`).
-Alpine musl and Ubuntu glibc must not share a directory.
+Two machines that share `dist/` still must not write the same prefix.
 
 | path | use |
 |---|---|
@@ -97,9 +97,8 @@ checked verify reports this run.
   (~8 KiB), max a reference tarball (~60 MiB), not 17 bytes.
 - `gh release view` without `--repo` fails if cwd is `/tmp/...`.
 - Older `gh` has no `--latest`; omit it.
-- The Alpine `reference*` loop in a mixed sweep can exit non-zero
-  (`KIT_SKIPPED`). That is not a static-cell failure and not a reason
-  to skip this release.
+- A leftover `dist/out/reference*/<triple>/` (no `_<hex>`) is not an
+  asset. The check script refuses it; do not "fix" that by uploading it.
 
 ## After
 

@@ -41,6 +41,12 @@ long-running build jobs alive.
 
 ## Container handle
 
+There is one container. Static, cross, `reference*`, verify, pack, and
+`kit` all run in it. Do not introduce a second image to "keep glibc and
+musl apart" — the image is Ubuntu (glibc hostcc for `reference*`);
+static/cross still use the gccfactory musl toolchains under
+`dist/toolchains/`.
+
 ```sh
 # one-shot exec
 docker compose exec -T spython sh -c 'cd /workspace && ...'
@@ -79,12 +85,12 @@ workers.
   multi-hour wall clock. Note that the build is fail-fast: one target's flake
   abandons the jobs still queued, so re-run rather than concluding anything
   from a partial sweep.
-- **Dynamic baseline (whichever host you're on)**:
+- **Dynamic baseline** (same container as the static build):
   ```sh
   ./staticpy build --profile reference
   ```
-  Builds a stock `--enable-shared` Python of the same pinned version with this
-  machine's own gcc, against shared copies of the same pinned dependencies.
+  Builds a stock `--enable-shared` Python of the same pinned version with the
+  container's gcc, against shared copies of the same pinned dependencies.
 
 Everything staticpy writes lives under `dist/` and is safe to delete; a
 content-addressed rebuild recovers whatever you removed. Within it:

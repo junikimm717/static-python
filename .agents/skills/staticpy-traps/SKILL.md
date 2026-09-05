@@ -36,8 +36,8 @@ Catch the **class** of the bug before you write the parking ticket:
 Those overnight parking tickets now have complete fixes. Do not put them
 back: Linux getpath reads `/proc/self/exe`; per-dep LTO deps configure
 with `/usr` and the recipe rewrites `.pc`/`.la`; `libat_atfork.c`
-replaces gcc's lock table; Alpine qemu is pinned to 11.1.1 and Ubuntu
-`*-binfmt-P` names are shimmed to Alpine's qemu.
+replaces gcc's lock table; the image pins qemu-user 11.1.1 and shims
+Ubuntu `*-binfmt-P` names to it.
 
 ## The long write-ups, in `references/`
 
@@ -108,9 +108,9 @@ Smoke probes pass (staticpy prefixes `qemu-riscv64`). Anything that
 `exec`s `sys.executable` is the host kernel's binfmt table, which is
 global and first-writer. Host `qemu-user-binfmt` registers
 `/usr/libexec/qemu-binfmt/<arch>-binfmt-P`. Dockerfile shims make that
-path exist *inside spython* for today's apk list; a new arch, a stale
-image, Fedora's `qemu-<arch>-static` names, or CI's host verify all
-miss. Refuse to verify unless the registered interpreter exists in
+path exist inside the container for today's qemu list in
+`scripts/docker/fetch-qemu-user.sh`; a new arch, a stale image, Fedora's
+`qemu-<arch>-static` names, or CI's host verify all miss. Refuse to verify unless the registered interpreter exists in
 this mount namespace. Do not wrap CPython's re-exec. Not an `[expect]`.
 
 **`test_subprocess.test_executable_without_cwd` fails with missing encodings.**
@@ -123,9 +123,10 @@ apply; do not add `[expect.static]`.
 
 **i386 core verify: `test_divmod` / `test_math` / `test_struct` fail under qemu.**
 qemu 11.0 TCG leaves `cc_op` stale after `SAHF` (`da7649c6`, GitLab #3537).
-Fixed in 11.0.4 / 11.1. The spython image pins qemu-user **11.1.1** from
-Alpine edge. If those methods fail again, the image is still on 11.0.x —
-upgrade qemu, do not restore the `:qemu` ignores. `*MathTests.testSinh*`
+Fixed in 11.0.4 / 11.1. The image pins qemu-user **11.1.1** (Alpine
+static-pie binaries, not Ubuntu 24.04's 8.2.2). If those methods fail
+again, the image is still on 11.0.x — upgrade qemu, do not restore the
+`:qemu` ignores. `*MathTests.testSinh*`
 is the real x87 1-ulp ABI issue and stays on `[expect.i386-linux-musl]`.
 Write-up: `references/I386_QEMU_SAHF.md`.
 
@@ -133,7 +134,7 @@ Write-up: `references/I386_QEMU_SAHF.md`.
 Same binfmt class. CPython reads `/proc/self/stat` field 20
 (`num_threads`). qemu < 9.1 (host Ubuntu 8.2.2) leaves it `0`. A
 missing shim falls through to the host qemu; a present shim keeps
-re-exec on Alpine 11.1.1. Doctor must require the binfmt interpreter
+re-exec on the image's 11.1.1. Doctor must require the binfmt interpreter
 to exist *and* be ≥ 9.1. Do not restore `[expect.qemu]`.
 
 **`suite:test_threading` SIGSEGV on s390x: `test_recursion_limit` (Issue 9670).**
@@ -157,7 +158,7 @@ script SIGSEGVs there, give it the same define, not a per-triple ignore.
 sqlite's configure builds a bootstrap `jimsh0` with the *target* CC and
 then runs it. Host binfmt intercepts the cross ELF. `B.cc=@BUILD_CC@`
 is make-only; configure never sees it. A host `jimsh` on the *hermetic*
-PATH skips the bootstrap — `/bin/jimsh` in the Dockerfile is the Alpine
+PATH skips the bootstrap — `/bin/jimsh` in the Dockerfile is the
 layout, same class as `expr`/`perl`. Put LookPath(jimsh) in the hermetic
 bin. Without it the message is often `./jimsh0: not found` then `No
 working C compiler found`. Do not make qemu able to run configure tests.
@@ -165,7 +166,7 @@ working C compiler found`. Do not make qemu able to run configure tests.
 **pyref sqlite configure: `Cannot find a tclsh to use for code generation`.**
 sqlite 3.51 autosetup looks for `tclsh`, not `jimsh`. The image shipped
 `jimtcl` (enough for the static `jimsh0` skip) and pyref still died on
-the host gcc path. `apk add tcl` and `/bin/tclsh` in the Dockerfile.
+the host gcc path. `apt install tcl` and `/bin/tclsh` in the Dockerfile.
 Do not pass `--disable-tcl` — that drops the amalgamation codegen.
 
 **`suite:test_bytes` unexpected pass on a reference arm.** `expect.static`
@@ -187,7 +188,7 @@ core as if it were missing. Unwrap `rootfs/` the same way.
 
 **`lto1: Cannot open Modules/_cursesmodule.o` during a CPython LTO link.**
 The other builder's `GCStale` deleted this job's live `dist/work` tree.
-`kill(pid, 0)` is PID-namespace local; spython and kitbuild share `dist/`
+`kill(pid, 0)` is PID-namespace local; the container and kitbuild share `dist/`
 and after `StaleAge` (10 min, shorter than `-flto-partition=none` WPA)
 each treats the other's scratch as dead. gcc 16 then reprints the next
 `open` as `Cannot open %s` with no errno (`_ssl.o`, `blob.o`,
@@ -239,9 +240,9 @@ docs, not a recipe refuse.
 **pyref libffi: `Something went wrong bootstrapping makefile fragments`.**
 Same hermetic-PATH class as `expr`. Host-built PATH names no toolchain,
 so it is `dirname(busybox)` only. GNU make lives at `/usr/bin/make`.
-`/bin/make` in the Dockerfile is the Alpine layout; Ubuntu "works"
-because usr-merge makes `dirname(/usr/bin/busybox)` equal `/usr/bin`
-and accidentally puts gcc/ld on PATH. Put LookPath(GNU make) and
+`/bin/make` in the Dockerfile is the hermetic-PATH layout; usr-merge
+makes `dirname(/usr/bin/busybox)` equal `/usr/bin` and accidentally
+puts gcc/ld on PATH. Put LookPath(GNU make) and
 LookPath(GNU patch) in the hermetic bin (overwrite busybox's `patch`
 applet). Do not put `/usr/bin` on the hermetic PATH.
 
