@@ -436,7 +436,7 @@ def geomean_svg(run: dict) -> str:
             vals.append(float(v))
     if not labels:
         return ""
-    label_w, bar_max, bar_h, gap, left, top = 140, 280, 18, 8, 12, 10
+    label_w, bar_max, bar_h, gap, left, top = 180, 320, 22, 10, 16, 16
     max_v = max(vals) if vals else 1.0
     width = left + label_w + bar_max + 70
     height = top + len(labels) * (bar_h + gap) + 4
@@ -444,7 +444,7 @@ def geomean_svg(run: dict) -> str:
         f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
         f'width="{width}" height="{height}" role="img" '
         f'aria-label="geomean vs {_esc(baseline)}">',
-        f'<rect width="{width}" height="{height}" fill="#fff"/>',
+        f'<rect width="{width}" height="{height}" fill="transparent"/>',
     ]
     for i, (label, val) in enumerate(zip(labels, vals)):
         y = top + i * (bar_h + gap)
@@ -452,7 +452,7 @@ def geomean_svg(run: dict) -> str:
         fill = "#4a5568" if label == baseline else "#2b6cb0"
         parts.append(
             f'<text x="{left + label_w - 8}" y="{y + bar_h - 5}" text-anchor="end" '
-            f'font-size="12" fill="#1a202c">{_esc(label)}</text>'
+            f'font-size="12" fill="currentColor">{_esc(label)}</text>'
         )
         parts.append(
             f'<rect x="{left + label_w}" y="{y}" width="{bw:.1f}" height="{bar_h}" '
@@ -460,7 +460,7 @@ def geomean_svg(run: dict) -> str:
         )
         parts.append(
             f'<text x="{left + label_w + bw + 8:.1f}" y="{y + bar_h - 5}" '
-            f'font-size="11" fill="#1a202c">{val:.3f}x</text>'
+            f'font-size="11" fill="currentColor">{val:.3f}x</text>'
         )
     parts.append("</svg>")
     return "\n".join(parts)
@@ -472,19 +472,46 @@ def _body_inner(doc: str) -> str:
 
 
 CSS = """
-body{font:14px/1.45 system-ui,sans-serif;max-width:960px;margin:2rem auto;padding:0 1rem;color:#1a202c}
-h1,h2{font-weight:600}
+body{font:15px/1.5 system-ui,sans-serif;max-width:1100px;margin:2rem auto;padding:0 1.25rem;color:#1a202c}
+h1{font-size:1.75rem;font-weight:650;margin:.25rem 0 .4rem}
+h2{font-size:1.15rem;font-weight:600;margin:1.75rem 0 .6rem}
+h3{font-size:1rem;font-weight:600;margin:1rem 0 .4rem}
 a{color:#2b6cb0}
+.lede{color:#4a5568;margin:.15rem 0 .4rem}
+.meta{color:#4a5568;font-size:.9rem;margin:.15rem 0 1.25rem}
+.skip{color:#744210}
+.table-wrap{overflow-x:auto;margin:1rem 0}
 table{border-collapse:collapse;width:100%;margin:1rem 0}
-th,td{border:1px solid #cbd5e0;padding:.35rem .6rem;text-align:right}
+th,td{border:1px solid #cbd5e0;padding:.35rem .55rem;text-align:right;vertical-align:top}
 th:first-child,td:first-child{text-align:left}
+td.fast{color:#276749;font-weight:600}
+td.slow{color:#c53030;font-weight:600}
 .env{background:#f7fafc;padding:.75rem 1rem;border-radius:6px}
-.env pre{white-space:pre-wrap;font-size:.85rem;overflow:auto;margin:.25rem 0}
+.env dt{font-weight:600;float:left;clear:left;width:9rem}
+.env dd{margin-left:9.5rem}
+.env::after{content:"";display:block;clear:both}
+.env pre{white-space:pre-wrap;font-size:.85rem;overflow:auto;margin:.25rem 0;float:none}
 .banner{background:#fefcbf;border:1px solid #d69e2e;padding:.75rem 1rem;border-radius:6px;margin:1rem 0}
 .empty{background:#edf2f7;padding:.75rem 1rem;border-radius:6px}
 .stale{color:#c05621;font-weight:600}
-svg{max-width:100%}
-nav{margin-bottom:1rem}
+svg{max-width:100%;height:auto}
+nav{margin-bottom:1.25rem}
+.panel{border:1px solid #e2e8f0;border-radius:8px;padding:.35rem 1rem;margin:1rem 0;background:#fff}
+.panel>summary{cursor:pointer;font-weight:600;padding:.45rem 0}
+.panel>summary:hover{color:#2b6cb0}
+.pkgs{columns:2;margin:.4rem 0 1rem;padding-left:1.2rem}
+.pkgs li{break-inside:avoid}
+@media (prefers-color-scheme: dark){
+body{color:#e2e8f0;background:#1a202c}
+a{color:#63b3ed}
+.lede,.meta{color:#a0aec0}
+.skip{color:#f6ad55}
+th,td{border-color:#4a5568}
+td.fast{color:#68d391}
+td.slow{color:#fc8181}
+.env,.empty,.panel{background:#2d3748;border-color:#4a5568}
+.banner{background:#744210;border-color:#d69e2e;color:#fefcbf}
+}
 """
 
 
@@ -498,27 +525,39 @@ def _page(title: str, body: str) -> str:
     )
 
 
+def _headline_geo(run: dict) -> str:
+    geo = run.get("geomean_vs_baseline") or {}
+    baseline = run.get("baseline") or ""
+    for key in ("default",):
+        v = geo.get(key)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            return f"{key} {v:.3f}x"
+    for key, v in geo.items():
+        if key == baseline:
+            continue
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            return f"{key} {v:.3f}x"
+    return "—"
+
+
 def _run_table(runs: list[dict], *, rel_prefix: str) -> str:
     if not runs:
         return ""
     parts = [
         "<table>\n<thead><tr>"
-        "<th>id</th><th>suite</th><th>protocol</th><th>baseline</th><th>arms</th>"
-        "<th>geomean vs baseline</th><th>skipped</th><th>cpu</th>"
+        "<th>id</th><th>suite</th><th>baseline</th>"
+        "<th>headline vs baseline</th><th>skipped</th><th>cpu</th>"
         "</tr></thead>\n<tbody>\n"
     ]
     for r in runs:
         stale = ' <span class="stale">stale protocol</span>' if r["stale_protocol"] else ""
         href = f"{rel_prefix}run/{_esc(r['id'])}/index.html"
-        geo = _fmt_geo(r["geomean_vs_baseline"])
         cpu = (r.get("machine") or {}).get("cpu_model") or ""
         parts.append(
             f'<tr><td><a href="{href}">{_esc(r["id"])}</a>{stale}</td>'
             f'<td>{_esc(_suite_label(r.get("suite")))}</td>'
-            f'<td>{_esc(r["protocol"])}</td>'
             f'<td>{_esc(r["baseline"])}</td>'
-            f'<td>{_esc(", ".join(r["arms"]))}</td>'
-            f'<td>{_esc(geo)}</td>'
+            f'<td>{_esc(_headline_geo(r))}</td>'
             f'<td>{_esc(r["skipped"])}</td>'
             f'<td>{_esc(cpu)}</td></tr>\n'
         )
@@ -531,21 +570,14 @@ def _env_dl(env: dict) -> str:
         return "<p>no env.json</p>\n"
     keys = [
         "kernel", "cpu_model", "logical_cores", "memory", "memory_bytes",
-        "memory_available", "cache_l1d", "topology", "affinity", "container",
+        "memory_available", "cache_l1d", "cache_l1i", "cache_l2", "cache_l3",
+        "topology", "affinity", "container",
     ]
-    fp = env.get("fingerprint") if isinstance(env.get("fingerprint"), dict) else None
     parts = ['<dl class="env">\n']
-    seen = {"fingerprint"}
     for k in keys:
         if k in env:
             parts.append(f"<dt>{_esc(k)}</dt><dd>{_format_env_value(env[k])}</dd>\n")
-            seen.add(k)
-    for k, v in env.items():
-        if k not in seen:
-            parts.append(f"<dt>{_esc(k)}</dt><dd>{_format_env_value(v)}</dd>\n")
     parts.append("</dl>\n")
-    if fp is not None:
-        parts.append(_fingerprint_html(fp))
     return "".join(parts)
 
 
@@ -575,21 +607,19 @@ def _interpreters_html(manifest: dict) -> str:
     if not isinstance(interps, list) or not interps:
         return ""
     parts = [
-        "<h2>Interpreters</h2>\n",
+        '<details class="panel"><summary>Interpreters</summary>\n',
         "<p>Profile names are not a stable description of the binary; "
         "factors and the content-addressed artifact key are.</p>\n",
-        "<table>\n<thead><tr>"
+        '<div class="table-wrap"><table>\n<thead><tr>'
         "<th>label</th><th>binary_sha256</th><th>artifact_key</th>"
         "<th>linkage</th><th>libc</th><th>lto</th><th>allocator</th>"
-        "<th>pgo</th><th>toolchain</th><th>packages</th>"
+        "<th>pgo</th><th>toolchain</th>"
         "</tr></thead>\n<tbody>\n",
     ]
     for item in interps:
         if not isinstance(item, dict):
             continue
         factors = item.get("factors") if isinstance(item.get("factors"), dict) else {}
-        pkgs = item.get("packages") if isinstance(item.get("packages"), dict) else {}
-        pkg_s = ", ".join(f"{k}=={v}" for k, v in sorted(pkgs.items())) if pkgs else ""
         parts.append(
             "<tr>"
             f'<td>{_esc(item.get("label", ""))}</td>'
@@ -601,10 +631,191 @@ def _interpreters_html(manifest: dict) -> str:
             f'<td>{_esc(factors.get("allocator", ""))}</td>'
             f'<td>{_esc(factors.get("pgo", ""))}</td>'
             f'<td>{_esc(factors.get("toolchain", ""))}</td>'
-            f'<td>{_esc(pkg_s)}</td>'
             "</tr>\n"
         )
-    parts.append("</tbody></table>\n")
+    parts.append("</tbody></table></div>\n</details>\n")
+    return "".join(parts)
+
+
+def _ratio_class(v: float) -> str:
+    if v > 1.02:
+        return "fast"
+    if v < 0.98:
+        return "slow"
+    return ""
+
+
+def _ratio_table_html(report: dict, order: list[str]) -> str:
+    rows = report.get("rows")
+    if not isinstance(rows, list) or not rows or not order:
+        return ""
+    parts = [
+        '<div class="table-wrap"><table class="ratios">\n<thead><tr><th>benchmark</th>'
+    ]
+    for a in order:
+        parts.append(f"<th>{_esc(a)}</th>")
+    parts.append("</tr></thead>\n<tbody>\n")
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        name = row.get("benchmark", "")
+        ratios = row.get("ratio_vs_baseline")
+        if not isinstance(ratios, dict):
+            ratios = {}
+        parts.append(f"<tr><td>{_esc(name)}</td>")
+        for a in order:
+            v = ratios.get(a)
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                cls = _ratio_class(float(v))
+                attr = f' class="{cls}"' if cls else ""
+                parts.append(f"<td{attr}>{float(v):.2f}x</td>")
+            else:
+                parts.append("<td>-</td>")
+        parts.append("</tr>\n")
+    parts.append("</tbody></table></div>\n")
+    return "".join(parts)
+
+
+def _packages_html(manifest: dict) -> str:
+    interps = manifest.get("interpreters")
+    if not isinstance(interps, list) or not interps:
+        return ""
+    groups: list[tuple[list[str], dict]] = []
+    for item in interps:
+        if not isinstance(item, dict):
+            continue
+        pkgs = item.get("packages") if isinstance(item.get("packages"), dict) else {}
+        if not pkgs:
+            continue
+        label = item.get("label", "")
+        key = tuple(sorted((str(k), str(v)) for k, v in pkgs.items()))
+        for labels, existing in groups:
+            if tuple(sorted((str(k), str(v)) for k, v in existing.items())) == key:
+                labels.append(str(label))
+                break
+        else:
+            groups.append(([str(label)], dict(pkgs)))
+    if not groups:
+        return ""
+    parts = [
+        '<details class="panel"><summary>Dependencies</summary>\n',
+        "<p>Packages installed into each arm's venv after the suite setup. "
+        "Identical sets are shown once.</p>\n",
+    ]
+    for labels, pkgs in groups:
+        heading = ", ".join(labels)
+        parts.append(f"<h3>{_esc(heading)}</h3>\n<ul class=\"pkgs\">\n")
+        for name, ver in sorted(pkgs.items(), key=lambda kv: str(kv[0]).lower()):
+            parts.append(f"<li><code>{_esc(name)}=={_esc(ver)}</code></li>\n")
+        parts.append("</ul>\n")
+    parts.append("</details>\n")
+    return "".join(parts)
+
+
+def _machine_html(env: dict) -> str:
+    fp = env.get("fingerprint") if isinstance(env.get("fingerprint"), dict) else None
+    parts = [
+        '<details class="panel"><summary>Machine</summary>\n',
+        _env_dl(env),
+    ]
+    if fp is not None:
+        parts.append(
+            '<details class="panel"><summary>Fingerprint and telemetry</summary>\n'
+        )
+        parts.append(_fingerprint_html(fp))
+        parts.append("</details>\n")
+    parts.append("</details>\n")
+    return "".join(parts)
+
+
+def _skipped_html(run: dict) -> str:
+    run_dir = Path(run["path"])
+    skipped_path = run_dir / "skipped.json"
+    items: list = []
+    if skipped_path.is_file():
+        data = _load_json(skipped_path)
+        if isinstance(data, list):
+            items = data
+    if not items:
+        skipped = (run.get("_manifest") or {}).get("skipped")
+        if isinstance(skipped, list):
+            items = skipped
+    n = len(items)
+    if n == 0 and not run.get("skipped"):
+        return ""
+    parts = [
+        f'<details class="panel"><summary>Skipped ({n})</summary>\n',
+        "<p>Named drops. They do not enter the geomean.</p>\n",
+    ]
+    if items:
+        parts.append("<ul>\n")
+        for item in items:
+            parts.append(f"<li>{_esc(item)}</li>\n")
+        parts.append("</ul>\n")
+    parts.append("</details>\n")
+    return "".join(parts)
+
+
+def _run_page_body(run: dict) -> str:
+    manifest = run.get("_manifest") or {}
+    report = run.get("_report") or {}
+    env = run.get("_env") or {}
+    suite = _suite_label(run.get("suite"))
+    title = f"{suite} comparison" if suite != "-" else run["id"]
+    baseline = run.get("baseline") or ""
+    cpu = (run.get("machine") or {}).get("cpu_model") or ""
+    lede = [run["id"]]
+    if cpu:
+        lede.append(cpu)
+    if baseline:
+        lede.append(f"baseline {baseline}")
+
+    parts = [
+        '<nav><a href="../../index.html">all runs</a></nav>\n',
+    ]
+    if run["fixture"]:
+        parts.append(
+            '<div class="banner"><p><strong>Fixture / demo.</strong> '
+            "Not a published score.</p></div>\n"
+        )
+    if run["stale_protocol"]:
+        parts.append(
+            f'<p class="stale">stale protocol {run["protocol"]} '
+            f"(current is {CURRENT_PROTOCOL})</p>\n"
+        )
+    parts.append(f"<h1>{_esc(title)}</h1>\n")
+    parts.append(f'<p class="lede">{_esc(" · ".join(lede))}</p>\n')
+    rev = manifest.get("git_revision")
+    if isinstance(rev, str) and rev:
+        parts.append(
+            f'<p class="meta">git_revision of the <code>staticpy</code> '
+            f"executable: <code>{_esc(rev)}</code></p>\n"
+        )
+    svg = geomean_svg(run)
+    if svg:
+        heading = f"Geomean vs {baseline}" if baseline else "Geomean vs baseline"
+        parts.append(f"<h2>{_esc(heading)}</h2>\n{svg}\n")
+    skipped = run.get("skipped") or 0
+    if skipped:
+        parts.append(
+            f'<p class="skip">{_esc(skipped)} benchmarks omitted from the '
+            "table; see <code>skipped.json</code>.</p>\n"
+        )
+    ratio_heading = (
+        f"Per-benchmark ratio vs {baseline}" if baseline else "Per-benchmark ratio"
+    )
+    parts.append(f"<h2>{_esc(ratio_heading)}</h2>\n")
+    table = _ratio_table_html(report, run.get("arms") or [])
+    if table:
+        parts.append(table)
+    else:
+        report_html = Path(run["path"]) / "report.html"
+        if report_html.is_file():
+            parts.append(_body_inner(report_html.read_text(encoding="utf-8")))
+    parts.append(_interpreters_html(manifest))
+    parts.append(_packages_html(manifest))
+    parts.append(_machine_html(env))
+    parts.append(_skipped_html(run))
     return "".join(parts)
 
 
@@ -671,47 +882,10 @@ def write_site(root: Path, out: Path) -> Path:
     (out / "index.html").write_text(_page("static-python benchmarks", "".join(body)), encoding="utf-8")
 
     for r in runs:
-        run_dir = Path(r["path"])
         run_out = out / "run" / r["id"]
         run_out.mkdir(parents=True, exist_ok=True)
-        report_html = run_dir / "report.html"
-        inner = ""
-        if report_html.is_file():
-            inner = _body_inner(report_html.read_text(encoding="utf-8"))
-        elif (run_dir / "report.md").is_file():
-            inner = "<pre>" + _esc((run_dir / "report.md").read_text(encoding="utf-8")) + "</pre>"
-        banner = ""
-        if r["fixture"]:
-            banner = (
-                '<div class="banner"><p><strong>Fixture / demo.</strong> '
-                "Not a published score.</p></div>\n"
-            )
-        stale = ""
-        if r["stale_protocol"]:
-            stale = (
-                f'<p class="stale">stale protocol {r["protocol"]} '
-                f"(current is {CURRENT_PROTOCOL})</p>\n"
-            )
-        rev = (r.get("_manifest") or {}).get("git_revision")
-        git = ""
-        if isinstance(rev, str) and rev:
-            git = (
-                f'<p>git_revision of the <code>staticpy</code> executable: '
-                f'<code>{_esc(rev)}</code></p>\n'
-            )
-        page = [
-            '<nav><a href="../../index.html">all runs</a></nav>\n',
-            banner,
-            stale,
-            f'<h1>{_esc(r["id"])}</h1>\n',
-            git,
-            _interpreters_html(r.get("_manifest") or {}),
-            "<h2>Machine</h2>\n",
-            _env_dl(r.get("_env") or {}),
-            inner,
-        ]
         (run_out / "index.html").write_text(
-            _page(r["id"], "".join(page)), encoding="utf-8"
+            _page(r["id"], _run_page_body(r)), encoding="utf-8"
         )
     return out
 
