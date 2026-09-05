@@ -1,6 +1,6 @@
 ---
 name: staticpy-bump
-description: Upgrade a pinned dependency — openssl, sqlite, ncurses, readline, libffi, xz, zlib, bzip2, util-linux/libuuid, or CPython itself — and survive the sharp corners: where the checksum must come from, why a patch that stops applying is the outcome you wanted, and the packages whose version is encoded in more than one place. Also the overnight matrix-upgrade rules (preemptive grok fuzz, class-wide hunt, 66+4 failed=0, pack from a clean tree). Use whenever changing a version in config/sources.toml or running a CPython/dep sweep.
+description: Upgrade a pinned dependency — openssl, sqlite, ncurses, readline, libffi, xz, zlib, bzip2, util-linux/libuuid, or CPython itself — and survive the sharp corners: where the checksum must come from, why a patch that stops applying is the outcome you wanted, and the packages whose version is encoded in more than one place. Also the overnight matrix-upgrade rules (preemptive grok fuzz, class-wide hunt, full matrix failed=0, pack from a clean tree). Use whenever changing a version in config/sources.toml or running a CPython/dep sweep.
 ---
 
 # Bumping a pinned dependency
@@ -160,9 +160,11 @@ plus a `sysconfig`/`ctypes` cross-check that catches a corrupted `_sysconfigdata
 ## Running a matrix upgrade
 
 A CPython minor bump, or a pin sweep that invalidates every interpreter, is
-not "edit sources.toml and hope". The 66 static cells (11 musl triples × 6
-profiles) plus the 4 glibc `reference*` arms are the job. Do not stop until
-every cell is packed and its verify artifact has `failed=0`.
+not "edit sources.toml and hope". The job is the current matrix: every
+triple `staticpy print targets-all` names, every static profile, and every
+host-built `reference*` profile. Do not hard-code a cell count — targets
+and profiles move. Do not stop until every cell is packed and its verify
+artifact has `failed=0`.
 
 **Fuzz before you compile.** A class-wide ABI, Setup, thread, or
 configure-guess hole costs more than an hour at verify, per cell. Spend
@@ -180,15 +182,14 @@ a one-package profile stanza is forbidden — that is the
 finding there.
 
 **Use the machine.** `--workers` times `-j` is the load. Maximize workers
-without exploding RSS (LTO peaks around 11 GB per target on this shape;
-measure before trusting the default 4). earlyoom is a backstop, not a
-plan. Fail-fast: one flake abandons the queue, so re-run rather than
-reading a partial sweep.
+without exploding RSS — LTO is the peak, so measure before trusting the
+worker default. earlyoom is a backstop, not a plan. Fail-fast: one flake
+abandons the queue, so re-run rather than reading a partial sweep.
 
 **Docker, not the host.** `spython` for every static / cross cell.
-`ubuntu` for the four `reference*` arms (hostcc-keyed prefixes; Alpine
-and glibc must not share a directory). `staticpy kit` for the 10-arm
-x86_64 lineup also belongs on `ubuntu`, or the baseline is the wrong
+`ubuntu` for host-built `reference*` arms (hostcc-keyed prefixes; Alpine
+and glibc must not share a directory). `staticpy kit` for the lineup in
+`[kit.default]` also belongs on `ubuntu`, or the baseline is the wrong
 libc.
 
 **Tmux on the host.** The container has no tmux. Detach a session that
