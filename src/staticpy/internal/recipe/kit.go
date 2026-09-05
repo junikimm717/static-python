@@ -371,7 +371,7 @@ Results land in results/<stamp>-<arch>/ with the same files as any other
 session (manifest, env, report.json/md/html, skipped, timeline).
 manage_benchmarks.py import does not care which --suite produced them.
 
-python/<profile>/bin/python3.13 is a normal interpreter.
+python/<profile>/bin/python3.14 is a normal interpreter.
 `
 
 var _ core.Job = (*kitJob)(nil)

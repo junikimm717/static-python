@@ -3,8 +3,8 @@
 #
 # The division of labour: this script provisions the execution environment,
 # the binary consumes paths and builds artifacts. staticpy itself never
-# reaches the network for a toolchain, a busybox or a qemu; it is handed them
-# and fails loudly when one is missing. That is what lets the same binary run
+# reaches the network for a toolchain or a qemu; it is handed them and
+# fails loudly when one is missing. That is what lets the same binary run
 # against a volume mount, a gccfactory checkout, or a musl.cc unpack.
 #
 # Nothing here is required. `staticpy --toolchains <dir> ...` works alone.
@@ -99,11 +99,6 @@ if needs_rebuild; then
     build_binary
 fi
 
-# busybox is deliberately not downloaded. Fetching an unpinned binary and
-# putting it on a build PATH would undercut the checksum story the rest of the
-# system depends on, so we use one that is already here or say what is missing.
-BUSYBOX="${STATICPY_BUSYBOX:-$(command -v busybox 2>/dev/null || true)}"
-
 # Ask the binary what this invocation needs before running it for real. It can
 # answer without a toolchain, which is what makes lazy provisioning possible.
 PLAN="$("$BIN" doctor --provision-plan --toolchains "$TOOLCHAINS" -- "$@" 2>/dev/null || true)"
@@ -115,7 +110,6 @@ if [ -n "$PLAN" ]; then
 fi
 
 set -- --toolchains "$TOOLCHAINS" --dist "$DIST" "$@"
-[ -n "$BUSYBOX" ] && set -- --busybox "$BUSYBOX" "$@"
 rev="$(cat "$BIN.rev" 2>/dev/null || git_revision)"
 [ -n "$rev" ] && set -- --git-revision "$rev" "$@"
 

@@ -163,14 +163,11 @@ Two cautions:
 
 staticpy never fetches qemu. Resolution is `--qemu <triple>=<path>` first, then
 `exec.LookPath(QemuBinaryName(t))`. Provisioning is the shim's and the
-container's job — for the dev container that means the apk list in `Dockerfile`.
-
-**`qemu-riscv32` is not in the Dockerfile**, so riscv32 is buildable there but
-not verifiable: `staticpy doctor` will show it as `(not found)` and any verify
-job fails at launcher construction. (Alpine appears to ship a `qemu-riscv32`
-package, but I have not confirmed it against this image — check before assuming
-the fix is a one-line apk add.) `qemu-armeb` is installed with no target using
-it; nothing depends on that, but do not read the list as authoritative.
+container's job — for the dev container that means
+`scripts/docker/qemu-user.sh` (`--target-list`) plus the
+`/usr/libexec/qemu-binfmt` shims. A new triple that needs verify must
+be added to that target list or `doctor` will show `(not found)` and
+the verify job fails at launcher construction.
 
 A target with no qemu is not a broken target. `doctor` separates *buildable*
 from *runnable* deliberately.

@@ -2,6 +2,6 @@
 
 set -eu
 
-docker compose pull spython
-docker compose up -d spython
-docker compose exec spython ash
+# Build from this tree. GHCR :latest stays Alpine until this lands on master.
+docker compose up -d --build spython
+docker compose exec spython bash

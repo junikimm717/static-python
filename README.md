@@ -34,7 +34,7 @@ much on dynamic loading.
 
 Binaries should be ready to use in [the releases
 page](https://github.com/junikimm717/static-python/releases/tag/binaries). Only
-Linux (5.8+) is supported, and only the latest version of python3 (3.13) is
+Linux (5.8+) is supported, and only the latest version of python3 (3.14) is
 supported. Feel free to do more monkey patching if you want older versions :)
 
 ## Setup
@@ -48,7 +48,7 @@ docker compose up -d
 That container also registers qemu in binfmt, which is why it runs privileged.
 
 Otherwise, `./staticpy doctor` says what your machine is missing. It is a short
-list -- go, perl, patch, busybox, cURL, tar, and a qemu-user for whichever
+list -- go, perl, patch, cURL, tar, and a qemu-user for whichever
 target you want to verify.
 
 ## The build system

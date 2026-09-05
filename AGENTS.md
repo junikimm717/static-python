@@ -26,20 +26,27 @@ and every job's key is hashed over its inputs and its dependencies' keys, so an
 edit rebuilds exactly what depends on it and nothing else.
 
 The interpreter is the artefact under
-`dist/artifacts/pynative_<profile>_<triple>/bin/python3.13` for a native build
+`dist/artifacts/pynative_<profile>_<triple>/bin/python3.14` for a native build
 and `dist/artifacts/pycross_<profile>_<host>_<triple>/` for a cross one;
 `--pack` also writes a relocatable tarball to
 `dist/out/<profile>/<triple>/`. The dynamically-linked baseline used for
 benchmarking is the `reference` profile's own artifact,
-`dist/artifacts/pyref_reference_<triple>/rootfs/bin/python3.13`.
+`dist/artifacts/pyref_reference_<triple>/rootfs/bin/python3.14`.
 
 The dev container is still the easiest way to get a clean host, and its
-`/workspace` is a bind mount of the repo, but staticpy builds hermetically
-against a fetched toolchain and busybox, so the host is no longer load-bearing.
+`/workspace` is a bind mount of the repo. Job PATH is the fetched toolchain
+first, then the process PATH. perl and patch are host tools; static and
+cross still compile with gccfactory.
 Use `tmux` *on the host* (the container image does not ship `tmux`) to keep
 long-running build jobs alive.
 
 ## Container handle
+
+There is one container. Static, cross, `reference*`, verify, pack, and
+`kit` all run in it. Do not introduce a second image to "keep glibc and
+musl apart" — the image is Ubuntu (glibc hostcc for `reference*`);
+static/cross still use the gccfactory musl toolchains under
+`dist/toolchains/`.
 
 ```sh
 # one-shot exec
@@ -79,12 +86,12 @@ workers.
   multi-hour wall clock. Note that the build is fail-fast: one target's flake
   abandons the jobs still queued, so re-run rather than concluding anything
   from a partial sweep.
-- **Dynamic baseline (whichever host you're on)**:
+- **Dynamic baseline** (same container as the static build):
   ```sh
   ./staticpy build --profile reference
   ```
-  Builds a stock `--enable-shared` Python of the same pinned version with this
-  machine's own gcc, against shared copies of the same pinned dependencies.
+  Builds a stock `--enable-shared` Python of the same pinned version with the
+  container's gcc, against shared copies of the same pinned dependencies.
 
 Everything staticpy writes lives under `dist/` and is safe to delete; a
 content-addressed rebuild recovers whatever you removed. Within it:

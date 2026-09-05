@@ -41,7 +41,7 @@ dist/                    everything generated; gitignored, safe to delete
 | question | answer |
 |---|---|
 | what commands and flags exist | `./staticpy help`, `./staticpy help <cmd>`, `help layout`, `help targets` — authoritative |
-| bump a pinned version | `config/sources.toml` (version + file + urls + topdir + **sha256 in the same edit**) |
+| bump a pinned version | `config/sources.toml` (version + file + urls + topdir + **sha256 in the same edit**). A CPython minor or a pin sweep that rebuilds the matrix: `staticpy-bump` **Running a matrix upgrade** — fuzz first, hunt the class, full matrix `failed=0`, pack from a clean tree |
 | change a package's configure flags | `config/packages.toml`. Only *decisions* live there: `--prefix`, `--exec-prefix`, `--host` are injected by the recipe because they are absolute or triple-derived |
 | change a compiler/linker flag | `config/profiles.toml`. Profile-wide, then scoped: `deps`, `deps.<pkg>`, `python`, `pyhost`. A scoped change rebuilds only what that scope reaches |
 | add a native library | a `[source.X]` in `config/sources.toml` + a `[package.X]` in `config/packages.toml` (`build` = autotools\|openssl\|make\|sources, `needs`, `provides`). `Deps` picks up every package automatically; `sysroot` composes them |
@@ -52,8 +52,9 @@ dist/                    everything generated; gitignored, safe to delete
 | a shell in a job's exact environment | `staticpy shell <slug>` (add `--step NAME`, or `--print` to just see the env). Recovered from the recorded attempt, so it works long after the process is gone |
 | what invalidates a rebuild | a job's Merkle key: its `KeyInputs` (recipe version, source sha256s, decision flags, triples, resolved profile) plus every dependency's key. Not timestamps. `staticpy status` calls the difference `stale` |
 | what would a build do right now | `staticpy status [--todo]` — pass the same `--verify`/`--pack` you would pass to `build`, or you are not looking at the same plan |
-| what this machine is missing | `staticpy doctor`. `perl` is the one irreducible host dependency (OpenSSL's Configure); busybox covers `sh`/`awk`/`sed`/`patch` |
+| what this machine is missing | `staticpy doctor`. `perl` is the one irreducible host dependency (OpenSSL's Configure); `patch` applies the pinned diffs |
 | a resolved value, for a script | `staticpy print <key>` — `python-version`, `python-abi`, `host`, `targets{,-all,-proven}`, `dist`, `recipe-version`, `version:<src>`, `sha256:<src>` |
+| pack a benchmark kit | the `staticpy-kit` skill — commit first, then stamp from a clean tree so `kit.json` is not `*-dirty` |
 | ship packed tarballs to GitHub | the `staticpy-release` skill — `scripts/gh-release.sh check\|stage\|publish\|verify`; do not invent the asset list |
 | what the flags actually resolve to | `staticpy config show [--profile N] [--scope S]`, which also names the file each layer came from |
 | why a built interpreter misbehaves | the `staticpy-traps` skill — symptom first. Read **Do not overfit the last failure** before adding an `[expect]` or a one-package stanza |
@@ -144,11 +145,9 @@ that tree, so `find` sees it.
    and artifacts built by a compiler nobody can name any more keep being served
    across a gccfactory re-publish.
 5. **The shim provisions, the binary consumes.** staticpy never fetches a
-   toolchain, a busybox or a qemu; it is handed paths and fails loudly when one
-   is missing. That is what lets the same binary run against a volume mount, a
-   gccfactory checkout or a musl.cc unpack — and busybox specifically is never
-   downloaded, because an unpinned binary on the build PATH would undercut the
-   checksums everything else depends on.
+   toolchain or a qemu; it is handed paths and fails loudly when one is
+   missing. That is what lets the same binary run against a volume mount, a
+   gccfactory checkout or a musl.cc unpack.
 6. **Content-anchored edits assert their match count.** `Edit.MustMatch` (zero
    meaning exactly once) makes a moved anchor a loud failure instead of a silent
    no-op or a double application. Edits are the exception; `patches/` holds real
@@ -281,6 +280,10 @@ Honest inventory, because the code reads more finished than it is:
 - `staticpy-traps` — symptom-to-cause catalogue, with the long bug write-ups in
   its `references/`. **Read it before debugging anything that builds but
   misbehaves, and write what you find there.**
+- `staticpy-bump` — pin edits, and the overnight matrix-upgrade rules
+  (preemptive fuzz, class-wide hunt, full-matrix done-when, clean-tree kit).
+- `staticpy-kit` — pack `staticpy kit`. Commit first, then stamp at a
+  non-dirty revision.
 - `staticpy-add-target` — adding and proving a new triple.
 - `comment-hygiene` — this repo's comment rule: say *why*, not *what*; no stale
   framing; no baked-in numbers unless the number is the point. Anything longer

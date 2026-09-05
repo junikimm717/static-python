@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - Dockerfile
+      - scripts/docker/**
       - .github/workflows/dev-image.yml
   pull_request:
     paths:
       - Dockerfile
+      - scripts/docker/**
       - .github/workflows/dev-image.yml
   workflow_dispatch:
 

@@ -25,7 +25,7 @@ import (
 
 // generatorVersion invalidates every symbols.c ever generated. Bump it when the
 // emitted C changes shape, not when CPython changes.
-const generatorVersion = "2"
+const generatorVersion = "3"
 
 //go:embed files/dump_stable_abi.py
 var dumpStableABI []byte
@@ -129,6 +129,9 @@ type abiItem struct {
 	// one that is declared conflicts), and being in Include/ does not imply
 	// declared (marshal.h is never included).
 	Declared bool `json:"declared"`
+	// MacroHidesFunc is a public-header #define of a real PyAPI_FUNC. &name
+	// then takes the address of the macro (Py_PACK_FULL_VERSION in 3.14).
+	MacroHidesFunc bool `json:"macro_hides_func"`
 }
 
 var cIdent = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
@@ -191,11 +194,35 @@ func renderSymbols(items []abiItem, version, manifestSHA string) ([]byte, error)
 	b.WriteString("#define EXPORT_FUNC(name) {#name, (void *)(uintptr_t)&name},\n")
 	b.WriteString("#define EXPORT_DATA(name) {#name, (void *)(uintptr_t)&name},\n\n")
 
+	writeUndefs(&b, items)
 	writeExterns(&b, funcs, data)
 
 	writeTable(&b, "static_functions", funcs, "EXPORT_FUNC")
 	writeTable(&b, "static_data", data, "EXPORT_DATA")
 	return b.Bytes(), nil
+}
+
+// A public header that #defines a stable-ABI function over a PyAPI_FUNC
+// (Py_PACK_FULL_VERSION in 3.14) makes &name take the address of the macro.
+func writeUndefs(b *bytes.Buffer, items []abiItem) {
+	seen := map[string]bool{}
+	var names []string
+	for _, it := range items {
+		if !it.MacroHidesFunc || seen[it.Name] {
+			continue
+		}
+		seen[it.Name] = true
+		names = append(names, it.Name)
+	}
+	if len(names) == 0 {
+		return
+	}
+	sort.Strings(names)
+	b.WriteString("/* Public headers #define these over a real PyAPI_FUNC. */\n")
+	for _, n := range names {
+		fmt.Fprintf(b, "#undef %s\n", n)
+	}
+	b.WriteString("\n")
 }
 
 // Only for entries no header reachable from Python.h declares: Windows emits a

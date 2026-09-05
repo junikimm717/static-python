@@ -36,8 +36,8 @@ Catch the **class** of the bug before you write the parking ticket:
 Those overnight parking tickets now have complete fixes. Do not put them
 back: Linux getpath reads `/proc/self/exe`; per-dep LTO deps configure
 with `/usr` and the recipe rewrites `.pc`/`.la`; `libat_atfork.c`
-replaces gcc's lock table; Alpine qemu is pinned to 11.1.1 and Ubuntu
-`*-binfmt-P` names are shimmed to Alpine's qemu.
+replaces gcc's lock table; the image pins qemu-user 11.1.1 and shims
+Ubuntu `*-binfmt-P` names to it.
 
 ## The long write-ups, in `references/`
 
@@ -86,31 +86,24 @@ log nobody read. Symptom: a library builds, links, and is subtly wrong.
 Countermeasure: staticpy's Runner checks every exit code and writes one log per
 command; never reintroduce a path where output is only inspectable in aggregate.
 
-**`expr: not found`, then `fcntl: No file descriptors available`.** Hermetic
-PATH is toolchain + `dirname(busybox)`, which is not a closed toolbox.
-Alpine keeps `expr`/`awk`/`tr`/`basename` under `/usr/bin` only; CI's
-`/usr/local/bin/busybox` has none of them. The Dockerfile
-`busybox --install -s /bin` plus compose `nofile` is image provisioning,
-not the class. Materialize `dist/.bin/hermetic/` (`busybox --install -s`
-plus LookPath symlinks) and put **that** dir on PATH — not `/usr/bin`,
-not `dirname(busybox)`. Doctor must resolve `expr` on the composed
-hermetic PATH. Do not "fix" this with `--no-hermetic`.
+**`expr: not found`, then `fcntl: No file descriptors available`.** configure
+looks up `expr` on PATH. A missing applet plus the default 1024 nofile is
+what exhausts fds retrying. Compose `nofile` and make sure `expr`/`awk`/`tr`
+are on the process PATH (the image's `busybox --install -s /bin` is one
+way). Do not invent a second PATH policy.
 
 **`env: can't execute 'perl'` on openssl Configure.** Same class as
-`expr`. `#!/usr/bin/env perl` looks up `perl` on hermetic PATH; doctor
-LookPaths the parent PATH and reports green while Configure dies. A
-`/bin/perl` symlink is the Alpine layout, not the class. Symlink
-LookPath(perl) into the hermetic bin. `perl ./Configure` is a local
-extra, not a substitute.
+`expr`. `#!/usr/bin/env perl` looks up `perl` on the job PATH. Doctor
+already requires it. `perl ./Configure` is a local extra, not a substitute.
 
 **riscv64 core verify: ten files fail with `FileNotFoundError: …/bin/python3`.**
 Smoke probes pass (staticpy prefixes `qemu-riscv64`). Anything that
 `exec`s `sys.executable` is the host kernel's binfmt table, which is
 global and first-writer. Host `qemu-user-binfmt` registers
 `/usr/libexec/qemu-binfmt/<arch>-binfmt-P`. Dockerfile shims make that
-path exist *inside spython* for today's apk list; a new arch, a stale
-image, Fedora's `qemu-<arch>-static` names, or CI's host verify all
-miss. Refuse to verify unless the registered interpreter exists in
+path exist inside the container for today's qemu list in
+`scripts/docker/qemu-user.sh`; a new arch, a stale image, Fedora's
+`qemu-<arch>-static` names, or CI's host verify all miss. Refuse to verify unless the registered interpreter exists in
 this mount namespace. Do not wrap CPython's re-exec. Not an `[expect]`.
 
 **`test_subprocess.test_executable_without_cwd` fails with missing encodings.**
@@ -123,9 +116,10 @@ apply; do not add `[expect.static]`.
 
 **i386 core verify: `test_divmod` / `test_math` / `test_struct` fail under qemu.**
 qemu 11.0 TCG leaves `cc_op` stale after `SAHF` (`da7649c6`, GitLab #3537).
-Fixed in 11.0.4 / 11.1. The spython image pins qemu-user **11.1.1** from
-Alpine edge. If those methods fail again, the image is still on 11.0.x —
-upgrade qemu, do not restore the `:qemu` ignores. `*MathTests.testSinh*`
+Fixed in 11.0.4 / 11.1. The image builds qemu-user **11.1.1** from
+download.qemu.org, not Ubuntu 24.04's 8.2.2. If those methods fail
+again, the image is still on 11.0.x — upgrade qemu, do not restore the
+`:qemu` ignores. `*MathTests.testSinh*`
 is the real x87 1-ulp ABI issue and stays on `[expect.i386-linux-musl]`.
 Write-up: `references/I386_QEMU_SAHF.md`.
 
@@ -133,22 +127,38 @@ Write-up: `references/I386_QEMU_SAHF.md`.
 Same binfmt class. CPython reads `/proc/self/stat` field 20
 (`num_threads`). qemu < 9.1 (host Ubuntu 8.2.2) leaves it `0`. A
 missing shim falls through to the host qemu; a present shim keeps
-re-exec on Alpine 11.1.1. Doctor must require the binfmt interpreter
+re-exec on the image's 11.1.1. Doctor must require the binfmt interpreter
 to exist *and* be ≥ 9.1. Do not restore `[expect.qemu]`.
+
+**`suite:test_threading` SIGSEGV on s390x: `test_recursion_limit` (Issue 9670).**
+The subprocess thread that infinite-recurses should raise RecursionError.
+qemu-s390x instead dies `uncaught target signal 11`. Not qemu and not
+libatomic: the same script exits 0 on aarch64/i386/mips64/ppc64le qemu
+and on native x86_64 static; main-thread recursion on s390x is fine;
+`threading.stack_size(8<<20)` and `sys.setrecursionlimit(100)` both pass.
+musl's default pthread stack is **128 KiB on every triple** (measured
+`pthread_attr_getstacksize` under qemu-s390x and qemu-aarch64). CPython
+3.14 skips `pthread_getattr_np` on musl and guesses `Py_C_STACK_SIZE`
+(320000 on `__s390x__`, 4 MiB elsewhere). s390x ELF frames are large
+enough that 1000 Python calls overflow 128 KiB before that window or
+`py_recursion_remaining` fires. Fix is `THREAD_STACK_SIZE 0x400000` in
+the s390x pyconfig fragment — the same define CPython already uses for
+FreeBSD/AIX for this test. Do not add `[expect.s390x]`. Watch
+powerpc64: it also has a large `Py_C_STACK_SIZE` (2 MiB); if the same
+script SIGSEGVs there, give it the same define, not a per-triple ignore.
 
 **sqlite configure: `s390x-binfmt-P: Could not open '/lib/ld-musl-s390x.so.1'`.**
 sqlite's configure builds a bootstrap `jimsh0` with the *target* CC and
 then runs it. Host binfmt intercepts the cross ELF. `B.cc=@BUILD_CC@`
-is make-only; configure never sees it. A host `jimsh` on the *hermetic*
-PATH skips the bootstrap — `/bin/jimsh` in the Dockerfile is the Alpine
-layout, same class as `expr`/`perl`. Put LookPath(jimsh) in the hermetic
-bin. Without it the message is often `./jimsh0: not found` then `No
+is make-only; configure never sees it. A host `jimsh` on PATH skips the
+bootstrap — `/bin/jimsh` in the Dockerfile is the same class as
+`expr`/`perl`. Without it the message is often `./jimsh0: not found` then `No
 working C compiler found`. Do not make qemu able to run configure tests.
 
 **pyref sqlite configure: `Cannot find a tclsh to use for code generation`.**
 sqlite 3.51 autosetup looks for `tclsh`, not `jimsh`. The image shipped
 `jimtcl` (enough for the static `jimsh0` skip) and pyref still died on
-the host gcc path. `apk add tcl` and `/bin/tclsh` in the Dockerfile.
+the host gcc path. `apt install tcl` and `/bin/tclsh` in the Dockerfile.
 Do not pass `--disable-tcl` — that drops the amalgamation codegen.
 
 **`suite:test_bytes` unexpected pass on a reference arm.** `expect.static`
@@ -170,7 +180,7 @@ core as if it were missing. Unwrap `rootfs/` the same way.
 
 **`lto1: Cannot open Modules/_cursesmodule.o` during a CPython LTO link.**
 The other builder's `GCStale` deleted this job's live `dist/work` tree.
-`kill(pid, 0)` is PID-namespace local; spython and kitbuild share `dist/`
+`kill(pid, 0)` is PID-namespace local; the container and kitbuild share `dist/`
 and after `StaleAge` (10 min, shorter than `-flto-partition=none` WPA)
 each treats the other's scratch as dead. gcc 16 then reprints the next
 `open` as `Cannot open %s` with no errno (`_ssl.o`, `blob.o`,
@@ -220,13 +230,9 @@ whatever `hostcc` fingerprints — do not refuse musl, do not treat
 docs, not a recipe refuse.
 
 **pyref libffi: `Something went wrong bootstrapping makefile fragments`.**
-Same hermetic-PATH class as `expr`. Host-built PATH names no toolchain,
-so it is `dirname(busybox)` only. GNU make lives at `/usr/bin/make`.
-`/bin/make` in the Dockerfile is the Alpine layout; Ubuntu "works"
-because usr-merge makes `dirname(/usr/bin/busybox)` equal `/usr/bin`
-and accidentally puts gcc/ld on PATH. Put LookPath(GNU make) and
-LookPath(GNU patch) in the hermetic bin (overwrite busybox's `patch`
-applet). Do not put `/usr/bin` on the hermetic PATH.
+libffi's bootstrap needs GNU make on PATH. Install it; the image already
+does. Do not put a musl toolchain first on a host-built job — gcc
+resolves `ld` from PATH, not `$LD`.
 
 **A `sed` fixup silently does nothing.** `sed -i '/anchor/...'` on a source tree
 is a no-op when the anchor moves, and exits 0. Upstream reformats one line on a
@@ -475,13 +481,30 @@ cannot be trimmed as dead weight without losing symbols.
 **`_ctypes_test` is a shared library** that ctypes' own tests `dlopen`. Those
 tests cannot pass here, ever. Declare them, do not debug them.
 
+**`test_ctypes.test_dllist.test_lists_system` fails with `loaded=['/proc/self/exe']`.**
+3.14 added `ctypes.util.dllist` (`dl_iterate_phdr`). The test wants `libc.so`
+or `libffi.so` in the list; a fully static binary has only the executable
+phdr. Dynamic reference arms pass. This is `[expect.static]`, not
+`[expect.<triple>]` and not qemu. Ignore glob is `*test_ctypes.test_dllist*`
+(the module). `*test_dllist.test_lists_system*` does not match: regrtest
+fnmatch never sees those two names adjacent. `test_lists_updates` needs
+`_ctypes_test` and skips.
+
 ## Generating the symbol table
 
-**`abi_only` does not mean undeclared.** 23 of the 57 `abi_only` entries in
-CPython 3.13 *are* declared in public headers, and emitting a synthetic
-`extern void f(void);` for those is a conflicting-types compile error. Scan
-`Include/*.h` and `Include/cpython/*.h` to find the genuinely undeclared set —
-34, at 3.13.13 — and emit externs only for those.
+**`abi_only` does not mean undeclared.** Many `abi_only` entries *are* declared
+in public headers, and emitting a synthetic `extern void f(void);` for those
+is a conflicting-types compile error. Scan the headers `Python.h` actually
+reaches to find the genuinely undeclared set and emit externs only for those.
+
+**A public header that `#define`s a stable-ABI function hides the `PyAPI_FUNC`.**
+3.14's `Py_PACK_FULL_VERSION` is declared, then immediately `#define`d to a
+function-like macro. `EXPORT_FUNC` takes `&name`, which becomes
+`&_Py_PACK_FULL_VERSION` and fails (`undeclared here (not in a function)`).
+`dump_stable_abi.py` marks names that are both a `#define` and a `PyAPI_FUNC`;
+the generator `#undef`s them so the real declaration is what we take the
+address of. Do not special-case one symbol: the next header wrapper hits the
+same hole.
 
 **Emit `#ifdef` guards per entry, never hoisted into blocks.** The table has to
 stay sorted whichever way a target resolves the guards, or `bsearch` silently

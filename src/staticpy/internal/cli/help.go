@@ -19,7 +19,7 @@ patches, flags, triples and its dependencies' keys, so rebuilding with identical
 inputs is a no-op, changing one configure flag rebuilds exactly what depends on
 it, and two staticpy processes may share one dist/ safely.
 
-staticpy never fetches a compiler. Toolchains, busybox and qemu are handed to it
+staticpy never fetches a compiler. Toolchains and qemu are handed to it
 by the ./staticpy shim (or by you, with flags); it fails loudly when one is
 missing rather than falling back to whatever the host happens to have. Upstream
 sources it does fetch, and only over a matching sha256.`
@@ -40,11 +40,6 @@ const globalHelp = `GLOBAL FLAGS (accepted before or after the command)
   --toolchain T=PATH  use this tree for triple T. Repeatable. Wins over
                       --toolchains, for testing one target against a hand-built
                       compiler.
-  --busybox PATH      busybox binary supplying sh/awk/sed to hermetic builds.
-                      Defaults to whatever is on PATH; the shim passes the one
-                      it found. It is deliberately never downloaded: fetching an
-                      unpinned binary onto a build PATH would undercut the
-                      checksums the rest of the system depends on.
   --qemu T=PATH       qemu-user binary for running triple T's binaries.
                       Repeatable. Only verification needs it. Without one, the
                       target's qemu name from targets.toml is looked up on PATH.
@@ -62,11 +57,6 @@ const globalHelp = `GLOBAL FLAGS (accepted before or after the command)
   --offline           never touch the network; only sources already verified in
                       dist/src may be used. Fails immediately instead of hanging
                       on a mirror that is not there.
-  --hermetic          compose PATH from busybox and the selected toolchain only.
-                      On by default when a busybox is available, because that is
-                      what makes an artifact reproducible on another machine.
-  --no-hermetic       let the host PATH through: friendlier on a dev box,
-                      reproducible nowhere.
   --keep-work         keep dist/work/<job>/ after a job succeeds, so
                       ` + "`staticpy shell <slug>`" + ` has a build tree to land in.
   -v, --verbose       mirror every command's output to the terminal as it runs.

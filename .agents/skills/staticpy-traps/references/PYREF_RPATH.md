@@ -102,4 +102,6 @@ Do not bump `recipe.Version`: the path is absolute and not in the key;
 host toolchain identity already invalidates a glibc artifact when
 `hostcc` changes. Do not skip readline. Do not `[expect]` it. Do not
 treat "delete the stale artifact" as the fix. Do not rebuild
-`--profile reference` inside Alpine if the baseline you want is glibc.
+`--profile reference` on a musl hostcc if the baseline you want is glibc.
+The one image is Ubuntu; hostcc-keyed prefixes still apply when two
+machines share `dist/`.

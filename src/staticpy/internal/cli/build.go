@@ -118,9 +118,6 @@ func runBuild(g *Global, args []string) error {
 		bold("build:"), s.host, strings.Join(s.targets, " "), s.g.Profile, todo, len(nodes), plural(len(nodes)))
 	fmt.Fprintf(os.Stderr, "%s\n", dim(fmt.Sprintf("dist %s   %d worker%s x make -j%d   logs %s",
 		s.e.Dist, s.e.Workers(), plural(s.e.Workers()), s.e.MakeJobs(), s.e.Path(core.DirLogs))))
-	if !s.e.Hermetic {
-		fmt.Fprintf(os.Stderr, "%s the host PATH is visible to this build (--no-hermetic, or no busybox found); its artifacts are not reproducible elsewhere\n", yellow("warning:"))
-	}
 
 	ctx, stop := signalContext()
 	defer stop()

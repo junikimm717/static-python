@@ -17,7 +17,7 @@ import (
 // have compiled in. Each is imported and reported as its own check, so one
 // missing module reads as one line rather than a wall of tracebacks.
 var ProbeModules = []string{
-	"ssl", "zlib", "sqlite3", "ctypes", "_lzma", "_hashlib", "readline", "curses", "uuid",
+	"ssl", "zlib", "sqlite3", "ctypes", "_lzma", "_hashlib", "readline", "curses", "uuid", "compression.zstd",
 }
 
 type ProbeOptions struct {

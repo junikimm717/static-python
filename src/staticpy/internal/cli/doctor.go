@@ -26,10 +26,8 @@ WHAT IS CHECKED
   perl      OpenSSL's Configure is a perl program. This is the one genuinely
             irreducible host dependency: everything else staticpy needs it
             either builds or is handed by the shim, but no toolchain ships a
-            perl and busybox has no perl applet.
-  patch     applies the pinned diffs to the source trees. busybox provides one.
-  busybox   supplies sh/awk/sed to a hermetic build. Without it, builds fall
-            back to the host's tools and stop being reproducible elsewhere.
+            perl.
+  patch     applies the pinned diffs to the source trees.
   toolchain one <triple>-cross or <triple>-native tree per target, under
             --toolchains. staticpy never fetches these; the shim does.
   qemu      needed to RUN a non-native target's binaries, so only verification
@@ -121,11 +119,6 @@ func doctorReport(g *Global) error {
 		lookupTool("perl", true, "OpenSSL's Configure is written in perl; nothing else can supply it"),
 		lookupTool("patch", true, "applies the pinned diffs to each source tree"),
 	}
-	busybox := toolCheck{Name: "busybox", OK: g.Busybox != "", Detail: g.Busybox}
-	if !busybox.OK {
-		busybox.Detail = "not found on PATH; builds will fall back to the host's tools (--no-hermetic behaviour) and will not be reproducible elsewhere"
-	}
-	tools = append(tools, busybox)
 
 	tcRoot := toolCheck{Name: "toolchains", OK: g.Toolchains != "" && isDir(g.Toolchains), Detail: g.Toolchains}
 	switch {
@@ -170,7 +163,7 @@ func doctorReport(g *Global) error {
 
 	if g.JSON {
 		out := map[string]any{
-			"dist": g.Dist, "toolchains": g.Toolchains, "busybox": g.Busybox,
+			"dist": g.Dist, "toolchains": g.Toolchains,
 			"tools": tools, "targets": rows,
 		}
 		if hostErr != nil {
@@ -410,7 +403,7 @@ func scanInvocation(args []string) invocation {
 	// mistaken for the subcommand name.
 	valued := map[string]bool{
 		"dist": true, "config": true, "sources": true, "toolchains": true,
-		"toolchain": true, "busybox": true, "qemu": true, "profile": true,
+		"toolchain": true, "qemu": true, "profile": true,
 		"host": true, "target": true, "workers": true, "j": true,
 		"color": true, "verify": true, "level": true, "bundle": true,
 		"step": true, "n": true, "scope": true,

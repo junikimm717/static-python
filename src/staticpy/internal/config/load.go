@@ -278,7 +278,7 @@ func profileFromTable(t map[string]any, origin, profile, scope string) (Profile,
 
 // OpenAsset reads a file under patches/, from whichever layer sources.toml came
 // from. Names are slash-separated and relative to patches/, e.g.
-// "python-3.13.13/ctypes_patch_1.py".
+// "python-3.14.7/ctypes_patch_1.py".
 func (c *Config) OpenAsset(name string) ([]byte, error) {
 	clean := path.Clean(name)
 	if clean == ".." || strings.HasPrefix(clean, "../") || path.IsAbs(clean) {

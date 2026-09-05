@@ -37,7 +37,7 @@ func TestReferenceProfileIsHostBuiltAndNotStatic(t *testing.T) {
 // adding one from rebuilding the world.
 func TestReferenceVariantsDoNotTouchDefault(t *testing.T) {
 	c := loadEmbedded(t)
-	for _, name := range []string{"openssl", "libffi", "xz", "zlib", "ncurses", "readline", "sqlite"} {
+	for _, name := range []string{"openssl", "libffi", "xz", "zlib", "ncurses", "readline", "sqlite", "zstd"} {
 		def, err := c.PackageFor(name, "default")
 		if err != nil {
 			t.Fatal(err)
@@ -56,7 +56,7 @@ func TestReferenceVariantsDoNotTouchDefault(t *testing.T) {
 // interpreter links the static one and stops being dynamic without saying so.
 func TestReferenceVariantsAreShared(t *testing.T) {
 	c := loadEmbedded(t)
-	for _, name := range []string{"libffi", "xz", "zlib", "ncurses", "readline", "sqlite"} {
+	for _, name := range []string{"libffi", "xz", "zlib", "ncurses", "readline", "sqlite", "zstd"} {
 		ref, err := c.PackageFor(name, "reference")
 		if err != nil {
 			t.Fatal(err)

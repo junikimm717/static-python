@@ -18,11 +18,11 @@ const (
 )
 
 // PathSentinel is what a recipe puts in Cmd.EnvAdd["PATH"] (or in a "PATH="
-// entry of a wholesale Cmd.Env) to have the Runner substitute Env.PathFor. A
-// recipe must not compose PATH itself: in hermetic mode the whole point is that
-// only the Env decides which directories a command can see, and a recipe that
-// pasted in os.Getenv("PATH") would silently reintroduce host tools. Append a
-// target triple to name the toolchain the command should see.
+// entry of a wholesale Cmd.Env) to have the Runner substitute Env.PathFor.
+// A recipe must not compose PATH itself: only PathFor prepends the
+// toolchain, and a recipe that pasted in os.Getenv("PATH") would put the
+// host gcc first. Append a target triple to name the toolchain the command
+// should see.
 const PathSentinel = "\x00staticpy-path\x00"
 
 var distSubdirs = []string{
@@ -155,15 +155,15 @@ func isDir(path string) bool {
 	return err == nil && fi.IsDir()
 }
 
-// Hermetic mode lists exactly the selected toolchain and busybox, so nothing a
-// developer happens to have installed can leak into an artifact and change it.
-// Without it the host's PATH follows, which is friendlier on a dev box and
-// reproducible nowhere.
+// PathFor is the selected toolchain's bin (when a target is named) followed
+// by the process PATH. The toolchain goes first so gcc/cc/ld resolve to
+// gccfactory. Recipes still set CC to an absolute path; this is the
+// backstop for configure scripts that look up `gcc` by name.
 //
 // A named target that will not resolve is an error, never a silent omission:
-// dropping it would hand the build the host compiler under a target triple, or
-// no compiler at all, and the failure would surface hundreds of lines later as
-// something unrecognisable.
+// dropping it would hand the build the host compiler under a target triple,
+// or no compiler at all, and the failure would surface hundreds of lines
+// later as something unrecognisable.
 func (e *Env) PathFor(target string) ([]string, error) {
 	var out []string
 	if target != "" {
@@ -176,14 +176,9 @@ func (e *Env) PathFor(target string) ([]string, error) {
 		}
 		out = append(out, filepath.Join(dir, "bin"))
 	}
-	if e.Busybox != "" {
-		out = append(out, filepath.Dir(e.Busybox))
-	}
-	if !e.Hermetic {
-		out = append(out, filepath.SplitList(os.Getenv("PATH"))...)
-	}
+	out = append(out, filepath.SplitList(os.Getenv("PATH"))...)
 	if len(out) == 0 {
-		return nil, fmt.Errorf("core: hermetic build has an empty PATH; --busybox is unset and no target was named")
+		return nil, fmt.Errorf("core: PATH is empty")
 	}
 	return out, nil
 }

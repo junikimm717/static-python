@@ -45,8 +45,8 @@ var CoreTests = []string{
 	"test_builtin", "test_int", "test_long", "test_float", "test_complex",
 	"test_str", "test_bytes", "test_list", "test_dict",
 	"test_os", "test_io", "test_time", "test_math", "test_struct",
-	"test_ssl", "test_sqlite3", "test_zlib", "test_bz2", "test_lzma",
-	"test_ctypes", "test_hashlib", "test_socket", "test_subprocess",
+	"test_ssl", "test_sqlite3", "test_zlib", "test_bz2", "test_lzma", "test_zstd",
+	"test_ctypes", "test_hashlib", "test_hmac", "test_socket", "test_subprocess",
 	"test_threading", "test_importlib", "test_zipimport",
 }
 
