@@ -24,9 +24,6 @@ type Session struct {
 	Stamp    string
 	timeline *os.File
 	quiet    *os.File
-	// Extra session trees (each a directory of <stamp>-<arch>/) consulted
-	// for the remaining-work ETA, on top of this session's parent.
-	PriorDirs []string
 }
 
 func NewSession(distDir, arch string, now time.Time) (*Session, error) {

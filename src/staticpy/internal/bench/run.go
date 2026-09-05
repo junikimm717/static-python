@@ -70,8 +70,7 @@ func RunSuite(ctx context.Context, x Exec, s *Session, pin Pin, arms []Arm, case
 	done := 0
 	suiteStart := time.Now()
 
-	priorDirs := append([]string{filepath.Dir(s.Dir)}, s.PriorDirs...)
-	prior := LoadDurationPrior(FindTimelineFiles(priorDirs, s.Dir))
+	prior := DefaultPrior()
 	fmt.Fprintf(os.Stderr, "  eta prior: %s\n", prior.Describe())
 
 	queue := make([]cellKey, 0, total)

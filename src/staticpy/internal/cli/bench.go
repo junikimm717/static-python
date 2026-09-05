@@ -101,12 +101,12 @@ SUITES
   executable's git revision), env.json (kernel, cpu, memory, affinity,
   fingerprint identity + telemetry), skipped.json, and timeline.jsonl --
   one record per measurement with its wall time, load average and the busy
-  fraction of the pinned core's SMT sibling. The progress ETA sums remaining
-  (arm, benchmark) cells from earlier timeline.jsonl files (sibling sessions
-  under the session parent, plus benchmarks/ next to dist/ when that tree
-  exists) and scales them by this run's median pace. With no prior it falls
-  back to elapsed/done, which overestimates once the long early benches have
-  finished. pyperformance also keeps the unaggregated pyperf JSON under raw/.
+  fraction of the pinned core's SMT sibling. The progress ETA weights each
+  leftover cell by that benchmark's typical length (embedded from earlier
+  pyperformance runs; the suite is alphabetical and a few benches take ten
+  minutes) and scales by this run's elapsed / completed-weight, so a one-shot
+  kit with a new lineup still gets a usable remaining time. pyperformance
+  also keeps the unaggregated pyperf JSON under raw/.
 
 MEASUREMENT
   The run is confined to one logical CPU with sched_setaffinity, inherited by

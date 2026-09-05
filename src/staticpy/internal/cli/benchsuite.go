@@ -37,9 +37,6 @@ func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, 
 		return err
 	}
 	defer sess.Close()
-	if repo := filepath.Join(filepath.Dir(e.Dist), "benchmarks"); isDir(repo) {
-		sess.PriorDirs = []string{repo}
-	}
 
 	runner, err := core.NewRunner(e, "bench:"+sess.Stamp)
 	if err != nil {
