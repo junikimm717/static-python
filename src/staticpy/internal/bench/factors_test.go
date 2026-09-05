@@ -98,7 +98,7 @@ func TestArtifactKeyNearFindsJobStamp(t *testing.T) {
 	if err := os.MkdirAll(bin, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	py := filepath.Join(bin, "python3.13")
+	py := filepath.Join(bin, "python3.14")
 	if err := os.WriteFile(py, []byte("x"), 0o755); err != nil {
 		t.Fatal(err)
 	}

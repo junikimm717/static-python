@@ -13,13 +13,13 @@ func TestLoadKitRoundTrip(t *testing.T) {
 	doc := KitDoc{
 		Protocol:      Protocol,
 		KitVersion:    "1",
-		PythonVersion: "3.13.0",
+		PythonVersion: "3.14.0",
 		Triple:        "x86_64-linux-musl",
 		Baseline:      "reference",
 		Pins:          DefaultPins(),
 		Arms: []KitArm{
-			{Label: "default", Path: "python/default/bin/python3.13"},
-			{Label: "reference", Path: "python/reference/bin/python3.13"},
+			{Label: "default", Path: "python/default/bin/python3.14"},
+			{Label: "reference", Path: "python/reference/bin/python3.14"},
 		},
 	}
 	b, err := json.MarshalIndent(doc, "", "  ")
@@ -40,7 +40,7 @@ func TestLoadKitRoundTrip(t *testing.T) {
 	if len(order) != 2 || order[0] != "default" || got.Baseline != "reference" {
 		t.Fatalf("order=%v baseline=%s", order, got.Baseline)
 	}
-	if !strings.HasSuffix(paths["default"], "python/default/bin/python3.13") {
+	if !strings.HasSuffix(paths["default"], "python/default/bin/python3.14") {
 		t.Fatalf("path = %s", paths["default"])
 	}
 }

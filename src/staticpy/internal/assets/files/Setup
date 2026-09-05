@@ -163,14 +163,20 @@ _locale _localemodule.c
 _operator _operator.c
 _stat _stat.c
 _symtable symtablemodule.c
+# 3.14 moved these into Setup.bootstrap; they are required for a functioning
+# interpreter, so they belong in the pyhost/minimal set too.
+_datetime _datetimemodule.c
+_opcode _opcode.c
+_types _typesmodule.c
 
 # for systems without $HOME env, used by site._getuserbase()
 pwd pwdmodule.c
 
 # freeze_modules.py asks hashlib for a digest; with no _hashlib these two are
 # what it falls back to, so pyhost needs them and nothing else from OpenSSL.
-_md5 md5module.c -I$(srcdir)/Modules/_hacl/include _hacl/Hacl_Hash_MD5.c -D_BSD_SOURCE -D_DEFAULT_SOURCE
-_sha2 sha2module.c -I$(srcdir)/Modules/_hacl/include Modules/_hacl/libHacl_Hash_SHA2.a
+# 3.14 compiles the HACL objects through MODULES_*_CFLAGS, not a prebuilt .a.
+_md5 md5module.c
+_sha2 sha2module.c
 
 #staticpy:section full
 
@@ -178,9 +184,7 @@ _sha2 sha2module.c -I$(srcdir)/Modules/_hacl/include Modules/_hacl/libHacl_Hash_
 
 _asyncio _asynciomodule.c
 _bisect _bisectmodule.c
-_contextvars _contextvarsmodule.c
 _csv _csv.c
-_datetime _datetimemodule.c
 _decimal _decimal/_decimal.c
 _heapq _heapqmodule.c
 _interpchannels _interpchannelsmodule.c
@@ -189,10 +193,10 @@ _interpreters _interpretersmodule.c
 _json _json.c
 _lsprof _lsprof.c rotatingtree.c
 _multiprocessing -I$(srcdir)/Modules/_multiprocessing _multiprocessing/multiprocessing.c _multiprocessing/semaphore.c
-_opcode _opcode.c
 _pickle _pickle.c
 _queue _queuemodule.c
 _random _randommodule.c
+_remote_debugging _remote_debugging_module.c
 _socket socketmodule.c
 _statistics _statisticsmodule.c
 _struct _struct.c
@@ -208,10 +212,13 @@ select selectmodule.c
 _elementtree _elementtree.c
 pyexpat pyexpat.c
 
-# hashing builtins
-_blake2 _blake2/blake2module.c _blake2/blake2b_impl.c _blake2/blake2s_impl.c
-_sha1 sha1module.c -I$(srcdir)/Modules/_hacl/include _hacl/Hacl_Hash_SHA1.c -D_BSD_SOURCE -D_DEFAULT_SOURCE
-_sha3 sha3module.c -I$(srcdir)/Modules/_hacl/include _hacl/Hacl_Hash_SHA3.c -D_BSD_SOURCE -D_DEFAULT_SOURCE
+# hashing builtins. 3.14 dropped the HACL static archives; makesetup picks up
+# MODULES_*_CFLAGS/LDFLAGS from configure when the line names no extra flags.
+# hmacmodule.c is the HACL* fallback for hmac when _hashlib is absent.
+_blake2 blake2module.c
+_sha1 sha1module.c
+_sha3 sha3module.c
+_hmac hmacmodule.c
 
 # text encodings and unicode
 _codecs_cn cjkcodecs/_codecs_cn.c
@@ -242,6 +249,7 @@ _bz2 _bz2module.c -lbz2
 _ctypes _ctypes/_ctypes.c _ctypes/callbacks.c _ctypes/callproc.c _ctypes/stgdict.c _ctypes/cfield.c -DHAVE_FFI_PREP_CIF_VAR -DHAVE_FFI_PREP_CLOSURE_LOC -DHAVE_FFI_CLOSURE_ALLOC -lffi
 _lzma _lzmamodule.c -llzma
 _uuid _uuidmodule.c -luuid
+_zstd _zstd/_zstdmodule.c _zstd/zstddict.c _zstd/compressor.c _zstd/decompressor.c -lzstd -I$(srcdir)/Modules/_zstd
 zlib  zlibmodule.c -lz
 
 # The readline module also supports libeditline (-leditline).
@@ -266,13 +274,12 @@ _sqlite3 _sqlite/blob.c _sqlite/connection.c _sqlite/cursor.c _sqlite/microproto
 *static*
 
 _testbuffer _testbuffer.c
-_testinternalcapi _testinternalcapi.c _testinternalcapi/test_lock.c _testinternalcapi/pytime.c _testinternalcapi/set.c _testinternalcapi/test_critical_sections.c
-_testcapi _testcapimodule.c _testcapi/vectorcall.c _testcapi/heaptype.c _testcapi/abstract.c _testcapi/unicode.c _testcapi/dict.c _testcapi/set.c _testcapi/list.c _testcapi/tuple.c _testcapi/getargs.c _testcapi/datetime.c _testcapi/docstring.c _testcapi/mem.c _testcapi/watchers.c _testcapi/long.c _testcapi/float.c _testcapi/complex.c _testcapi/numbers.c _testcapi/structmember.c _testcapi/exceptions.c _testcapi/code.c _testcapi/buffer.c _testcapi/pyatomic.c _testcapi/run.c _testcapi/file.c _testcapi/codec.c _testcapi/immortal.c _testcapi/gc.c _testcapi/hash.c _testcapi/time.c _testcapi/bytes.c _testcapi/object.c _testcapi/monitoring.c
+_testinternalcapi _testinternalcapi.c _testinternalcapi/test_lock.c _testinternalcapi/pytime.c _testinternalcapi/set.c _testinternalcapi/test_critical_sections.c _testinternalcapi/complex.c
+_testcapi _testcapimodule.c _testcapi/vectorcall.c _testcapi/heaptype.c _testcapi/abstract.c _testcapi/unicode.c _testcapi/dict.c _testcapi/set.c _testcapi/list.c _testcapi/tuple.c _testcapi/getargs.c _testcapi/datetime.c _testcapi/docstring.c _testcapi/mem.c _testcapi/watchers.c _testcapi/long.c _testcapi/float.c _testcapi/complex.c _testcapi/numbers.c _testcapi/structmember.c _testcapi/exceptions.c _testcapi/code.c _testcapi/buffer.c _testcapi/pyatomic.c _testcapi/run.c _testcapi/file.c _testcapi/codec.c _testcapi/immortal.c _testcapi/gc.c _testcapi/hash.c _testcapi/time.c _testcapi/bytes.c _testcapi/object.c _testcapi/monitoring.c _testcapi/config.c _testcapi/import.c _testcapi/frame.c _testcapi/type.c _testcapi/function.c _testcapi/weakref.c
 _testimportmultiple _testimportmultiple.c
 _testmultiphase _testmultiphase.c
 _testsinglephase _testsinglephase.c
 _xxtestfuzz _xxtestfuzz/_xxtestfuzz.c _xxtestfuzz/fuzzer.c
-_testexternalinspection _testexternalinspection.c
 _testclinic _testclinic.c
 xxsubtype xxsubtype.c
 

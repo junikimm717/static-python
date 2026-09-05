@@ -136,6 +136,23 @@ missing shim falls through to the host qemu; a present shim keeps
 re-exec on Alpine 11.1.1. Doctor must require the binfmt interpreter
 to exist *and* be ≥ 9.1. Do not restore `[expect.qemu]`.
 
+**`suite:test_threading` SIGSEGV on s390x: `test_recursion_limit` (Issue 9670).**
+The subprocess thread that infinite-recurses should raise RecursionError.
+qemu-s390x instead dies `uncaught target signal 11`. Not qemu and not
+libatomic: the same script exits 0 on aarch64/i386/mips64/ppc64le qemu
+and on native x86_64 static; main-thread recursion on s390x is fine;
+`threading.stack_size(8<<20)` and `sys.setrecursionlimit(100)` both pass.
+musl's default pthread stack is **128 KiB on every triple** (measured
+`pthread_attr_getstacksize` under qemu-s390x and qemu-aarch64). CPython
+3.14 skips `pthread_getattr_np` on musl and guesses `Py_C_STACK_SIZE`
+(320000 on `__s390x__`, 4 MiB elsewhere). s390x ELF frames are large
+enough that 1000 Python calls overflow 128 KiB before that window or
+`py_recursion_remaining` fires. Fix is `THREAD_STACK_SIZE 0x400000` in
+the s390x pyconfig fragment — the same define CPython already uses for
+FreeBSD/AIX for this test. Do not add `[expect.s390x]`. Watch
+powerpc64: it also has a large `Py_C_STACK_SIZE` (2 MiB); if the same
+script SIGSEGVs there, give it the same define, not a per-triple ignore.
+
 **sqlite configure: `s390x-binfmt-P: Could not open '/lib/ld-musl-s390x.so.1'`.**
 sqlite's configure builds a bootstrap `jimsh0` with the *target* CC and
 then runs it. Host binfmt intercepts the cross ELF. `B.cc=@BUILD_CC@`
@@ -475,13 +492,30 @@ cannot be trimmed as dead weight without losing symbols.
 **`_ctypes_test` is a shared library** that ctypes' own tests `dlopen`. Those
 tests cannot pass here, ever. Declare them, do not debug them.
 
+**`test_ctypes.test_dllist.test_lists_system` fails with `loaded=['/proc/self/exe']`.**
+3.14 added `ctypes.util.dllist` (`dl_iterate_phdr`). The test wants `libc.so`
+or `libffi.so` in the list; a fully static binary has only the executable
+phdr. Dynamic reference arms pass. This is `[expect.static]`, not
+`[expect.<triple>]` and not qemu. Ignore glob is `*test_ctypes.test_dllist*`
+(the module). `*test_dllist.test_lists_system*` does not match: regrtest
+fnmatch never sees those two names adjacent. `test_lists_updates` needs
+`_ctypes_test` and skips.
+
 ## Generating the symbol table
 
-**`abi_only` does not mean undeclared.** 23 of the 57 `abi_only` entries in
-CPython 3.13 *are* declared in public headers, and emitting a synthetic
-`extern void f(void);` for those is a conflicting-types compile error. Scan
-`Include/*.h` and `Include/cpython/*.h` to find the genuinely undeclared set —
-34, at 3.13.13 — and emit externs only for those.
+**`abi_only` does not mean undeclared.** Many `abi_only` entries *are* declared
+in public headers, and emitting a synthetic `extern void f(void);` for those
+is a conflicting-types compile error. Scan the headers `Python.h` actually
+reaches to find the genuinely undeclared set and emit externs only for those.
+
+**A public header that `#define`s a stable-ABI function hides the `PyAPI_FUNC`.**
+3.14's `Py_PACK_FULL_VERSION` is declared, then immediately `#define`d to a
+function-like macro. `EXPORT_FUNC` takes `&name`, which becomes
+`&_Py_PACK_FULL_VERSION` and fails (`undeclared here (not in a function)`).
+`dump_stable_abi.py` marks names that are both a `#define` and a `PyAPI_FUNC`;
+the generator `#undef`s them so the real declaration is what we take the
+address of. Do not special-case one symbol: the next header wrapper hits the
+same hole.
 
 **Emit `#ifdef` guards per entry, never hoisted into blocks.** The table has to
 stay sorted whichever way a target resolves the guards, or `bsearch` silently

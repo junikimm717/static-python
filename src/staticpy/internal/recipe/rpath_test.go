@@ -86,10 +86,10 @@ func TestOriginRunpath(t *testing.T) {
 	for _, tt := range []struct {
 		rel, want string
 	}{
-		{"bin/python3.13", "$ORIGIN/../lib:$ORIGIN/../lib64"},
+		{"bin/python3.14", "$ORIGIN/../lib:$ORIGIN/../lib64"},
 		{"lib/libssl.so.3", "$ORIGIN:$ORIGIN/../lib64"},
 		{"lib64/libffi.so.8", "$ORIGIN/../lib:$ORIGIN"},
-		{"lib/python3.13/lib-dynload/_ssl.so", "$ORIGIN/../..:$ORIGIN/../../../lib64"},
+		{"lib/python3.14/lib-dynload/_ssl.so", "$ORIGIN/../..:$ORIGIN/../../../lib64"},
 	} {
 		if got := originRunpath(tt.rel); got != tt.want {
 			t.Errorf("originRunpath(%q) = %q, want %q", tt.rel, got, tt.want)

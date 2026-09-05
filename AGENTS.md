@@ -26,12 +26,12 @@ and every job's key is hashed over its inputs and its dependencies' keys, so an
 edit rebuilds exactly what depends on it and nothing else.
 
 The interpreter is the artefact under
-`dist/artifacts/pynative_<profile>_<triple>/bin/python3.13` for a native build
+`dist/artifacts/pynative_<profile>_<triple>/bin/python3.14` for a native build
 and `dist/artifacts/pycross_<profile>_<host>_<triple>/` for a cross one;
 `--pack` also writes a relocatable tarball to
 `dist/out/<profile>/<triple>/`. The dynamically-linked baseline used for
 benchmarking is the `reference` profile's own artifact,
-`dist/artifacts/pyref_reference_<triple>/rootfs/bin/python3.13`.
+`dist/artifacts/pyref_reference_<triple>/rootfs/bin/python3.14`.
 
 The dev container is still the easiest way to get a clean host, and its
 `/workspace` is a bind mount of the repo, but staticpy builds hermetically

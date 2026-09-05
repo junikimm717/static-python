@@ -94,6 +94,20 @@ not wired up.\
 """
 
 [[expect.static.ignore]]
+test = "*test_ctypes.test_dllist*"
+why = """
+3.14 ctypes.util.dllist walks dl_iterate_phdr and expects libc.so or \
+libffi.so. A fully static binary has neither; the only phdr is \
+/proc/self/exe. Same class as test_find / test_dlerror, not a per-triple \
+gap. The glob must be the module (*test_ctypes.test_dllist*), not \
+*test_dllist.test_lists_system* — regrtest fnmatch never sees those two \
+components adjacent (ListSharedLibraries sits between them), so the \
+tighter pattern left the method running. Confirmed on aarch64 and \
+riscv64 qemu; dynamic reference arms pass because they load those .so \
+files.\
+"""
+
+[[expect.static.ignore]]
 test = "*test_incomplete_multi_phase_init_module*"
 why = """
 Interpolates _testmultiphase.__file__ into a script. It is a builtin, and a \

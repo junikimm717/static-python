@@ -363,9 +363,9 @@ func (j *pyRef) assertUsable(rootfs string) error {
 // .py that wraps it. Checking only the extension is how that reached a
 // published artifact once already.
 var modulesFromDeps = []string{
-	"_ssl", "_hashlib", "_sqlite3", "_lzma", "_bz2", "zlib",
+	"_ssl", "_hashlib", "_sqlite3", "_lzma", "_bz2", "_zstd", "zlib",
 	"_ctypes", "_curses", "_uuid", "readline",
-	"ssl", "sqlite3", "lzma", "bz2", "ctypes", "curses", "uuid", "decimal", "hashlib",
+	"ssl", "sqlite3", "lzma", "bz2", "compression.zstd", "ctypes", "curses", "uuid", "decimal", "hashlib",
 }
 
 func (j *pyRef) assertModules(ctx context.Context, r *core.Runner, rootfs string) error {

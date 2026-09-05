@@ -34,7 +34,7 @@ much on dynamic loading.
 
 Binaries should be ready to use in [the releases
 page](https://github.com/junikimm717/static-python/releases/tag/binaries). Only
-Linux (5.8+) is supported, and only the latest version of python3 (3.13) is
+Linux (5.8+) is supported, and only the latest version of python3 (3.14) is
 supported. Feel free to do more monkey patching if you want older versions :)
 
 ## Setup

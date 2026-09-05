@@ -93,6 +93,13 @@ name = "bzip2"
 build = "make"
 provides = ["lib/libbz2.a"]
 
+# CPython 3.14's compression.zstd / _zstd. Same make shape as bzip2: no
+# configure, named archive target (patched in), PREFIX install.
+[package.zstd]
+name = "zstd"
+build = "make"
+provides = ["lib/libzstd.a"]
+
 # libuuid is compiled straight from util-linux's sources rather than through
 # util-linux's build system. Building the real thing needs meson, ninja, flex
 # and bison on the host to produce one small library CPython uses for exactly
@@ -283,6 +290,11 @@ make_vars = ["SHLIB_LIBS=-lncursesw"]
 [package.sqlite.profile.reference]
 configure = ["--disable-static", "--enable-shared"]
 provides = ["lib/libsqlite3.so"]
+
+[package.zstd.profile.reference]
+# Default `make` builds lib-release (shared + static). provides is the .so
+# the dynamic interpreter actually loads.
+provides = ["lib/libzstd.so"]
 
 # mimalloc exists to beat musl's allocator at static link time. A reference
 # build carrying it would not be the stock interpreter it exists to measure.
