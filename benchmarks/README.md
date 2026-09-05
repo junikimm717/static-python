@@ -2,7 +2,8 @@
 
 Committed `./staticpy bench` sessions. CI never measures; GitHub Pages is
 built from this tree by `./manage_benchmarks.py site`. Do not commit `_site`.
-Fixtures under `fixtures/` are synthetic demo data, not scores.
+Only measured sessions belong here. The manager's tests keep a synthetic
+session under `tests/fixtures/`.
 
 ## What we accept
 
@@ -74,4 +75,5 @@ Then commit `benchmarks/` and push. Pages rebuilds from that tree on `master`.
 
 `--force` overwrites an existing id. `--allow-stale-protocol` imports a
 session whose `protocol` is not 2; those stay in the tree and the site badges
-them. `delete` refuses `fixtures/` unless `--fixtures` is also passed.
+them. `delete` refuses anything still under `fixtures/` unless `--fixtures`
+is also passed.

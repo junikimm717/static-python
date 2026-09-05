@@ -1,5 +1,5 @@
-"""Tests for manage_benchmarks.py. They copy the committed fixture into a
-temp tree so they never mutate benchmarks/.
+"""Tests for manage_benchmarks.py. They copy the synthetic session under
+tests/fixtures/ into a temp tree so they never mutate benchmarks/.
 """
 
 from __future__ import annotations
@@ -20,7 +20,8 @@ if str(ROOT) not in sys.path:
 import manage_benchmarks as mb  # noqa: E402
 
 FIXTURE_ID = "20000101T000000Z-x86_64"
-FIXTURE = ROOT / "benchmarks" / "fixtures" / FIXTURE_ID
+FIXTURE = ROOT / "tests" / "fixtures" / FIXTURE_ID
+REAL_ID = "20260904T143118Z-amd64"
 
 
 def _copy_fixture(dest: Path) -> Path:
@@ -180,17 +181,25 @@ class VerifyTests(unittest.TestCase):
 
 
 class SiteTests(unittest.TestCase):
-    def test_site_contains_fixture_id_and_heading(self):
+    def test_site_leads_with_geomean(self):
         out = Path(tempfile.mkdtemp()) / "site"
         self.addCleanup(shutil.rmtree, out.parent, True)
         mb.write_site(ROOT, out)
         index = (out / "index.html").read_text(encoding="utf-8")
-        self.assertIn(FIXTURE_ID, index)
-        self.assertIn("Fixture / demo", index)
+        self.assertIn(REAL_ID, index)
+        self.assertNotIn("Fixture / demo", index)
         self.assertIn(">pyperformance<", index)
-        self.assertTrue((out / "run" / FIXTURE_ID / "index.html").is_file())
+        self.assertTrue((out / "run" / REAL_ID / "index.html").is_file())
         self.assertTrue((out / "data" / "index.json").is_file())
-        page = (out / "run" / FIXTURE_ID / "index.html").read_text(encoding="utf-8")
+        page = (out / "run" / REAL_ID / "index.html").read_text(encoding="utf-8")
+        self.assertIn("<h1>pyperformance comparison</h1>", page)
+        self.assertLess(page.find("<h1>"), page.find("Geomean vs"))
+        self.assertLess(page.find("Geomean vs"), page.find("Per-benchmark ratio"))
+        self.assertLess(page.find("Per-benchmark ratio"), page.find("Interpreters"))
+        self.assertLess(page.find("Interpreters"), page.find("Dependencies"))
+        self.assertIn("<summary>Interpreters</summary>", page)
+        self.assertIn("<summary>Dependencies</summary>", page)
+        self.assertIn("<summary>Machine</summary>", page)
         self.assertIn("fingerprint", page)
         self.assertIn("spectre_v2", page)
         self.assertIn("telemetry", page)
@@ -199,6 +208,22 @@ class SiteTests(unittest.TestCase):
         self.assertIn("whole-graph", page)
         self.assertIn("mimalloc", page)
         self.assertIn("pyperformance==1.14.0", page)
+        self.assertNotIn("<th>packages</th>", page)
+
+    def test_site_badges_fixtures(self):
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, True)
+        root = tmp / "repo"
+        fx = root / "benchmarks" / "fixtures" / FIXTURE_ID
+        _copy_fixture(fx)
+        out = tmp / "site"
+        mb.write_site(root, out)
+        index = (out / "index.html").read_text(encoding="utf-8")
+        self.assertIn(FIXTURE_ID, index)
+        self.assertIn("Fixture / demo", index)
+        page = (out / "run" / FIXTURE_ID / "index.html").read_text(encoding="utf-8")
+        self.assertIn("Fixture / demo", page)
+        self.assertIn("<h1>pyperformance comparison</h1>", page)
 
 
 class GitignoreTests(unittest.TestCase):
@@ -241,9 +266,9 @@ class GitignoreTests(unittest.TestCase):
         self.assertTrue(ignored(f"{prefix}/venv/junk"))
         self.assertTrue(ignored(f"{prefix}/raw/x.json"))
         self.assertTrue(ignored(f"{prefix}/logs/run.log"))
-        fixture = f"benchmarks/fixtures/{FIXTURE_ID}"
+        real = f"benchmarks/{REAL_ID}"
         for name in mb.ALLOWED_FILES:
-            self.assertFalse(ignored(f"{fixture}/{name}"), name)
+            self.assertFalse(ignored(f"{real}/{name}"), name)
 
 
 class HelpTests(unittest.TestCase):
