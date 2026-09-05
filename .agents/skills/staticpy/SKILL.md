@@ -41,7 +41,7 @@ dist/                    everything generated; gitignored, safe to delete
 | question | answer |
 |---|---|
 | what commands and flags exist | `./staticpy help`, `./staticpy help <cmd>`, `help layout`, `help targets` — authoritative |
-| bump a pinned version | `config/sources.toml` (version + file + urls + topdir + **sha256 in the same edit**) |
+| bump a pinned version | `config/sources.toml` (version + file + urls + topdir + **sha256 in the same edit**). A CPython minor or a pin sweep that rebuilds the matrix: `staticpy-bump` **Running a matrix upgrade** — fuzz first, hunt the class, 66+4 `failed=0`, pack from a clean tree |
 | change a package's configure flags | `config/packages.toml`. Only *decisions* live there: `--prefix`, `--exec-prefix`, `--host` are injected by the recipe because they are absolute or triple-derived |
 | change a compiler/linker flag | `config/profiles.toml`. Profile-wide, then scoped: `deps`, `deps.<pkg>`, `python`, `pyhost`. A scoped change rebuilds only what that scope reaches |
 | add a native library | a `[source.X]` in `config/sources.toml` + a `[package.X]` in `config/packages.toml` (`build` = autotools\|openssl\|make\|sources, `needs`, `provides`). `Deps` picks up every package automatically; `sysroot` composes them |
@@ -281,6 +281,8 @@ Honest inventory, because the code reads more finished than it is:
 - `staticpy-traps` — symptom-to-cause catalogue, with the long bug write-ups in
   its `references/`. **Read it before debugging anything that builds but
   misbehaves, and write what you find there.**
+- `staticpy-bump` — pin edits, and the overnight matrix-upgrade rules
+  (preemptive fuzz, class-wide hunt, 66+4 done-when, clean-tree kit).
 - `staticpy-add-target` — adding and proving a new triple.
 - `comment-hygiene` — this repo's comment rule: say *why*, not *what*; no stale
   framing; no baked-in numbers unless the number is the point. Anything longer

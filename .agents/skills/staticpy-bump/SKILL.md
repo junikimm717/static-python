@@ -1,6 +1,6 @@
 ---
 name: staticpy-bump
-description: Upgrade a pinned dependency — openssl, sqlite, ncurses, readline, libffi, xz, zlib, bzip2, util-linux/libuuid, or CPython itself — and survive the sharp corners: where the checksum must come from, why a patch that stops applying is the outcome you wanted, and the packages whose version is encoded in more than one place. Use whenever changing a version in config/sources.toml.
+description: Upgrade a pinned dependency — openssl, sqlite, ncurses, readline, libffi, xz, zlib, bzip2, util-linux/libuuid, or CPython itself — and survive the sharp corners: where the checksum must come from, why a patch that stops applying is the outcome you wanted, and the packages whose version is encoded in more than one place. Also the overnight matrix-upgrade rules (preemptive grok fuzz, class-wide hunt, 66+4 failed=0, pack from a clean tree). Use whenever changing a version in config/sources.toml or running a CPython/dep sweep.
 ---
 
 # Bumping a pinned dependency
@@ -154,5 +154,60 @@ Cheapest first, so a mistake costs seconds rather than an hour:
 
 Then the sanity imports, which catch a dependency that built but linked wrong:
 `ssl`, `zlib`, `sqlite3`, `ctypes`, `_lzma`, `_hashlib`, `readline`, `curses`,
-`uuid`. The `smoke` verification level runs exactly these, plus a
-`sysconfig`/`ctypes` cross-check that catches a corrupted `_sysconfigdata`.
+`uuid`, `compression.zstd`. The `smoke` verification level runs exactly these,
+plus a `sysconfig`/`ctypes` cross-check that catches a corrupted `_sysconfigdata`.
+
+## Running a matrix upgrade
+
+A CPython minor bump, or a pin sweep that invalidates every interpreter, is
+not "edit sources.toml and hope". The 66 static cells (11 musl triples × 6
+profiles) plus the 4 glibc `reference*` arms are the job. Do not stop until
+every cell is packed and its verify artifact has `failed=0`.
+
+**Fuzz before you compile.** A class-wide ABI, Setup, thread, or
+configure-guess hole costs more than an hour at verify, per cell. Spend
+minutes of grok 4.6 subagents on the codebase first: stable-ABI /
+`staticapi` macros, `Setup` vs `Modules/Setup.stdlib.in`, fork/atomics,
+new `AC_RUN_IFELSE` tests the ABI probe does not cover. Always do this
+preemptively, even when the last bump was "just a patch release".
+
+**Hunt the class, do not green-wash.** Getting the matrix to build is not
+the goal; the build has to stay reproducible. When a cell fails, deploy a
+subagent and demand evidence (repro on a second arm, the layer, the
+complete fix). Parking the last failure under `[expect.<this-triple>]` or
+a one-package profile stanza is forbidden — that is the
+`staticpy-traps` rule **Do not overfit the last failure**. Write the
+finding there.
+
+**Use the machine.** `--workers` times `-j` is the load. Maximize workers
+without exploding RSS (LTO peaks around 11 GB per target on this shape;
+measure before trusting the default 4). earlyoom is a backstop, not a
+plan. Fail-fast: one flake abandons the queue, so re-run rather than
+reading a partial sweep.
+
+**Docker, not the host.** `spython` for every static / cross cell.
+`ubuntu` for the four `reference*` arms (hostcc-keyed prefixes; Alpine
+and glibc must not share a directory). `staticpy kit` for the 10-arm
+x86_64 lineup also belongs on `ubuntu`, or the baseline is the wrong
+libc.
+
+**Tmux on the host.** The container has no tmux. Detach a session that
+`docker compose exec`s, tees the log, and writes `EXIT_CODE=` from
+`${PIPESTATUS[0]}` — not `tee`'s 0. Poll the log and `staticpy status`;
+do not attach.
+
+**Pack from a clean tree.** The `./staticpy` shim stamps
+`HEAD` plus `-dirty` when `git status --porcelain` is non-empty into
+`buildinfo.GitRevision`. That string is a kit key input and is copied
+into `kit.json` and `bin/staticpy-bench`. Interpreters built or kitted
+while the upgrade is still uncommitted will advertise a dirty
+static-python revision. Commit the pin/recipe work first, confirm
+`git status` is empty, then pack and kit. If you packed while dirty,
+restamp: rebuild `dist/.bin/staticpy` (or pass `STATICPY_GIT_REVISION`)
+and re-run `staticpy kit --name default --verify core` on ubuntu.
+
+Done when: `staticpy status --target all --verify core --pack` is 0 stale
+/ 0 missing on every static profile; ubuntu status is the same for each
+`reference*`; every verify report has `failed=0`; every tarball sha256
+matches its sidecar; the kit, if you shipped one, has a clean
+`git_revision`.
