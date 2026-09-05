@@ -1,6 +1,6 @@
 ---
 name: staticpy-bump
-description: Upgrade a pinned dependency — openssl, sqlite, ncurses, readline, libffi, xz, zlib, bzip2, util-linux/libuuid, or CPython itself — and survive the sharp corners: where the checksum must come from, why a patch that stops applying is the outcome you wanted, and the packages whose version is encoded in more than one place. Also the overnight matrix-upgrade rules (preemptive fuzz, class-wide hunt, full matrix failed=0, pack from a clean tree). Use whenever changing a version in config/sources.toml or running a CPython/dep sweep.
+description: Upgrade a pinned dependency — openssl, sqlite, ncurses, readline, libffi, xz, zlib, bzip2, util-linux/libuuid, or CPython itself — and survive the sharp corners: where the checksum must come from, why a patch that stops applying is the outcome you wanted, and the packages whose version is encoded in more than one place. Also the overnight matrix-upgrade rules (preemptive fuzz, class-wide hunt, full matrix failed=0, pack from a clean tree). A pyperformance/pyperf pin lives in config/bench.toml, not sources.toml — restamp eta_weights.json after a session has timed the new names (see staticpy, Bench ETA weights). Use whenever changing a version in config/sources.toml or bench.toml, or running a CPython/dep sweep.
 ---
 
 # Bumping a pinned dependency
@@ -139,6 +139,14 @@ explicitly.
 
 **Adding a package is not bumping one.** A new native library is a `[source.X]`
 plus a `[package.X]`; a new architecture is `staticpy-add-target`.
+
+**The bench suite is not a `sources.toml` pin.** pyperformance and pyperf live
+in `config/bench.toml` (and the fallback constants in `internal/bench/pins.go`).
+A pin bump is a suite change, not a protocol bump. The ETA weight table
+(`internal/bench/eta_weights.json`) is the benches we actually time, not the
+full upstream suite — do not treat a pin edit as "the table is now wrong and
+the ETA will break." After a session has timed the new names, restamp the
+table so they join the shape. Procedure: `staticpy` skill, **Bench ETA weights**.
 
 ## Verifying the bump
 

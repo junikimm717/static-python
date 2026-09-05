@@ -46,3 +46,17 @@ If you already packed while dirty, restamp: delete the published kit
 directory, rebuild the binary from a clean tree, and run `kit` again.
 `./staticpy print git-revision` and `kit.json`'s `git_revision` must be a
 bare SHA, not `*-dirty`.
+
+## After the quiet box measures
+
+The kit runner has no checkout and no last session. The progress ETA uses
+the weights embedded in the binary (`eta_weights.json`), not last night's
+`(arm, benchmark)` cells. That table is the names we actually time, not all
+of pyperformance.
+
+When you commit the new session under `benchmarks/`, check `skipped.json`
+and the timeline for names that are not in `eta_weights.json`. If a bench
+that used to skip has started running, restamp the table so the next kit
+picks up its length. The ETA does not break if you skip this — the new name
+is a local guess and stays out of the pace — but the shape stays stale until
+you do. Procedure: `staticpy` skill, **Bench ETA weights**.
