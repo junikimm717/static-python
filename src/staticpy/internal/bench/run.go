@@ -70,6 +70,18 @@ func RunSuite(ctx context.Context, x Exec, s *Session, pin Pin, arms []Arm, case
 	done := 0
 	suiteStart := time.Now()
 
+	priorDirs := append([]string{filepath.Dir(s.Dir)}, s.PriorDirs...)
+	prior := LoadDurationPrior(FindTimelineFiles(priorDirs, s.Dir))
+	fmt.Fprintf(os.Stderr, "  eta prior: %s\n", prior.Describe())
+
+	queue := make([]cellKey, 0, total)
+	for _, c := range cases {
+		for _, a := range arms {
+			queue = append(queue, cellKey{a.Label, c.Name})
+		}
+	}
+	var observed []obs
+
 	for _, c := range cases {
 		for _, a := range arms {
 			out := filepath.Join(s.Dir, "raw", a.Label, c.Name+".json")
@@ -118,7 +130,12 @@ func RunSuite(ctx context.Context, x Exec, s *Session, pin Pin, arms []Arm, case
 			s.Record(ev)
 
 			done++
-			progress(done, total, suiteStart, c.Name, a.Label, wall, runErr, ev.SibBusy)
+			observed = append(observed, obs{cellKey{a.Label, c.Name}, wall.Seconds()})
+			var eta time.Duration
+			if done < total {
+				eta = prior.Remaining(observed, queue[done:], time.Since(suiteStart))
+			}
+			progress(done, total, c.Name, a.Label, wall, eta, runErr, ev.SibBusy)
 
 			if runErr == nil {
 				if vals, err := ParseResult(out); err == nil {
@@ -176,12 +193,10 @@ func (s *Session) Trace(pin Pin, arm, benchmark string, fn func() error) error {
 // ran, how long it took, and how far off the end is. The sibling-busy figure
 // is printed inline rather than left for the postmortem -- it is the signal
 // that the numbers being produced right now are contaminated.
-func progress(done, total int, start time.Time, bench, arm string, wall time.Duration, err error, sibBusy float64) {
-	elapsed := time.Since(start)
+func progress(done, total int, bench, arm string, wall, remain time.Duration, err error, sibBusy float64) {
 	var eta string
 	if done > 0 && done < total {
-		per := elapsed / time.Duration(done)
-		eta = " eta " + (per * time.Duration(total-done)).Round(time.Second).String()
+		eta = " eta " + remain.Round(time.Second).String()
 	}
 	status := "ok"
 	if err != nil {
