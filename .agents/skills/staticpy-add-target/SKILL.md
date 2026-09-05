@@ -164,7 +164,7 @@ Two cautions:
 staticpy never fetches qemu. Resolution is `--qemu <triple>=<path>` first, then
 `exec.LookPath(QemuBinaryName(t))`. Provisioning is the shim's and the
 container's job — for the dev container that means
-`scripts/docker/build-qemu-user.sh` (`--target-list`) plus the
+`scripts/docker/qemu-user.sh` (`--target-list`) plus the
 `/usr/libexec/qemu-binfmt` shims. A new triple that needs verify must
 be added to that target list or `doctor` will show `(not found)` and
 the verify job fails at launcher construction.

@@ -48,7 +48,7 @@ sinh(1)+sinh(-1) = 2.22e-16 is unchanged across 8.2.2, 11.0.1, and
 ## What we ended up doing
 
 The image builds qemu-user **11.1.1** from `https://download.qemu.org/qemu-11.1.1.tar.xz`
-(sha256-pinned in `scripts/docker/build-qemu-user.sh`). Ubuntu 24.04's own
+(sha256-pinned in `scripts/docker/qemu-user.sh`). Ubuntu 24.04's own
 qemu-user is 8.2.2 and still has the wrong `cc_op` and a broken
 `/proc/self/stat` `num_threads`. The twelve
 `[expect."i386-linux-musl:qemu"]` ignores are deleted. *MathTests.testSinh*

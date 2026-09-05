@@ -15,8 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-dev \
     xz-utils \
   && rm -rf /var/lib/apt/lists/*
-COPY scripts/docker/build-qemu-user.sh /tmp/build-qemu-user.sh
-RUN chmod +x /tmp/build-qemu-user.sh && /tmp/build-qemu-user.sh
+COPY scripts/docker/qemu-user.sh /tmp/qemu-user.sh
+RUN chmod +x /tmp/qemu-user.sh && /tmp/qemu-user.sh
 
 FROM ubuntu:24.04
 

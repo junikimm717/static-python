@@ -102,7 +102,7 @@ Smoke probes pass (staticpy prefixes `qemu-riscv64`). Anything that
 global and first-writer. Host `qemu-user-binfmt` registers
 `/usr/libexec/qemu-binfmt/<arch>-binfmt-P`. Dockerfile shims make that
 path exist inside the container for today's qemu list in
-`scripts/docker/build-qemu-user.sh`; a new arch, a stale image, Fedora's
+`scripts/docker/qemu-user.sh`; a new arch, a stale image, Fedora's
 `qemu-<arch>-static` names, or CI's host verify all miss. Refuse to verify unless the registered interpreter exists in
 this mount namespace. Do not wrap CPython's re-exec. Not an `[expect]`.
 
