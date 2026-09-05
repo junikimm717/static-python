@@ -1,3 +1,23 @@
+# qemu-user 11.1.1 from download.qemu.org. Ubuntu 24.04 ships 8.2.2, which
+# still has the i386 SAHF/cc_op bug and a broken /proc/self/stat num_threads.
+FROM ubuntu:24.04 AS qemu-user
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    curl \
+    python3 \
+    python3-venv \
+    python3-setuptools \
+    meson \
+    ninja-build \
+    pkg-config \
+    libglib2.0-dev \
+    xz-utils \
+  && rm -rf /var/lib/apt/lists/*
+COPY scripts/docker/build-qemu-user.sh /tmp/build-qemu-user.sh
+RUN chmod +x /tmp/build-qemu-user.sh && /tmp/build-qemu-user.sh
+
 FROM ubuntu:24.04
 
 # One image for every profile: gccfactory musl static/cross *and* host-built
@@ -27,6 +47,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ninja-build \
     patchelf \
     make \
+    libglib2.0-0 \
   && rm -rf /var/lib/apt/lists/*
 
 # Ubuntu 24.04's golang is older than go.mod (1.23).
@@ -44,11 +65,11 @@ RUN set -eu; \
     rm /tmp/go.tgz
 ENV PATH=/usr/local/go/bin:$PATH
 
-# qemu-user 11.1.1 (Alpine edge static-pie). Ubuntu 24.04 ships 8.2.2.
-COPY scripts/docker/fetch-qemu-user.sh /tmp/fetch-qemu-user.sh
-RUN chmod +x /tmp/fetch-qemu-user.sh \
- && /tmp/fetch-qemu-user.sh "$TARGETARCH" \
- && rm /tmp/fetch-qemu-user.sh
+COPY --from=qemu-user /usr/local/bin/qemu-* /usr/bin/
+RUN mkdir -p /usr/libexec/qemu-binfmt \
+ && for a in x86_64 i386 aarch64 arm armeb ppc64 ppc64le s390x riscv64 riscv32 mips64; do \
+      [ -x /usr/bin/qemu-$a ] && ln -sfn /usr/bin/qemu-$a /usr/libexec/qemu-binfmt/${a}-binfmt-P; \
+    done
 
 COPY scripts/docker/binfmt /usr/local/bin/binfmt
 RUN chmod +x /usr/local/bin/binfmt

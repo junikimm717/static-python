@@ -47,14 +47,14 @@ sinh(1)+sinh(-1) = 2.22e-16 is unchanged across 8.2.2, 11.0.1, and
 
 ## What we ended up doing
 
-The Dockerfile installs qemu-user **11.1.1-r0** as Alpine edge static-pie
-binaries (sha256-pinned in `scripts/docker/fetch-qemu-user.sh`). Ubuntu
-24.04's own qemu-user is 8.2.2 and still has the wrong `cc_op` and a
-broken `/proc/self/stat` `num_threads`. The twelve
+The image builds qemu-user **11.1.1** from `https://download.qemu.org/qemu-11.1.1.tar.xz`
+(sha256-pinned in `scripts/docker/build-qemu-user.sh`). Ubuntu 24.04's own
+qemu-user is 8.2.2 and still has the wrong `cc_op` and a broken
+`/proc/self/stat` `num_threads`. The twelve
 `[expect."i386-linux-musl:qemu"]` ignores are deleted. *MathTests.testSinh*
 stays on `[expect.i386-linux-musl]` — that is the real 80-bit ABI issue.
 
 ## What we'd want upstream
 
-Ubuntu shipping qemu-user >= 11.1, so the Alpine apk fetch can go.
+Ubuntu shipping qemu-user >= 11.1, so the from-source pin can go.
 `-one-insn-per-tb` is a proof, not a default.

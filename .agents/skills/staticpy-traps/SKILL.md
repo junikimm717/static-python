@@ -102,7 +102,7 @@ Smoke probes pass (staticpy prefixes `qemu-riscv64`). Anything that
 global and first-writer. Host `qemu-user-binfmt` registers
 `/usr/libexec/qemu-binfmt/<arch>-binfmt-P`. Dockerfile shims make that
 path exist inside the container for today's qemu list in
-`scripts/docker/fetch-qemu-user.sh`; a new arch, a stale image, Fedora's
+`scripts/docker/build-qemu-user.sh`; a new arch, a stale image, Fedora's
 `qemu-<arch>-static` names, or CI's host verify all miss. Refuse to verify unless the registered interpreter exists in
 this mount namespace. Do not wrap CPython's re-exec. Not an `[expect]`.
 
@@ -116,8 +116,8 @@ apply; do not add `[expect.static]`.
 
 **i386 core verify: `test_divmod` / `test_math` / `test_struct` fail under qemu.**
 qemu 11.0 TCG leaves `cc_op` stale after `SAHF` (`da7649c6`, GitLab #3537).
-Fixed in 11.0.4 / 11.1. The image pins qemu-user **11.1.1** (Alpine
-static-pie binaries, not Ubuntu 24.04's 8.2.2). If those methods fail
+Fixed in 11.0.4 / 11.1. The image builds qemu-user **11.1.1** from
+download.qemu.org, not Ubuntu 24.04's 8.2.2. If those methods fail
 again, the image is still on 11.0.x — upgrade qemu, do not restore the
 `:qemu` ignores. `*MathTests.testSinh*`
 is the real x87 1-ulp ABI issue and stays on `[expect.i386-linux-musl]`.
