@@ -550,6 +550,7 @@ table{border-collapse:collapse;width:100%;margin:1rem 0}
 th,td{border:1px solid #cbd5e0;padding:.35rem .55rem;text-align:right;vertical-align:top}
 th:first-child,td:first-child{text-align:left}
 table.ratios{font-variant-numeric:tabular-nums}
+table.ratios tr.geomean th,table.ratios tr.geomean td{font-weight:650}
 .ratio{font-weight:600}
 .ratio.lose3{background:#d55e00;color:#fff}
 .ratio.lose2{background:#e69f00;color:#1a202c}
@@ -815,6 +816,19 @@ def _ratio_table_html(report: dict, order: list[str], tips: dict[str, str] | Non
     for a in order:
         parts.append(f"<th>{_tipped(a, tips)}</th>")
     parts.append("</tr></thead>\n<tbody>\n")
+    geo = report.get("geomean_vs_baseline")
+    if isinstance(geo, dict) and geo:
+        baseline = report.get("baseline")
+        parts.append('<tr class="geomean"><th scope="row">geomean</th>')
+        for a in order:
+            v = geo.get(a)
+            if v is None and a == baseline:
+                v = 1.0
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                parts.append(_ratio_td(float(v)))
+            else:
+                parts.append("<td>-</td>")
+        parts.append("</tr>\n")
     for row in rows:
         if not isinstance(row, dict):
             continue

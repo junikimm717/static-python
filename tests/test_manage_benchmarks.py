@@ -222,6 +222,36 @@ class SiteTests(unittest.TestCase):
         self.assertIn("whole-program LTO", page)
         self.assertIn("Baseline for the ratios", page)
         self.assertIn("Hover an arm name", page)
+        geo_at = page.find('<tr class="geomean">')
+        first_bench = page.find("<tr><td>2to3</td>")
+        self.assertNotEqual(geo_at, -1)
+        self.assertNotEqual(first_bench, -1)
+        self.assertLess(geo_at, first_bench)
+        self.assertIn(">geomean</th>", page)
+        self.assertIn('class="ratio win1">1.13x</td>', page)
+
+    def test_ratio_table_leads_with_colored_geomean(self):
+        html = mb._ratio_table_html(
+            {
+                "baseline": "reference",
+                "geomean_vs_baseline": {"default": 1.13, "nomimalloc": 0.80},
+                "rows": [
+                    {
+                        "benchmark": "nqueens",
+                        "ratio_vs_baseline": {"reference": 1.0, "default": 1.26},
+                    }
+                ],
+            },
+            ["reference", "default", "nomimalloc"],
+        )
+        geo = html.find('<tr class="geomean">')
+        self.assertNotEqual(geo, -1)
+        self.assertLess(geo, html.find("<tr><td>nqueens</td>"))
+        row = html[geo : html.find("</tr>", geo)]
+        self.assertIn(">geomean</th>", row)
+        self.assertIn("1.00x</td>", row)
+        self.assertIn('class="ratio win1">1.13x</td>', row)
+        self.assertIn('class="ratio lose2">0.80x</td>', row)
 
     def test_site_badges_fixtures(self):
         tmp = Path(tempfile.mkdtemp())
