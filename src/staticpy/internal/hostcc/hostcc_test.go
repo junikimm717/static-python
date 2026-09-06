@@ -46,6 +46,17 @@ func TestIdentifyIsStableAndPopulated(t *testing.T) {
 	t.Logf("triple = %s", a.Triple)
 }
 
+func TestHostCCPrefersGCCOverCC(t *testing.T) {
+	if hostCCNames[0] != "gcc" {
+		t.Fatalf("hostCCNames = %v, want gcc first so CPython 3.13's *gcc* glob hits", hostCCNames)
+	}
+	for i, name := range hostCCNames {
+		if name == "cc" && i == 0 {
+			t.Fatal("cc must not be preferred over gcc")
+		}
+	}
+}
+
 func TestLibcOf(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

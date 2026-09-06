@@ -70,6 +70,43 @@ func TestSysrootObjectsCollectsOnlyDotO(t *testing.T) {
 	}
 }
 
+func TestAssertCPythonOptFlags(t *testing.T) {
+	ok := `
+LTOFLAGS=-flto -fuse-linker-plugin -ffat-lto-objects
+CONFIGURE_CFLAGS_NODIST=-fno-semantic-interposition -flto
+PGO_PROF_USE_FLAG=-fprofile-use -fprofile-correction
+`
+	if err := assertCPythonOptFlagsWrite(t, ok, true, true); err != nil {
+		t.Fatalf("good Makefile: %v", err)
+	}
+	if err := assertCPythonOptFlagsWrite(t, "PGO_PROF_USE_FLAG=-fprofile-use\n", false, true); err != nil {
+		t.Fatalf("nolto with PGO: %v", err)
+	}
+
+	empty := `
+LTOFLAGS=
+PGO_PROF_USE_FLAG=
+`
+	if err := assertCPythonOptFlagsWrite(t, empty, true, true); err == nil {
+		t.Fatal("empty LTOFLAGS: want error")
+	}
+	if err := assertCPythonOptFlagsWrite(t, "LTOFLAGS=-flto\nPGO_PROF_USE_FLAG=\n", true, true); err == nil {
+		t.Fatal("empty PGO_PROF_USE_FLAG: want error")
+	}
+	if err := assertCPythonOptFlagsWrite(t, empty, false, false); err != nil {
+		t.Fatalf("neither wanted: %v", err)
+	}
+}
+
+func assertCPythonOptFlagsWrite(t *testing.T, body string, wantLTO, wantPGO bool) error {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "Makefile")
+	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return assertCPythonOptFlags(p, wantLTO, wantPGO)
+}
+
 func TestSysrootObjectsMissingLibIsEmpty(t *testing.T) {
 	got, err := sysrootObjects(t.TempDir())
 	if err != nil {

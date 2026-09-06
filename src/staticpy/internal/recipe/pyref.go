@@ -314,6 +314,9 @@ func (j *pyRef) cpython(ctx context.Context, e *core.Env, r *core.Runner, work, 
 	if err := r.Run(ctx, te.cmd("python-configure", src, args, extra)); err != nil {
 		return err
 	}
+	if err := assertCPythonOptFlags(filepath.Join(src, "Makefile"), withLTO(j.res), j.res.PGO != "off"); err != nil {
+		return err
+	}
 
 	r.Step("building CPython")
 	mk := []string{"make", "-j" + strconv.Itoa(e.MakeJobs())}
@@ -329,6 +332,51 @@ func (j *pyRef) cpython(ctx context.Context, e *core.Env, r *core.Runner, work, 
 	// dependencies were merged into and the whole thing moves as one tree.
 	return r.Run(ctx, te.cmd("python-install", src,
 		[]string{"make", "install", "DESTDIR=" + shadowRoot}, extra))
+}
+
+// CPython 3.13 decides LTO/PGO by matching *gcc* against $CC. CC=/usr/bin/cc
+// leaves CONFIG_ARGS claiming --with-lto --enable-optimizations and the
+// Makefile empty. See staticpy-traps.
+func assertCPythonOptFlags(makefile string, wantLTO, wantPGO bool) error {
+	raw, err := os.ReadFile(makefile)
+	if err != nil {
+		return fmt.Errorf("recipe: pyref: reading configure Makefile: %w", err)
+	}
+	vars := parseMakeAssignments(string(raw))
+	if wantLTO {
+		joined := vars["LTOFLAGS"] + " " + vars["CONFIGURE_CFLAGS_NODIST"] + " " + vars["CFLAGS_NODIST"]
+		if !strings.Contains(joined, "-flto") {
+			return fmt.Errorf("recipe: pyref passed --with-lto but configure put no -flto in the Makefile (LTOFLAGS=%q). CPython 3.13 matches *gcc* against $CC; /usr/bin/cc silently drops LTO. See staticpy-traps", vars["LTOFLAGS"])
+		}
+	}
+	if wantPGO && strings.TrimSpace(vars["PGO_PROF_USE_FLAG"]) == "" {
+		return fmt.Errorf("recipe: pyref passed --enable-optimizations but PGO_PROF_USE_FLAG is empty. CPython 3.13 matches *gcc* against CC_BASENAME; cc silently skips PGO. See staticpy-traps")
+	}
+	return nil
+}
+
+func parseMakeAssignments(text string) map[string]string {
+	out := make(map[string]string)
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, val, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key = strings.TrimSpace(key)
+		if key == "" || strings.ContainsAny(key, " \t:+?") {
+			continue
+		}
+		val = strings.TrimSpace(val)
+		if i := strings.IndexByte(val, '#'); i >= 0 {
+			val = strings.TrimSpace(val[:i])
+		}
+		out[key] = val
+	}
+	return out
 }
 
 // An interpreter that cannot import the modules it was linked against is not a
