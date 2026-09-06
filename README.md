@@ -2,9 +2,12 @@
 
 Building a (mostly) functional cross-compiled python interpreter with zero
 shared libraries and full link-time optimization (-O3 -flto). On a Ryzen 5 3600
-that is a **1.45× geomean** (about 45%) on pyperformance versus a dynamically
-linked build of the same CPython on glibc (!!) — see the
+that is a **1.13× geomean** (about 13%) on pyperformance versus a dynamically
+linked build of the same CPython 3.14 on glibc — see the
 [benchmark pages](https://junikimm717.github.io/static-python/).
+The same comparison was **1.45×** on 3.13: the static binary did not get
+slower; 3.14's shared libpython finally compiled the LTO+PGO it was already
+advertising.
 
 **Warning:** this project is exclusively as a hobby. For basically all intents
 and purposes, you should use your standard dynamically linked python
