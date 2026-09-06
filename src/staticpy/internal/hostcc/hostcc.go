@@ -28,6 +28,8 @@ var supported = map[string]string{
 	"arm64": "aarch64",
 }
 
+var hostCCNames = []string{"gcc", "clang", "cc"}
+
 func SupportedArch() (string, error) {
 	if a, ok := supported[runtime.GOARCH]; ok {
 		return a, nil
@@ -44,7 +46,10 @@ func Find() (string, error) {
 		}
 		tried = append(tried, cc+" (from $CC)")
 	}
-	for _, name := range []string{"cc", "gcc", "clang"} {
+	// gcc before cc: CPython 3.13's configure matches *gcc* against $CC
+	// for LTO, PGO, and -fno-semantic-interposition. /usr/bin/cc is gcc
+	// and still misses. See staticpy-traps.
+	for _, name := range hostCCNames {
 		if p, err := exec.LookPath(name); err == nil {
 			return p, nil
 		}

@@ -336,6 +336,17 @@ inherits both from the same srctree and dies on `import ctypes` with
 asserts the match count, so an upstream bump that moves either line fails loudly
 rather than shipping the static interpreter's ctypes in a dynamic one.
 
+**`--with-lto --enable-optimizations` in CONFIG_ARGS, no `-flto` in the binary.**
+CPython 3.13's configure matches `*gcc*` against `$CC` / `CC_BASENAME` for LTO,
+PGO, and `-fno-semantic-interposition`. `hostcc.Find` used to prefer `cc`; on
+Ubuntu that is `/usr/bin/cc` → gcc, the glob misses, and `profile-opt` still
+runs two uninstrumented builds. The 3.13 kit advertised both flags and shipped
+neither: `reference` and `reference-nolto` differed by 8 bytes. 3.14 switched
+those cases to `ac_cv_cc_name` ([gh-96398](https://github.com/python/cpython/issues/96398)),
+so the same recipe suddenly worked. `hostcc` now prefers `gcc`, and pyref
+refuses a Makefile that asked for LTO/PGO and did not get the flags. Those
+3.13 sessions are gone; they are not a baseline.
+
 **Countermeasure for all of the above:** `pyref` imports every module that
 exists only because a dependency was built, *including the Python-level
 wrappers* — `ctypes` fails while `_ctypes` imports cleanly, and checking only

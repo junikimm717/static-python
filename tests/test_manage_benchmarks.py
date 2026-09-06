@@ -21,7 +21,7 @@ import manage_benchmarks as mb  # noqa: E402
 
 FIXTURE_ID = "20000101T000000Z-x86_64"
 FIXTURE = ROOT / "tests" / "fixtures" / FIXTURE_ID
-REAL_ID = "20260904T143118Z-amd64"
+REAL_ID = "20260905T152918Z-amd64"
 
 
 def _copy_fixture(dest: Path) -> Path:
@@ -205,7 +205,7 @@ class SiteTests(unittest.TestCase):
         self.assertIn("telemetry", page)
         self.assertIn("git_revision", page)
         self.assertIn("python_version", page)
-        self.assertIn("3.13.13", page)
+        self.assertIn("3.14.7", page)
         self.assertIn("<summary>Kit</summary>", page)
         self.assertIn("binary_sha256", page)
         self.assertIn("whole-graph", page)

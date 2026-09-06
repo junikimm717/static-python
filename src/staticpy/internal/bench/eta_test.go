@@ -104,7 +104,7 @@ func TestDefaultPriorReplaysCommittedTimeline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(dir, "20260905T015400Z-amd64", "timeline.jsonl")
+	path := filepath.Join(dir, "20260905T152918Z-amd64", "timeline.jsonl")
 	if _, err := os.Stat(path); err != nil {
 		t.Skip("committed timeline not present")
 	}
