@@ -229,6 +229,36 @@ class SiteTests(unittest.TestCase):
         self.assertLess(geo_at, first_bench)
         self.assertIn(">geomean</th>", page)
         self.assertIn('class="ratio win1">1.13x</td>', page)
+        self.assertIn('id="baseline-select"', page)
+        self.assertIn("Standard of measurement", page)
+        self.assertIn('<option value="reference" selected>', page)
+        self.assertIn('id="bench-payload"', page)
+        self.assertIn('id="geo-heading"', page)
+        self.assertIn('id="ratio-table-wrap"', page)
+        self.assertIn("searchParams", page)
+        payload = json.loads(
+            re.search(
+                r'<script type="application/json" id="bench-payload">(.*?)</script>',
+                page,
+                re.S,
+            ).group(1)
+        )
+        self.assertEqual(payload["kind"], "run")
+        self.assertEqual(payload["defaultBaseline"], "reference")
+        self.assertIn("default", payload["arms"])
+        self.assertIn("reference", payload["rows"][0]["min_s"])
+        self.assertNotIn("Baseline for the ratios", json.dumps(payload["tips"]))
+        index_payload = json.loads(
+            re.search(
+                r'<script type="application/json" id="bench-payload">(.*?)</script>',
+                index,
+                re.S,
+            ).group(1)
+        )
+        self.assertEqual(index_payload["kind"], "index")
+        self.assertEqual(index_payload["defaultBaseline"], "reference")
+        self.assertIn('<option value="reference" selected>', index)
+        self.assertIn('class="js-headline"', index)
 
     def test_ratio_table_leads_with_colored_geomean(self):
         html = mb._ratio_table_html(
@@ -267,6 +297,41 @@ class SiteTests(unittest.TestCase):
         page = (out / "run" / FIXTURE_ID / "index.html").read_text(encoding="utf-8")
         self.assertIn("Fixture / demo", page)
         self.assertIn("<h1>pyperformance comparison</h1>", page)
+        self.assertIn('id="baseline-select"', page)
+        self.assertIn('<option value="reference" selected>', page)
+
+
+class CompareAgainstTests(unittest.TestCase):
+    def test_matches_committed_geomean_vs_reference(self):
+        report = json.loads(
+            (ROOT / "benchmarks" / REAL_ID / "report.json").read_text(encoding="utf-8")
+        )
+        run = mb.load_run(ROOT / "benchmarks" / REAL_ID, fixture=False)
+        _, geo = mb.compare_against(report["rows"], "reference", run["arms"])
+        stored = report["geomean_vs_baseline"]
+        self.assertNotIn("reference", geo)
+        for k, v in stored.items():
+            self.assertAlmostEqual(geo[k], v, places=9, msg=k)
+
+    def test_retarget_default_inverts_reference_geomean(self):
+        report = json.loads(
+            (ROOT / "benchmarks" / REAL_ID / "report.json").read_text(encoding="utf-8")
+        )
+        run = mb.load_run(ROOT / "benchmarks" / REAL_ID, fixture=False)
+        _, vs_ref = mb.compare_against(report["rows"], "reference", run["arms"])
+        _, vs_def = mb.compare_against(report["rows"], "default", run["arms"])
+        self.assertNotIn("default", vs_def)
+        self.assertAlmostEqual(vs_def["reference"] * vs_ref["default"], 1.0, places=9)
+
+    def test_row_without_baseline_time_is_dropped_from_geomean(self):
+        rows = [
+            {"benchmark": "a", "min_s": {"x": 2.0, "y": 1.0}},
+            {"benchmark": "b", "min_s": {"y": 1.0}},
+        ]
+        out, geo = mb.compare_against(rows, "x", ["x", "y"])
+        self.assertEqual(out[0]["ratio_vs_baseline"]["y"], 2.0)
+        self.assertEqual(out[1]["ratio_vs_baseline"], {})
+        self.assertAlmostEqual(geo["y"], 2.0)
 
 
 class InterpTipTests(unittest.TestCase):

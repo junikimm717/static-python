@@ -462,12 +462,13 @@ def _interp_tip(item: dict, *, baseline: str = "") -> str:
     return text if text.endswith(".") else text + "."
 
 
-def _interp_tips(manifest: dict) -> dict[str, str]:
+def _interp_tips(manifest: dict, *, baseline: str | None = None) -> dict[str, str]:
     tips: dict[str, str] = {}
     interps = manifest.get("interpreters")
     if not isinstance(interps, list):
         return tips
-    baseline = manifest.get("baseline") if isinstance(manifest.get("baseline"), str) else ""
+    if baseline is None:
+        baseline = manifest.get("baseline") if isinstance(manifest.get("baseline"), str) else ""
     for item in interps:
         if isinstance(item, dict) and item.get("label"):
             tips[str(item["label"])] = _interp_tip(item, baseline=baseline)
@@ -481,20 +482,156 @@ def _tipped(label: str, tips: dict[str, str]) -> str:
     return f'<span data-tip="{_esc(tip)}">{_esc(label)}</span>'
 
 
-def geomean_svg(run: dict) -> str:
-    geo = run.get("geomean_vs_baseline") or {}
-    baseline = run.get("baseline") or ""
+def _is_positive(v) -> bool:
+    return (
+        isinstance(v, (int, float))
+        and not isinstance(v, bool)
+        and math.isfinite(v)
+        and v > 0
+    )
+
+
+def _geomean(rs: list[float]) -> float | None:
+    vals = [r for r in rs if _is_positive(r)]
+    if not vals:
+        return None
+    return math.exp(sum(math.log(r) for r in vals) / len(vals))
+
+
+def compare_against(
+    rows, baseline: str, arms: list[str]
+) -> tuple[list[dict], dict[str, float]]:
+    """Recompute per-arm ratios and geomean from min_s against one baseline.
+
+    Same contract as Go's bench.Compare: ratio is baseline_min / arm_min
+    (>1 is faster), and a row with no baseline time contributes nothing.
+    """
+    acc: dict[str, list[float]] = {a: [] for a in arms if a != baseline}
+    out_rows: list[dict] = []
+    raw = rows if isinstance(rows, list) else []
+    for row in raw:
+        if not isinstance(row, dict):
+            continue
+        mins = row.get("min_s")
+        if not isinstance(mins, dict):
+            mins = {}
+        base = mins.get(baseline)
+        ratios: dict[str, float] = {}
+        if _is_positive(base):
+            for a in arms:
+                t = mins.get(a)
+                if _is_positive(t):
+                    ratio = float(base) / float(t)
+                    ratios[a] = ratio
+                    if a != baseline:
+                        acc[a].append(ratio)
+        out_rows.append(
+            {"benchmark": row.get("benchmark", ""), "ratio_vs_baseline": ratios}
+        )
+    geo: dict[str, float] = {}
+    for a, rs in acc.items():
+        g = _geomean(rs)
+        if g is not None:
+            geo[a] = g
+    return out_rows, geo
+
+
+def _min_s_rows(report: dict) -> list[dict]:
+    rows: list[dict] = []
+    raw = report.get("rows") if isinstance(report, dict) else None
+    if not isinstance(raw, list):
+        return rows
+    for row in raw:
+        if not isinstance(row, dict):
+            continue
+        mins = row.get("min_s")
+        if not isinstance(mins, dict):
+            continue
+        clean = {
+            str(k): float(v)
+            for k, v in mins.items()
+            if isinstance(k, str) and _is_positive(v)
+        }
+        rows.append({"benchmark": row.get("benchmark", ""), "min_s": clean})
+    return rows
+
+
+def _json_script(element_id: str, obj) -> str:
+    blob = json.dumps(obj, separators=(",", ":")).replace("<", "\\u003c")
+    return f'<script type="application/json" id="{_esc(element_id)}">{blob}</script>\n'
+
+
+def _baseline_picker_html(
+    arms: list[str], selected: str, *, note: str = ""
+) -> str:
+    if len(arms) < 2:
+        return ""
+    opts = []
+    for a in arms:
+        sel = " selected" if a == selected else ""
+        opts.append(f'<option value="{_esc(a)}"{sel}>{_esc(a)}</option>')
+    extra = f" {_esc(note)}" if note else ""
+    return (
+        '<p class="baseline-picker"><label>Standard of measurement '
+        f'<select id="baseline-select" autocomplete="off">{"".join(opts)}</select>'
+        "</label> "
+        f'<span class="scale">&gt;1 is faster than this arm.{extra}</span></p>\n'
+    )
+
+
+def _arm_payload(run: dict) -> dict:
+    man = run.get("_manifest") or {}
+    return {
+        "defaultBaseline": run.get("baseline") or "",
+        "arms": list(run.get("arms") or []),
+        "tips": _interp_tips(man, baseline=""),
+        "rows": _min_s_rows(run.get("_report") or {}),
+    }
+
+
+def _run_payload(run: dict) -> dict:
+    return {"kind": "run", **_arm_payload(run)}
+
+
+def _index_payload(runs: list[dict]) -> dict:
+    arms: list[str] = []
+    seen: set[str] = set()
+    has_ref = any("reference" in (r.get("arms") or []) for r in runs)
+    if has_ref:
+        arms.append("reference")
+        seen.add("reference")
+    for r in runs:
+        for a in r.get("arms") or []:
+            if a not in seen:
+                arms.append(a)
+                seen.add(a)
+    default = "reference" if has_ref else next(
+        (r["baseline"] for r in runs if r.get("baseline")), ""
+    )
+    return {
+        "kind": "index",
+        "defaultBaseline": default,
+        "arms": arms,
+        "runs": [{**_arm_payload(r), "id": r["id"]} for r in runs],
+    }
+
+
+def geomean_svg(run: dict, *, baseline: str | None = None, geo: dict | None = None) -> str:
+    geo = geo if geo is not None else (run.get("geomean_vs_baseline") or {})
+    if baseline is None:
+        baseline = run.get("baseline") or ""
     arms = list(run.get("arms") or [])
     labels = []
     vals = []
     if baseline:
         labels.append(baseline)
         vals.append(1.0)
-    for k, v in geo.items():
-        if k == baseline:
+    for a in arms:
+        if a == baseline:
             continue
+        v = geo.get(a)
         if isinstance(v, (int, float)) and not isinstance(v, bool) and v > 0:
-            labels.append(k)
+            labels.append(a)
             vals.append(float(v))
     if not labels:
         return ""
@@ -575,6 +712,9 @@ table.ratios tr.geomean th,table.ratios tr.geomean td{font-weight:650}
 .stale{color:#c05621;font-weight:600}
 svg{max-width:100%;height:auto}
 nav{margin-bottom:1.25rem}
+.baseline-picker{margin:1rem 0 .75rem;display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap}
+.baseline-picker label{font-weight:600}
+.baseline-picker select{font:inherit;margin-left:.35rem;padding:.25rem .45rem;border:1px solid #cbd5e0;border-radius:4px;background:#fff;color:inherit}
 .panel{border:1px solid #e2e8f0;border-radius:8px;padding:.35rem 1rem;margin:1rem 0;background:#fff}
 .panel>summary{cursor:pointer;font-weight:600;padding:.45rem 0}
 .panel>summary:hover{color:#2b6cb0}
@@ -597,6 +737,7 @@ th,td{border-color:#4a5568}
 .scale .swatch:not(.ratio){background:#2d3748;color:#a0aec0}
 .env,.empty,.panel{background:#2d3748;border-color:#4a5568}
 .banner{background:#744210;border-color:#d69e2e;color:#fefcbf}
+.baseline-picker select{background:#2d3748;border-color:#4a5568;color:#e2e8f0}
 #arm-tip{background:#f7fafc;color:#1a202c}
 }
 """
@@ -627,6 +768,226 @@ _TIP_JS = """
 </script>
 """
 
+# Ports bench.Compare / bench.Geomean so the page can retarget any arm.
+_COMPARE_JS = r"""
+<script>
+(function(){
+  var payloadEl = document.getElementById("bench-payload");
+  var select = document.getElementById("baseline-select");
+  if (!payloadEl || !select) return;
+  var data;
+  try { data = JSON.parse(payloadEl.textContent); }
+  catch (e) { return; }
+  if (!data || !select.options.length) return;
+
+  function esc(s){
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function positive(v){
+    return typeof v === "number" && isFinite(v) && v > 0;
+  }
+  function geomean(rs){
+    var sum = 0, n = 0, i;
+    for (i = 0; i < rs.length; i++) if (positive(rs[i])) { sum += Math.log(rs[i]); n++; }
+    return n ? Math.exp(sum / n) : null;
+  }
+  function compare(rows, baseline, arms){
+    var acc = {}, out = [], i, j, r, a, t, ratio, mins, base, ratios, g;
+    for (i = 0; i < arms.length; i++) if (arms[i] !== baseline) acc[arms[i]] = [];
+    rows = rows || [];
+    for (r = 0; r < rows.length; r++){
+      mins = rows[r].min_s || {};
+      base = mins[baseline];
+      ratios = {};
+      if (positive(base)){
+        for (j = 0; j < arms.length; j++){
+          a = arms[j];
+          t = mins[a];
+          if (positive(t)){
+            ratio = base / t;
+            ratios[a] = ratio;
+            if (a !== baseline) acc[a].push(ratio);
+          }
+        }
+      }
+      out.push({benchmark: rows[r].benchmark, ratios: ratios});
+    }
+    var geo = {};
+    for (a in acc){
+      g = geomean(acc[a]);
+      if (g != null) geo[a] = g;
+    }
+    return {rows: out, geo: geo};
+  }
+  function ratioBand(v){
+    if (!positive(v)) return "";
+    if (v < 0.75) return "lose3";
+    if (v < 0.90) return "lose2";
+    if (v < 0.98) return "lose1";
+    if (v <= 1.02) return "";
+    if (v < 1.20) return "win1";
+    if (v < 1.50) return "win2";
+    return "win3";
+  }
+  function ratioTd(v){
+    var band = ratioBand(v), txt = v.toFixed(2) + "x";
+    if (band) return '<td class="ratio ' + band + '">' + txt + "</td>";
+    return "<td>" + txt + "</td>";
+  }
+  function withBaselineTip(label, tip, baseline){
+    tip = tip || "";
+    if (label === baseline){
+      if (tip && tip.charAt(tip.length - 1) !== ".") tip += ".";
+      tip = (tip ? tip + " " : "") + "Baseline for the ratios.";
+    }
+    return tip;
+  }
+  function tipped(label, tips, baseline){
+    var tip = withBaselineTip(label, tips[label], baseline);
+    if (!tip) return esc(label);
+    return '<span data-tip="' + esc(tip) + '">' + esc(label) + "</span>";
+  }
+  function geomeanSvg(arms, baseline, geo, tips){
+    var labels = [], vals = [], i, a, v;
+    if (baseline){ labels.push(baseline); vals.push(1.0); }
+    for (i = 0; i < arms.length; i++){
+      a = arms[i];
+      if (a === baseline) continue;
+      v = geo[a];
+      if (positive(v)){ labels.push(a); vals.push(v); }
+    }
+    if (!labels.length) return "";
+    var labelW = 180, barMax = 320, barH = 22, gap = 10, left = 16, top = 16;
+    var maxV = 1;
+    for (i = 0; i < vals.length; i++) if (vals[i] > maxV) maxV = vals[i];
+    var width = left + labelW + barMax + 70;
+    var height = top + labels.length * (barH + gap) + 4;
+    var parts = [
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + width + " " + height +
+      '" width="' + width + '" height="' + height + '" role="img" aria-label="geomean vs ' +
+      esc(baseline) + '">',
+      '<rect width="' + width + '" height="' + height + '" fill="transparent"/>'
+    ];
+    for (i = 0; i < labels.length; i++){
+      var y = top + i * (barH + gap);
+      var bw = maxV > 0 ? vals[i] / maxV * barMax : 0;
+      var fill = labels[i] === baseline ? "#4a5568" : "#2b6cb0";
+      var tip = withBaselineTip(labels[i], (tips || {})[labels[i]], baseline);
+      var tipAttr = tip ? ' data-tip="' + esc(tip) + '"' : "";
+      parts.push(
+        '<text x="' + (left + labelW - 8) + '" y="' + (y + barH - 5) +
+        '" text-anchor="end" font-size="12" fill="currentColor"' + tipAttr + ">" +
+        esc(labels[i]) + "</text>"
+      );
+      parts.push(
+        '<rect x="' + (left + labelW) + '" y="' + y + '" width="' + bw.toFixed(1) +
+        '" height="' + barH + '" fill="' + fill + '" rx="3"/>'
+      );
+      parts.push(
+        '<text x="' + (left + labelW + bw + 8).toFixed(1) + '" y="' + (y + barH - 5) +
+        '" font-size="11" fill="currentColor">' + vals[i].toFixed(3) + "x</text>"
+      );
+    }
+    parts.push("</svg>");
+    return parts.join("\n");
+  }
+  function ratioTable(cmp, arms, tips, baseline){
+    var parts = ['<table class="ratios">\n<thead><tr><th>benchmark</th>'], i, a, v, r, row;
+    for (i = 0; i < arms.length; i++) parts.push("<th>" + tipped(arms[i], tips, baseline) + "</th>");
+    parts.push("</tr></thead>\n<tbody>\n");
+    parts.push('<tr class="geomean"><th scope="row">geomean</th>');
+    for (i = 0; i < arms.length; i++){
+      a = arms[i];
+      v = a === baseline ? 1.0 : cmp.geo[a];
+      parts.push(positive(v) ? ratioTd(v) : "<td>-</td>");
+    }
+    parts.push("</tr>\n");
+    for (r = 0; r < cmp.rows.length; r++){
+      row = cmp.rows[r];
+      parts.push("<tr><td>" + esc(row.benchmark) + "</td>");
+      for (i = 0; i < arms.length; i++){
+        v = row.ratios[arms[i]];
+        parts.push(positive(v) ? ratioTd(v) : "<td>-</td>");
+      }
+      parts.push("</tr>\n");
+    }
+    parts.push("</tbody></table>\n");
+    return parts.join("");
+  }
+  function headline(geo, baseline){
+    var prefer = ["default"], i, k;
+    for (i = 0; i < prefer.length; i++){
+      if (prefer[i] !== baseline && positive(geo[prefer[i]]))
+        return prefer[i] + " " + geo[prefer[i]].toFixed(3) + "x";
+    }
+    for (k in geo){
+      if (k !== baseline && positive(geo[k])) return k + " " + geo[k].toFixed(3) + "x";
+    }
+    return "—";
+  }
+  function applyRun(baseline){
+    var cmp = compare(data.rows || [], baseline, data.arms || []);
+    var geoH = document.getElementById("geo-heading");
+    var geoC = document.getElementById("geomean-chart");
+    var ratioH = document.getElementById("ratio-heading");
+    var ratioT = document.getElementById("ratio-table-wrap");
+    if (geoH) geoH.textContent = baseline ? ("Geomean vs " + baseline) : "Geomean vs baseline";
+    if (geoC) geoC.innerHTML = geomeanSvg(data.arms || [], baseline, cmp.geo, data.tips || {});
+    if (ratioH) ratioH.textContent = baseline ? ("Per-benchmark ratio vs " + baseline) : "Per-benchmark ratio";
+    if (ratioT) ratioT.innerHTML = ratioTable(cmp, data.arms || [], data.tips || {}, baseline);
+  }
+  function applyIndex(baseline){
+    var runs = data.runs || [], i, run, vs, cmp, tr, b, h, box;
+    for (i = 0; i < runs.length; i++){
+      run = runs[i];
+      vs = (run.arms || []).indexOf(baseline) >= 0 ? baseline : (run.defaultBaseline || "");
+      if (!vs) continue;
+      cmp = compare(run.rows || [], vs, run.arms || []);
+      tr = document.querySelector('tr[data-run-id="' + run.id + '"]');
+      if (tr){
+        b = tr.querySelector(".js-baseline");
+        h = tr.querySelector(".js-headline");
+        if (b) b.textContent = vs;
+        if (h) h.textContent = headline(cmp.geo, vs);
+      }
+      box = document.querySelector('.js-run-geo[data-run-id="' + run.id + '"] .geomean-chart');
+      if (box) box.innerHTML = geomeanSvg(run.arms || [], vs, cmp.geo, run.tips || {});
+    }
+  }
+  function apply(vs){
+    if (data.kind === "index") applyIndex(vs);
+    else applyRun(vs);
+  }
+  function readVs(){
+    try { return new URL(location.href).searchParams.get("vs") || ""; }
+    catch (e) { return ""; }
+  }
+  function writeVs(vs){
+    try {
+      var u = new URL(location.href);
+      if (vs === (data.defaultBaseline || "")) u.searchParams.delete("vs");
+      else u.searchParams.set("vs", vs);
+      history.replaceState(null, "", u.pathname + u.search + u.hash);
+    } catch (e) {}
+  }
+  function optionExists(value){
+    var i;
+    for (i = 0; i < select.options.length; i++) if (select.options[i].value === value) return true;
+    return false;
+  }
+  var requested = readVs();
+  if (requested && optionExists(requested)) select.value = requested;
+  select.addEventListener("change", function(){
+    apply(select.value);
+    writeVs(select.value);
+  });
+  if (select.value !== (data.defaultBaseline || "")) apply(select.value);
+})();
+</script>
+"""
+
 
 def _page(title: str, body: str) -> str:
     return (
@@ -636,7 +997,7 @@ def _page(title: str, body: str) -> str:
         f"<title>{_esc(title)}</title>\n"
         f"<style>{CSS}</style>\n</head>\n<body>\n{body}\n"
         '<div id="arm-tip" hidden></div>\n'
-        f"{_TIP_JS}</body>\n</html>\n"
+        f"{_TIP_JS}{_COMPARE_JS}</body>\n</html>\n"
     )
 
 
@@ -670,11 +1031,11 @@ def _run_table(runs: list[dict], *, rel_prefix: str) -> str:
         cpu = (r.get("machine") or {}).get("cpu_model") or ""
         py = r.get("python_version") or (r.get("_manifest") or {}).get("python_version") or ""
         parts.append(
-            f'<tr><td><a href="{href}">{_esc(r["id"])}</a>{stale}</td>'
+            f'<tr data-run-id="{_esc(r["id"])}"><td><a href="{href}">{_esc(r["id"])}</a>{stale}</td>'
             f'<td>{_esc(py)}</td>'
             f'<td>{_esc(_suite_label(r.get("suite")))}</td>'
-            f'<td>{_esc(r["baseline"])}</td>'
-            f'<td>{_esc(_headline_geo(r))}</td>'
+            f'<td class="js-baseline">{_esc(r["baseline"])}</td>'
+            f'<td class="js-headline">{_esc(_headline_geo(r))}</td>'
             f'<td>{_esc(r["skipped"])}</td>'
             f'<td>{_esc(cpu)}</td></tr>\n'
         )
@@ -811,7 +1172,7 @@ def _ratio_table_html(report: dict, order: list[str], tips: dict[str, str] | Non
     parts = [
         _ratio_scale_html(),
         '<p class="scale">Hover an arm name for what that binary is.</p>\n',
-        '<div class="table-wrap"><table class="ratios">\n<thead><tr><th>benchmark</th>',
+        '<div id="ratio-table-wrap" class="table-wrap"><table class="ratios">\n<thead><tr><th>benchmark</th>',
     ]
     for a in order:
         parts.append(f"<th>{_tipped(a, tips)}</th>")
@@ -958,10 +1319,20 @@ def _run_page_body(run: dict) -> str:
     parts.append(f"<h1>{_esc(title)}</h1>\n")
     parts.append(f'<p class="lede">{_esc(" · ".join(lede))}</p>\n')
     parts.append(_experiment_html(manifest))
+    arms = list(run.get("arms") or [])
+    if len(arms) >= 2:
+        session_note = (
+            f"Session recorded against {baseline}." if baseline else ""
+        )
+        parts.append(
+            _baseline_picker_html(arms, baseline or arms[0], note=session_note)
+        )
+        parts.append(_json_script("bench-payload", _run_payload(run)))
     svg = geomean_svg(run)
     if svg:
         heading = f"Geomean vs {baseline}" if baseline else "Geomean vs baseline"
-        parts.append(f"<h2>{_esc(heading)}</h2>\n{svg}\n")
+        parts.append(f'<h2 id="geo-heading">{_esc(heading)}</h2>\n')
+        parts.append(f'<div id="geomean-chart">{svg}</div>\n')
     skipped = run.get("skipped") or 0
     if skipped:
         parts.append(
@@ -971,7 +1342,7 @@ def _run_page_body(run: dict) -> str:
     ratio_heading = (
         f"Per-benchmark ratio vs {baseline}" if baseline else "Per-benchmark ratio"
     )
-    parts.append(f"<h2>{_esc(ratio_heading)}</h2>\n")
+    parts.append(f'<h2 id="ratio-heading">{_esc(ratio_heading)}</h2>\n')
     table = _ratio_table_html(report, run.get("arms") or [], _interp_tips(manifest))
     if table:
         parts.append(table)
@@ -1070,6 +1441,14 @@ def write_site(root: Path, out: Path) -> Path:
         "<p>These pages are built from the committed <code>benchmarks/</code> "
         "tree. CI does not run <code>./staticpy bench</code>.</p>\n"
     )
+    bench_payload = _index_payload(runs)
+    if len(bench_payload.get("arms") or []) >= 2:
+        body.append(
+            _baseline_picker_html(
+                bench_payload["arms"], bench_payload["defaultBaseline"]
+            )
+        )
+        body.append(_json_script("bench-payload", bench_payload))
     if not prod:
         body.append(
             '<div class="empty"><p><strong>No production runs imported.</strong> '
@@ -1084,7 +1463,11 @@ def write_site(root: Path, out: Path) -> Path:
         for r in prod:
             svg = geomean_svg(r)
             if svg:
-                body.append(f'<h3>{_esc(r["id"])}</h3>\n{svg}\n')
+                body.append(
+                    f'<div class="js-run-geo" data-run-id="{_esc(r["id"])}">'
+                    f'<h3>{_esc(r["id"])}</h3>\n'
+                    f'<div class="geomean-chart">{svg}</div></div>\n'
+                )
     if fx:
         body.append("<h2>Fixture / demo</h2>\n")
         body.append(
@@ -1096,7 +1479,10 @@ def write_site(root: Path, out: Path) -> Path:
         for r in fx:
             svg = geomean_svg(r)
             if svg:
-                body.append(svg + "\n")
+                body.append(
+                    f'<div class="js-run-geo" data-run-id="{_esc(r["id"])}">'
+                    f'<div class="geomean-chart">{svg}</div></div>\n'
+                )
     (out / "index.html").write_text(_page("static-python benchmarks", "".join(body)), encoding="utf-8")
 
     for r in runs:
