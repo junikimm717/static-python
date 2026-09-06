@@ -101,8 +101,14 @@ SUITES
   executable's git revision), env.json (kernel, cpu, memory, affinity,
   fingerprint identity + telemetry), skipped.json, and timeline.jsonl --
   one record per measurement with its wall time, load average and the busy
-  fraction of the pinned core's SMT sibling. pyperformance also keeps the
-  unaggregated pyperf JSON under raw/.
+  fraction of the pinned core's SMT sibling. The progress ETA weights each
+  leftover cell by that benchmark's typical length. The table is the benches
+  we actually measure, not all of pyperformance (several never install;
+  some die at import). A name that is not in the table is a new or
+  newly-runnable bench: it is guessed at the median and kept out of the
+  pace, so one surprise ten-minute script does not rewrite every remaining
+  estimate. Scale is this run's elapsed / completed-weight over known
+  names only. pyperformance also keeps the unaggregated pyperf JSON under raw/.
 
 MEASUREMENT
   The run is confined to one logical CPU with sched_setaffinity, inherited by
