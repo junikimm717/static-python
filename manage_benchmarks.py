@@ -679,14 +679,16 @@ h1{font-size:1.75rem;font-weight:650;margin:.25rem 0 .4rem}
 h2{font-size:1.15rem;font-weight:600;margin:1.75rem 0 .6rem}
 h3{font-size:1rem;font-weight:600;margin:1rem 0 .4rem}
 a{color:#2b6cb0}
-.lede{color:#4a5568;margin:.15rem 0 .4rem}
+.lede{color:#4a5568;margin:.15rem 0 .4rem;overflow-wrap:anywhere}
 .meta{color:#4a5568;font-size:.9rem;margin:.15rem 0 1.25rem}
 .skip{color:#744210}
-.table-wrap{overflow-x:auto;margin:1rem 0}
+code{overflow-wrap:anywhere}
+.table-wrap{overflow-x:auto;max-width:100%;margin:1rem 0;-webkit-overflow-scrolling:touch}
 table{border-collapse:collapse;width:100%;margin:1rem 0}
-th,td{border:1px solid #cbd5e0;padding:.35rem .55rem;text-align:right;vertical-align:top}
+th,td{border:1px solid #cbd5e0;padding:.35rem .55rem;text-align:right;vertical-align:top;white-space:nowrap}
 th:first-child,td:first-child{text-align:left}
 table.ratios{font-variant-numeric:tabular-nums}
+.table-wrap table{width:max-content;min-width:100%}
 table.ratios tr.geomean th,table.ratios tr.geomean td{font-weight:650}
 .ratio{font-weight:600}
 .ratio.lose3{background:#d55e00;color:#fff}
@@ -702,24 +704,31 @@ table.ratios tr.geomean th,table.ratios tr.geomean td{font-weight:650}
 [data-tip]{cursor:help;border-bottom:1px dotted currentColor}
 #arm-tip{position:fixed;z-index:20;max-width:22rem;padding:.55rem .75rem;border-radius:6px;background:#1a202c;color:#f7fafc;font-size:.85rem;line-height:1.4;box-shadow:0 4px 16px rgba(0,0,0,.35);pointer-events:none}
 #arm-tip[hidden]{display:none}
-.env{background:#f7fafc;padding:.75rem 1rem;border-radius:6px}
-.env dt{font-weight:600;float:left;clear:left;width:11rem}
-.env dd{margin-left:11.5rem}
-.env::after{content:"";display:block;clear:both}
-.env pre{white-space:pre-wrap;font-size:.85rem;overflow:auto;margin:.25rem 0;float:none}
+.env{background:#f7fafc;padding:.75rem 1rem;border-radius:6px;display:grid;grid-template-columns:max-content minmax(0,1fr);column-gap:1rem;row-gap:.2rem}
+.env dt{font-weight:600}
+.env dd{margin:0;min-width:0}
+.env>pre{grid-column:1/-1}
+.env pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.85rem;overflow:auto;margin:.25rem 0;max-width:100%}
 .banner{background:#fefcbf;border:1px solid #d69e2e;padding:.75rem 1rem;border-radius:6px;margin:1rem 0}
 .empty{background:#edf2f7;padding:.75rem 1rem;border-radius:6px}
 .stale{color:#c05621;font-weight:600}
 svg{max-width:100%;height:auto}
 nav{margin-bottom:1.25rem}
-.baseline-picker{margin:1rem 0 .75rem;display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap}
+.baseline-picker{margin:1rem 0 .75rem;display:flex;align-items:baseline;gap:.6rem;flex-wrap:wrap;max-width:100%}
 .baseline-picker label{font-weight:600}
-.baseline-picker select{font:inherit;margin-left:.35rem;padding:.25rem .45rem;border:1px solid #cbd5e0;border-radius:4px;background:#fff;color:inherit}
+.baseline-picker select{font:inherit;margin-left:.35rem;padding:.25rem .45rem;border:1px solid #cbd5e0;border-radius:4px;background:#fff;color:inherit;max-width:100%}
+.baseline-picker .scale{flex:1 1 12rem}
 .panel{border:1px solid #e2e8f0;border-radius:8px;padding:.35rem 1rem;margin:1rem 0;background:#fff}
 .panel>summary{cursor:pointer;font-weight:600;padding:.45rem 0}
 .panel>summary:hover{color:#2b6cb0}
 .pkgs{columns:2;margin:.4rem 0 1rem;padding-left:1.2rem}
 .pkgs li{break-inside:avoid}
+@media (max-width:520px){
+.env{grid-template-columns:1fr}
+.env dt{margin-top:.35rem}
+.pkgs{columns:1}
+#arm-tip{max-width:calc(100vw - 16px)}
+}
 @media (prefers-color-scheme: dark){
 body{color:#e2e8f0;background:#1a202c}
 a{color:#63b3ed}
@@ -1040,7 +1049,7 @@ def _run_table(runs: list[dict], *, rel_prefix: str) -> str:
             f'<td>{_esc(cpu)}</td></tr>\n'
         )
     parts.append("</tbody></table>\n")
-    return "".join(parts)
+    return '<div class="table-wrap">' + "".join(parts) + "</div>\n"
 
 
 def _env_dl(env: dict) -> str:
@@ -1389,7 +1398,13 @@ def _experiment_html(manifest: dict) -> str:
         return ""
     parts = ['<dl class="env experiment">\n']
     for key, val in rows:
-        parts.append(f"<dt>{_esc(key)}</dt><dd><code>{_esc(val)}</code></dd>\n")
+        display = _short_sha(val) if key == "git_revision" else val
+        title = ""
+        if key == "git_revision" and isinstance(val, str) and display != val:
+            title = f' title="{_esc(val)}"'
+        parts.append(
+            f"<dt>{_esc(key)}</dt><dd><code{title}>{_esc(display)}</code></dd>\n"
+        )
     parts.append("</dl>\n")
     return "".join(parts)
 

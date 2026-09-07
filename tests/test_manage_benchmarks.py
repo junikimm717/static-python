@@ -206,6 +206,11 @@ class SiteTests(unittest.TestCase):
         self.assertIn("git_revision", page)
         self.assertIn("python_version", page)
         self.assertIn("3.14.7", page)
+        self.assertIn(">2e44df0243ce</code>", page)
+        self.assertIn('title="2e44df0243cea7b4c60235445ccc7c454210b9a5"', page)
+        self.assertIn("grid-template-columns:max-content minmax(0,1fr)", page)
+        self.assertIn("@media (max-width:520px)", page)
+        self.assertIn('class="table-wrap"', index)
         self.assertIn("<summary>Kit</summary>", page)
         self.assertIn("binary_sha256", page)
         self.assertIn("whole-graph", page)
@@ -332,6 +337,21 @@ class CompareAgainstTests(unittest.TestCase):
         self.assertEqual(out[0]["ratio_vs_baseline"]["y"], 2.0)
         self.assertEqual(out[1]["ratio_vs_baseline"], {})
         self.assertAlmostEqual(geo["y"], 2.0)
+
+
+class ExperimentHtmlTests(unittest.TestCase):
+    def test_git_revision_is_short_with_full_title(self):
+        html = mb._experiment_html(
+            {"git_revision": "2e44df0243cea7b4c60235445ccc7c454210b9a5"}
+        )
+        self.assertIn(">2e44df0243ce</code>", html)
+        self.assertIn('title="2e44df0243cea7b4c60235445ccc7c454210b9a5"', html)
+        self.assertNotRegex(html, r"<code>[0-9a-f]{40}</code>")
+
+    def test_short_revision_has_no_title(self):
+        html = mb._experiment_html({"git_revision": "abc"})
+        self.assertIn(">abc</code>", html)
+        self.assertNotIn("title=", html)
 
 
 class InterpTipTests(unittest.TestCase):
