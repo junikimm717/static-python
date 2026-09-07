@@ -1,0 +1,3103 @@
+{
+  "baseline": "reference",
+  "geomean_vs_baseline": {
+    "default": 1.1160261793123294,
+    "nolto": 1.023323094416879,
+    "nolto-nomimalloc": 0.964276961340111,
+    "nomimalloc": 1.0241617916776349,
+    "reference-mimalloc": 0.9875347889000669,
+    "reference-nolto": 0.891763139702725,
+    "reference-nolto-mimalloc": 0.8741016173426142,
+    "seplto": 1.1038086359837063,
+    "seplto-nomimalloc": 1.0303833170495633
+  },
+  "protocol": 2,
+  "rows": [
+    {
+      "benchmark": "2to3",
+      "min_s": {
+        "default": 0.26365059200907126,
+        "nolto": 0.28206887701526284,
+        "nolto-nomimalloc": 0.2930917630146723,
+        "nomimalloc": 0.28180440299911425,
+        "reference": 0.2854751219856553,
+        "reference-mimalloc": 0.28923148298054,
+        "reference-nolto": 0.325696297979448,
+        "reference-nolto-mimalloc": 0.33522011499735527,
+        "seplto": 0.2659941239980981,
+        "seplto-nomimalloc": 0.28107542399084195
+      },
+      "spread": {
+        "default": 0.013451158838860786,
+        "nolto": 0.0073615246553478215,
+        "nolto-nomimalloc": 0.005498694151334368,
+        "nomimalloc": 0.013403378235043848,
+        "reference": 0.006550924594772665,
+        "reference-mimalloc": 0.01351177941682778,
+        "reference-nolto": 0.007741669276394898,
+        "reference-nolto-mimalloc": 0.005653345152983873,
+        "seplto": 0.01723797856544118,
+        "seplto-nomimalloc": 0.010620779102531336
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0827782323956743,
+        "nolto": 1.0120759333905816,
+        "nolto-nomimalloc": 0.9740127769178019,
+        "nomimalloc": 1.0130257687512163,
+        "reference": 1,
+        "reference-mimalloc": 0.9870126137162687,
+        "reference-nolto": 0.8765071133957724,
+        "reference-nolto-mimalloc": 0.8516049879283275,
+        "seplto": 1.0732384523941458,
+        "seplto-nomimalloc": 1.0156530867492588
+      }
+    },
+    {
+      "benchmark": "ascii85_large",
+      "min_s": {
+        "default": 0.9843772510066628,
+        "nolto": 1.0403825730027165,
+        "nolto-nomimalloc": 1.1559414119983558,
+        "nomimalloc": 1.1272274770017248,
+        "reference": 1.1081282169907354,
+        "reference-mimalloc": 1.1168208809976932,
+        "reference-nolto": 1.190161475999048,
+        "reference-nolto-mimalloc": 1.2773404530016705,
+        "seplto": 0.9936184010002762,
+        "seplto-nomimalloc": 1.1118101220054086
+      },
+      "spread": {
+        "default": 0.04007703442191113,
+        "nolto": 0.023162025806701892,
+        "nolto-nomimalloc": 0.013114193198392549,
+        "nomimalloc": 0.022390988058537068,
+        "reference": 0.011949970962904075,
+        "reference-mimalloc": 0.04745075591150845,
+        "reference-nolto": 0.02379297731922733,
+        "reference-nolto-mimalloc": 0.038864007548232125,
+        "seplto": 0.035908910281222936,
+        "seplto-nomimalloc": 0.020975172390477574
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1257149795543526,
+        "nolto": 1.06511608877924,
+        "nolto-nomimalloc": 0.9586370083195113,
+        "nomimalloc": 0.9830564279165809,
+        "reference": 1,
+        "reference-mimalloc": 0.9922165996760445,
+        "reference-nolto": 0.931073841102568,
+        "reference-nolto-mimalloc": 0.8675276934874356,
+        "seplto": 1.1152452650586806,
+        "seplto-nomimalloc": 0.9966883688664103
+      }
+    },
+    {
+      "benchmark": "ascii85_small",
+      "min_s": {
+        "default": 0.018601972748001572,
+        "nolto": 0.020016251124616247,
+        "nolto-nomimalloc": 0.020781512124813162,
+        "nomimalloc": 0.019956842876126757,
+        "reference": 0.021291856002790155,
+        "reference-mimalloc": 0.021272572503221454,
+        "reference-nolto": 0.023384398373309523,
+        "reference-nolto-mimalloc": 0.02499544449528912,
+        "seplto": 0.018800966623530257,
+        "seplto-nomimalloc": 0.019892514625098556
+      },
+      "spread": {
+        "default": 0.020950331793990418,
+        "nolto": 0.018049508887619577,
+        "nolto-nomimalloc": 0.012597356826853826,
+        "nomimalloc": 0.02051992900016026,
+        "reference": 0.01904122390835705,
+        "reference-mimalloc": 0.03032277810564605,
+        "reference-nolto": 0.02309668684347689,
+        "reference-nolto-mimalloc": 0.02728412180799748,
+        "seplto": 0.026981485079935502,
+        "seplto-nomimalloc": 0.02663863815867772
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1446020425482861,
+        "nolto": 1.0637284609506699,
+        "nolto-nomimalloc": 1.0245575911373477,
+        "nomimalloc": 1.0668950061364866,
+        "reference": 1,
+        "reference-mimalloc": 1.000906495891166,
+        "reference-nolto": 0.9105154497834868,
+        "reference-nolto-mimalloc": 0.8518294606364379,
+        "seplto": 1.1324873039316201,
+        "seplto-nomimalloc": 1.07034512247768
+      }
+    },
+    {
+      "benchmark": "async_generators",
+      "min_s": {
+        "default": 0.3957781810022425,
+        "nolto": 0.44209218700416386,
+        "nolto-nomimalloc": 0.42750597299891524,
+        "nomimalloc": 0.397777017991757,
+        "reference": 0.5316127280239016,
+        "reference-mimalloc": 0.5324663310020696,
+        "reference-nolto": 0.6357522530015558,
+        "reference-nolto-mimalloc": 0.6738096499757376,
+        "seplto": 0.4027836539898999,
+        "seplto-nomimalloc": 0.3936513439984992
+      },
+      "spread": {
+        "default": 0.03839999709986917,
+        "nolto": 0.07136434416698648,
+        "nolto-nomimalloc": 0.04539072954935376,
+        "nomimalloc": 0.04730421606809946,
+        "reference": 0.034571301661556676,
+        "reference-mimalloc": 0.02990764124660229,
+        "reference-nolto": 0.05323943226791696,
+        "reference-nolto-mimalloc": 0.039771368699900334,
+        "seplto": 0.04224406042565442,
+        "seplto-nomimalloc": 0.05943251906911284
+      },
+      "ratio_vs_baseline": {
+        "default": 1.343208780932998,
+        "nolto": 1.202492927157056,
+        "nolto-nomimalloc": 1.243521170697773,
+        "nomimalloc": 1.3364591315703362,
+        "reference": 1,
+        "reference-mimalloc": 0.9983968883505524,
+        "reference-nolto": 0.8361947999618031,
+        "reference-nolto-mimalloc": 0.7889657383847855,
+        "seplto": 1.3198468278388282,
+        "seplto-nomimalloc": 1.3504659291241448
+      }
+    },
+    {
+      "benchmark": "async_tree_none",
+      "min_s": {
+        "default": 0.30043792200740427,
+        "nolto": 0.320746326004155,
+        "nolto-nomimalloc": 0.3179625980264973,
+        "nomimalloc": 0.30198353200103156,
+        "reference": 0.3327895889815409,
+        "reference-mimalloc": 0.3358753189968411,
+        "reference-nolto": 0.3777721539954655,
+        "reference-nolto-mimalloc": 0.3828158469987102,
+        "seplto": 0.3082197229960002,
+        "seplto-nomimalloc": 0.30415639400598593
+      },
+      "spread": {
+        "default": 0.10363159141459025,
+        "nolto": 0.10454458951188085,
+        "nolto-nomimalloc": 0.1078529713581704,
+        "nomimalloc": 0.10360014267016945,
+        "reference": 0.0979371504211517,
+        "reference-mimalloc": 0.09888175798278655,
+        "reference-nolto": 0.08526385462291339,
+        "reference-nolto-mimalloc": 0.08644659372227752,
+        "seplto": 0.09692369363174007,
+        "seplto-nomimalloc": 0.10410485726680177
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1076817026225447,
+        "nolto": 1.0375476256499034,
+        "nolto-nomimalloc": 1.0466312423129969,
+        "nomimalloc": 1.1020123739078729,
+        "reference": 1,
+        "reference-mimalloc": 0.9908128706077113,
+        "reference-nolto": 0.8809267317927711,
+        "reference-nolto-mimalloc": 0.8693203052867927,
+        "seplto": 1.0797154242652391,
+        "seplto-nomimalloc": 1.0941397108192683
+      }
+    },
+    {
+      "benchmark": "asyncio_tcp",
+      "min_s": {
+        "default": 0.5066934580099769,
+        "nolto": 0.5168664070079103,
+        "nolto-nomimalloc": 2.3425755169882905,
+        "nomimalloc": 2.3536650919995736,
+        "reference": 0.39754291900317185,
+        "reference-mimalloc": 0.41417679097503424,
+        "reference-nolto": 0.4040147759951651,
+        "reference-nolto-mimalloc": 0.41911158701987006,
+        "seplto": 0.5176698430150282,
+        "seplto-nomimalloc": 2.350658592011314
+      },
+      "spread": {
+        "default": 0.0278361734628267,
+        "nolto": 0.021014033539475428,
+        "nolto-nomimalloc": 0.008718055778766302,
+        "nomimalloc": 0.00786941612232646,
+        "reference": 0.05289073204627025,
+        "reference-mimalloc": 0.013225342795325902,
+        "reference-nolto": 0.050597874691269355,
+        "reference-nolto-mimalloc": 0.01277113097154879,
+        "seplto": 0.023385926655274353,
+        "seplto-nomimalloc": 0.006934551894714236
+      },
+      "ratio_vs_baseline": {
+        "default": 0.7845826953529448,
+        "nolto": 0.7691405624608288,
+        "nolto-nomimalloc": 0.1697033526220188,
+        "nomimalloc": 0.16890377494847253,
+        "reference": 1,
+        "reference-mimalloc": 0.9598387154125566,
+        "reference-nolto": 0.9839811378778119,
+        "reference-nolto-mimalloc": 0.9485371708044052,
+        "seplto": 0.7679468378683033,
+        "seplto-nomimalloc": 0.16911980342624697
+      }
+    },
+    {
+      "benchmark": "asyncio_websockets",
+      "min_s": {
+        "default": 0.5772836190008093,
+        "nolto": 0.5776359689771198,
+        "nolto-nomimalloc": 0.7150722319784109,
+        "nomimalloc": 0.7142487450037152,
+        "reference": 0.5866765950049739,
+        "reference-mimalloc": 0.5691427860001568,
+        "reference-nolto": 0.5871807220100891,
+        "reference-nolto-mimalloc": 0.5699497559980955,
+        "seplto": 0.5720668190042488,
+        "seplto-nomimalloc": 0.7097179749980569
+      },
+      "spread": {
+        "default": 0.3631781954629437,
+        "nolto": 0.08416792517754798,
+        "nolto-nomimalloc": 0.3022882701208221,
+        "nomimalloc": 0.0038566521864745605,
+        "reference": 0.00487245616489896,
+        "reference-mimalloc": 0.2768285408939902,
+        "reference-nolto": 0.057732969981895775,
+        "reference-nolto-mimalloc": 0.008505846288177773,
+        "seplto": 0.0029669837961265356,
+        "seplto-nomimalloc": 0.05575065503767868
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0162709900212006,
+        "nolto": 1.0156510787301964,
+        "nolto-nomimalloc": 0.8204438219923587,
+        "nomimalloc": 0.821389745671758,
+        "reference": 1,
+        "reference-mimalloc": 1.0308073991907056,
+        "reference-nolto": 0.9991414448972552,
+        "reference-nolto-mimalloc": 1.0293479185329002,
+        "seplto": 1.0255385831084474,
+        "seplto-nomimalloc": 0.8266334173184499
+      }
+    },
+    {
+      "benchmark": "base16_large",
+      "min_s": {
+        "default": 0.007552842562290607,
+        "nolto": 0.00870630700046604,
+        "nolto-nomimalloc": 0.014320786624011816,
+        "nomimalloc": 0.013179548124753637,
+        "reference": 0.007935485624329885,
+        "reference-mimalloc": 0.008316055436807801,
+        "reference-nolto": 0.008315523062265129,
+        "reference-nolto-mimalloc": 0.009083993749300134,
+        "seplto": 0.007556542936072219,
+        "seplto-nomimalloc": 0.01317919487337349
+      },
+      "spread": {
+        "default": 0.0007230887678275726,
+        "nolto": 0.0005218343225464496,
+        "nolto-nomimalloc": 0.07274587312627546,
+        "nomimalloc": 0.004777259728978461,
+        "reference": 0.0025542309000216013,
+        "reference-mimalloc": 0.0008492758101017688,
+        "reference-nolto": 0.0008082848565178958,
+        "reference-nolto-mimalloc": 0.0007763107301095148,
+        "seplto": 0.0010283392889947273,
+        "seplto-nomimalloc": 0.08878117278499671
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0506621260649225,
+        "nolto": 0.9114640253215406,
+        "nolto-nomimalloc": 0.5541235850148323,
+        "nomimalloc": 0.6021060471280931,
+        "reference": 1,
+        "reference-mimalloc": 0.9542367393568024,
+        "reference-nolto": 0.9542978312861871,
+        "reference-nolto-mimalloc": 0.873567930949013,
+        "seplto": 1.050147625900295,
+        "seplto-nomimalloc": 0.6021221858068354
+      }
+    },
+    {
+      "benchmark": "base16_small",
+      "min_s": {
+        "default": 0.0004108566172362771,
+        "nolto": 0.00044905946094786486,
+        "nolto-nomimalloc": 0.00048069844137899054,
+        "nomimalloc": 0.00044662958202934533,
+        "reference": 0.0004477159999396463,
+        "reference-mimalloc": 0.000485136328165936,
+        "reference-nolto": 0.0004808109218856771,
+        "reference-nolto-mimalloc": 0.0004842638905984131,
+        "seplto": 0.0004063856639504593,
+        "seplto-nomimalloc": 0.000451928386723921
+      },
+      "spread": {
+        "default": 0.023532892124787756,
+        "nolto": 0.021276431396493028,
+        "nolto-nomimalloc": 0.03163059424901581,
+        "nomimalloc": 0.029640622570100025,
+        "reference": 0.02140144563348566,
+        "reference-mimalloc": 0.01927873846706536,
+        "reference-nolto": 0.03673083360627032,
+        "reference-nolto-mimalloc": 0.024283965611795362,
+        "seplto": 0.01348500663039348,
+        "seplto-nomimalloc": 0.013073922071285915
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0897134940926896,
+        "nolto": 0.9970082781345195,
+        "nolto-nomimalloc": 0.9313864190099581,
+        "nomimalloc": 1.0024324808611302,
+        "reference": 1,
+        "reference-mimalloc": 0.9228663654858466,
+        "reference-nolto": 0.9311685312466762,
+        "reference-nolto-mimalloc": 0.9245289781701378,
+        "seplto": 1.101702249010008,
+        "seplto-nomimalloc": 0.9906790834388369
+      }
+    },
+    {
+      "benchmark": "base32_large",
+      "min_s": {
+        "default": 0.45061533199623227,
+        "nolto": 0.533082533016568,
+        "nolto-nomimalloc": 0.5311053339974023,
+        "nomimalloc": 0.4769775549939368,
+        "reference": 0.5737179320130963,
+        "reference-mimalloc": 0.5804734400007874,
+        "reference-nolto": 0.6697633860167116,
+        "reference-nolto-mimalloc": 0.7125822350208182,
+        "seplto": 0.46829231799347326,
+        "seplto-nomimalloc": 0.48511779800173827
+      },
+      "spread": {
+        "default": 0.06478123342827054,
+        "nolto": 0.03773600471517331,
+        "nolto-nomimalloc": 0.06625812951896044,
+        "nomimalloc": 0.030926853634695238,
+        "reference": 0.043905646991353964,
+        "reference-mimalloc": 0.04308252590960785,
+        "reference-nolto": 0.0344626691654939,
+        "reference-nolto-mimalloc": 0.029823171163930635,
+        "seplto": 0.04104288341921642,
+        "seplto-nomimalloc": 0.03443483847118428
+      },
+      "ratio_vs_baseline": {
+        "default": 1.2731877751951266,
+        "nolto": 1.0762272190135056,
+        "nolto-nomimalloc": 1.080233797870127,
+        "nomimalloc": 1.202819558292191,
+        "reference": 1,
+        "reference-mimalloc": 0.9883620721945833,
+        "reference-nolto": 0.8565979329284823,
+        "reference-nolto-mimalloc": 0.8051252245943726,
+        "seplto": 1.2251277887097272,
+        "seplto-nomimalloc": 1.1826363295189606
+      }
+    },
+    {
+      "benchmark": "base32_small",
+      "min_s": {
+        "default": 0.008794260313152336,
+        "nolto": 0.010420714750580373,
+        "nolto-nomimalloc": 0.009973767562769353,
+        "nomimalloc": 0.008880663812306011,
+        "reference": 0.010910175375101971,
+        "reference-mimalloc": 0.011061407562010572,
+        "reference-nolto": 0.012791317622031784,
+        "reference-nolto-mimalloc": 0.013557822625443805,
+        "seplto": 0.009055147811523057,
+        "seplto-nomimalloc": 0.00913221718656132
+      },
+      "spread": {
+        "default": 0.04149594285864694,
+        "nolto": 0.039716247557496295,
+        "nolto-nomimalloc": 0.04710600171824569,
+        "nomimalloc": 0.03390212518035033,
+        "reference": 0.04453751738493059,
+        "reference-mimalloc": 0.03954804676294439,
+        "reference-nolto": 0.029822768350563123,
+        "reference-nolto-mimalloc": 0.031668396230070214,
+        "seplto": 0.03212573883725392,
+        "seplto-nomimalloc": 0.02779079355157029
+      },
+      "ratio_vs_baseline": {
+        "default": 1.2406018228486095,
+        "nolto": 1.0469699666708887,
+        "nolto-nomimalloc": 1.093887069900054,
+        "nomimalloc": 1.2285315158517371,
+        "reference": 1,
+        "reference-mimalloc": 0.9863279437032956,
+        "reference-nolto": 0.8529360068668977,
+        "reference-nolto-mimalloc": 0.8047144203396625,
+        "seplto": 1.2048588937685052,
+        "seplto-nomimalloc": 1.194690747298152
+      }
+    },
+    {
+      "benchmark": "base64_large",
+      "min_s": {
+        "default": 0.010183693124417914,
+        "nolto": 0.009381684189065709,
+        "nolto-nomimalloc": 0.010549972688750131,
+        "nomimalloc": 0.01199643506333814,
+        "reference": 0.006318912999631721,
+        "reference-mimalloc": 0.00634734375125845,
+        "reference-nolto": 0.005803395593829919,
+        "reference-nolto-mimalloc": 0.005832047156218323,
+        "seplto": 0.01011712474974047,
+        "seplto-nomimalloc": 0.012705395125522045
+      },
+      "spread": {
+        "default": 0.022617893624809843,
+        "nolto": 0.06037548008334634,
+        "nolto-nomimalloc": 0.1437036361396786,
+        "nomimalloc": 0.03453582755917559,
+        "reference": 0.03197258780979842,
+        "reference-mimalloc": 0.16795475445427166,
+        "reference-nolto": 0.02084459613682365,
+        "reference-nolto-mimalloc": 0.021097662457170496,
+        "seplto": 0.03443027996684394,
+        "seplto-nomimalloc": 0.10701543398999126
+      },
+      "ratio_vs_baseline": {
+        "default": 0.6204932653047616,
+        "nolto": 0.673537167984867,
+        "nolto-nomimalloc": 0.5989506500210978,
+        "nomimalloc": 0.5267325639883399,
+        "reference": 1,
+        "reference-mimalloc": 0.9955208426168676,
+        "reference-nolto": 1.088830305890209,
+        "reference-nolto-mimalloc": 1.0834811225581886,
+        "seplto": 0.6245759695504216,
+        "seplto-nomimalloc": 0.49734092778732736
+      }
+    },
+    {
+      "benchmark": "base64_small",
+      "min_s": {
+        "default": 0.00039858743355125625,
+        "nolto": 0.0003819304824332903,
+        "nolto-nomimalloc": 0.0003758622363534414,
+        "nomimalloc": 0.0003970228359548855,
+        "reference": 0.0003313482070552709,
+        "reference-mimalloc": 0.00033888712113139263,
+        "reference-nolto": 0.00036826997660455163,
+        "reference-nolto-mimalloc": 0.0003553968691676346,
+        "seplto": 0.0003900297303971456,
+        "seplto-nomimalloc": 0.0003916162617088048
+      },
+      "spread": {
+        "default": 0.0230937805397099,
+        "nolto": 0.021450069860277077,
+        "nolto-nomimalloc": 0.04553263498497861,
+        "nomimalloc": 0.04766958570461047,
+        "reference": 0.022852611518237274,
+        "reference-mimalloc": 0.07018561183432621,
+        "reference-nolto": 0.031094433794999213,
+        "reference-nolto-mimalloc": 0.025067766773067556,
+        "seplto": 0.03537087134834633,
+        "seplto-nomimalloc": 0.05588692962060065
+      },
+      "ratio_vs_baseline": {
+        "default": 0.8313062057754544,
+        "nolto": 0.8675615649849202,
+        "nolto-nomimalloc": 0.8815682316743526,
+        "nomimalloc": 0.8345822382189689,
+        "reference": 1,
+        "reference-mimalloc": 0.9777539079946365,
+        "reference-nolto": 0.8997426564888635,
+        "reference-nolto-mimalloc": 0.932332937629171,
+        "seplto": 0.8495460249091202,
+        "seplto-nomimalloc": 0.8461043104018301
+      }
+    },
+    {
+      "benchmark": "base85_large",
+      "min_s": {
+        "default": 0.37670259800506756,
+        "nolto": 0.39515689699328505,
+        "nolto-nomimalloc": 0.4567639140004758,
+        "nomimalloc": 0.42576743397512473,
+        "reference": 0.4412959509936627,
+        "reference-mimalloc": 0.4483401059987955,
+        "reference-nolto": 0.5046697540092282,
+        "reference-nolto-mimalloc": 0.5409384529921226,
+        "seplto": 0.35944929899415,
+        "seplto-nomimalloc": 0.42507783899782225
+      },
+      "spread": {
+        "default": 0.04542067956718933,
+        "nolto": 0.03458843845108297,
+        "nolto-nomimalloc": 0.019554771560116504,
+        "nomimalloc": 0.023125514595105357,
+        "reference": 0.022170312178263967,
+        "reference-mimalloc": 0.03209452110049157,
+        "reference-nolto": 0.05954127378997017,
+        "reference-nolto-mimalloc": 0.02025621573116993,
+        "seplto": 0.04162456304990867,
+        "seplto-nomimalloc": 0.026448073666612056
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1714704207793285,
+        "nolto": 1.1167613531522436,
+        "nolto-nomimalloc": 0.966135759562659,
+        "nomimalloc": 1.036471828936182,
+        "reference": 1,
+        "reference-mimalloc": 0.9842883674449778,
+        "reference-nolto": 0.874425200812794,
+        "reference-nolto-mimalloc": 0.8157969701593557,
+        "seplto": 1.2277001296943544,
+        "seplto-nomimalloc": 1.0381532757249279
+      }
+    },
+    {
+      "benchmark": "base85_small",
+      "min_s": {
+        "default": 0.006950530187168624,
+        "nolto": 0.007462894998752745,
+        "nolto-nomimalloc": 0.007959798436786514,
+        "nomimalloc": 0.00733331268747861,
+        "reference": 0.00820219100023678,
+        "reference-mimalloc": 0.008316046123582055,
+        "reference-nolto": 0.009561698312609224,
+        "reference-nolto-mimalloc": 0.010177691374337883,
+        "seplto": 0.006646707250183681,
+        "seplto-nomimalloc": 0.007366817688307492
+      },
+      "spread": {
+        "default": 0.025175390721440385,
+        "nolto": 0.019458769239673233,
+        "nolto-nomimalloc": 0.01796890673684236,
+        "nomimalloc": 0.02695773499373948,
+        "reference": 0.019194215821844576,
+        "reference-mimalloc": 0.04126520090538492,
+        "reference-nolto": 0.025458552562381966,
+        "reference-nolto-mimalloc": 0.024175073634688852,
+        "seplto": 0.030653561377945508,
+        "seplto-nomimalloc": 0.05940508556107037
+      },
+      "ratio_vs_baseline": {
+        "default": 1.180081343345411,
+        "nolto": 1.0990628973886933,
+        "nolto-nomimalloc": 1.030452098175004,
+        "nomimalloc": 1.1184837398576706,
+        "reference": 1,
+        "reference-mimalloc": 0.9863089836620299,
+        "reference-nolto": 0.8578173805609793,
+        "reference-nolto-mimalloc": 0.8058989704598288,
+        "seplto": 1.2340232075077646,
+        "seplto-nomimalloc": 1.1133967674067977
+      }
+    },
+    {
+      "benchmark": "bench_mp_pool",
+      "min_s": {
+        "default": 0.015142469248530688,
+        "nolto": 0.015625629250280326,
+        "nolto-nomimalloc": 0.015308468751754845,
+        "nomimalloc": 0.01699065250068088,
+        "reference": 0.016141609750775388,
+        "reference-mimalloc": 0.0166633480002929,
+        "reference-nolto": 0.017021284002112225,
+        "reference-nolto-mimalloc": 0.01789988687596633,
+        "seplto": 0.014829918625764549,
+        "seplto-nomimalloc": 0.015697571376222186
+      },
+      "spread": {
+        "default": 0.15837885893962003,
+        "nolto": 0.12733920768817508,
+        "nolto-nomimalloc": 0.15478795838671985,
+        "nomimalloc": 0.17974395041473976,
+        "reference": 0.23947566611399387,
+        "reference-mimalloc": 0.20031880735150784,
+        "reference-nolto": 0.17501460959357285,
+        "reference-nolto-mimalloc": 0.1247722828595363,
+        "seplto": 0.20833652756003426,
+        "seplto-nomimalloc": 0.12558113779118205
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0659826667530892,
+        "nolto": 1.033021422192377,
+        "nolto-nomimalloc": 1.0544235359219085,
+        "nomimalloc": 0.9500288320374118,
+        "reference": 1,
+        "reference-mimalloc": 0.9686894704768609,
+        "reference-nolto": 0.9483191602215394,
+        "reference-nolto-mimalloc": 0.9017716068612851,
+        "seplto": 1.0884489765663306,
+        "seplto-nomimalloc": 1.0282870747271011
+      }
+    },
+    {
+      "benchmark": "bench_thread_pool",
+      "min_s": {
+        "default": 0.0011808733827365359,
+        "nolto": 0.001223232617121539,
+        "nolto-nomimalloc": 0.0012342857421572262,
+        "nomimalloc": 0.001184771953148811,
+        "reference": 0.001184828187660969,
+        "reference-mimalloc": 0.001273083656315066,
+        "reference-nolto": 0.0012729474842672062,
+        "reference-nolto-mimalloc": 0.0013864071172520198,
+        "seplto": 0.0011988851094884012,
+        "seplto-nomimalloc": 0.0012040172734941734
+      },
+      "spread": {
+        "default": 0.026324616676229526,
+        "nolto": 0.021438034556555078,
+        "nolto-nomimalloc": 0.029814503995972436,
+        "nomimalloc": 0.02548968255001921,
+        "reference": 0.0337219842977353,
+        "reference-mimalloc": 0.02577321056297685,
+        "reference-nolto": 0.031195181917306507,
+        "reference-nolto-mimalloc": 0.015289159679385312,
+        "seplto": 0.015337035526340363,
+        "seplto-nomimalloc": 0.02109282428306135
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0033490507807605,
+        "nolto": 0.9686041486116175,
+        "nolto-nomimalloc": 0.9599302229564626,
+        "nomimalloc": 1.0000474644187927,
+        "reference": 1,
+        "reference-mimalloc": 0.9306758293405855,
+        "reference-nolto": 0.9307753872839738,
+        "reference-nolto-mimalloc": 0.8546033649981559,
+        "seplto": 0.9882750050724788,
+        "seplto-nomimalloc": 0.9840624497209115
+      }
+    },
+    {
+      "benchmark": "bpe_tokeniser",
+      "min_s": {
+        "default": 4.324445869016927,
+        "nolto": 4.92180389497662,
+        "nolto-nomimalloc": 5.2097519260132685,
+        "nomimalloc": 4.638529987016227,
+        "reference": 5.26520046198857,
+        "reference-mimalloc": 5.4312135170039255,
+        "reference-nolto": 6.455701087019406,
+        "reference-nolto-mimalloc": 6.713993009005208,
+        "seplto": 4.294884174014442,
+        "seplto-nomimalloc": 4.591378912999062
+      },
+      "spread": {
+        "default": 0.02880397251896806,
+        "nolto": 0.023599843775222694,
+        "nolto-nomimalloc": 0.008477094040083552,
+        "nomimalloc": 0.022893397322886894,
+        "reference": 0.014372745641881778,
+        "reference-mimalloc": 0.029614359752176092,
+        "reference-nolto": 0.017677039017579523,
+        "reference-nolto-mimalloc": 0.01637429020953964,
+        "seplto": 0.03846666575701247,
+        "seplto-nomimalloc": 0.012911738089009424
+      },
+      "ratio_vs_baseline": {
+        "default": 1.217543385087048,
+        "nolto": 1.069770469189647,
+        "nolto-nomimalloc": 1.010643220015609,
+        "nomimalloc": 1.1351010938220654,
+        "reference": 1,
+        "reference-mimalloc": 0.9694335244792706,
+        "reference-nolto": 0.815589258396025,
+        "reference-nolto-mimalloc": 0.7842129795081063,
+        "seplto": 1.2259237382569903,
+        "seplto-nomimalloc": 1.146757991827203
+      }
+    },
+    {
+      "benchmark": "chameleon",
+      "min_s": {
+        "default": 0.013826076123223174,
+        "nolto": 0.015879859747656155,
+        "nolto-nomimalloc": 0.01726254437380703,
+        "nomimalloc": 0.0156463330022234,
+        "reference": 0.015339584999310318,
+        "reference-mimalloc": 0.015349581251939526,
+        "reference-nolto": 0.0177685798771563,
+        "reference-nolto-mimalloc": 0.018329387250560103,
+        "seplto": 0.013820600874169031,
+        "seplto-nomimalloc": 0.015500917124882108
+      },
+      "spread": {
+        "default": 0.025170436855746634,
+        "nolto": 0.01417868325772544,
+        "nolto-nomimalloc": 0.032865817107625324,
+        "nomimalloc": 0.021433744147861266,
+        "reference": 0.020172343269639587,
+        "reference-mimalloc": 0.02448657992605177,
+        "reference-nolto": 0.030521206708998726,
+        "reference-nolto-mimalloc": 0.02123012172816273,
+        "seplto": 0.02896674884816734,
+        "seplto-nomimalloc": 0.03304477063326321
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1094677088856004,
+        "nolto": 0.9659773601951629,
+        "nolto-nomimalloc": 0.8886051017244899,
+        "nomimalloc": 0.9803948949016046,
+        "reference": 1,
+        "reference-mimalloc": 0.9993487605645305,
+        "reference-nolto": 0.8632983111402869,
+        "reference-nolto-mimalloc": 0.8368847681387481,
+        "seplto": 1.1099072420201568,
+        "seplto-nomimalloc": 0.9895920915987082
+      }
+    },
+    {
+      "benchmark": "chaos",
+      "min_s": {
+        "default": 0.05742058649775572,
+        "nolto": 0.06696723349159583,
+        "nolto-nomimalloc": 0.06334724499902222,
+        "nomimalloc": 0.06030135000764858,
+        "reference": 0.0694852769956924,
+        "reference-mimalloc": 0.07076604850590229,
+        "reference-nolto": 0.08552078099455684,
+        "reference-nolto-mimalloc": 0.08291251600894611,
+        "seplto": 0.057917477504815906,
+        "seplto-nomimalloc": 0.058017794508486986
+      },
+      "spread": {
+        "default": 0.015909311594296316,
+        "nolto": 0.017216195993146426,
+        "nolto-nomimalloc": 0.018865161384063415,
+        "nomimalloc": 0.028282078306432562,
+        "reference": 0.012078911440644302,
+        "reference-mimalloc": 0.014627339257737232,
+        "reference-nolto": 0.02204381766948877,
+        "reference-nolto-mimalloc": 0.021478403694355018,
+        "seplto": 0.025774603214474962,
+        "seplto-nomimalloc": 0.023240068063214037
+      },
+      "ratio_vs_baseline": {
+        "default": 1.2101108893829955,
+        "nolto": 1.0376011277875556,
+        "nolto-nomimalloc": 1.0968950109316502,
+        "nomimalloc": 1.1523005204175187,
+        "reference": 1,
+        "reference-mimalloc": 0.9819013278648296,
+        "reference-nolto": 0.8124958190000036,
+        "reference-nolto-mimalloc": 0.8380553424309916,
+        "seplto": 1.1997289935480118,
+        "seplto-nomimalloc": 1.1976545745034815
+      }
+    },
+    {
+      "benchmark": "comprehensions",
+      "min_s": {
+        "default": 0.000017132472169834045,
+        "nolto": 0.000019185385131237354,
+        "nolto-nomimalloc": 0.00001864915368443576,
+        "nomimalloc": 0.00001757840942318012,
+        "reference": 0.000018923101318790714,
+        "reference-mimalloc": 0.00001931497900287127,
+        "reference-nolto": 0.000021365268676021287,
+        "reference-nolto-mimalloc": 0.00002184201086308235,
+        "seplto": 0.00001728622778429667,
+        "seplto-nomimalloc": 0.000017341813109084114
+      },
+      "spread": {
+        "default": 0.039646634962792054,
+        "nolto": 0.02301663507721336,
+        "nolto-nomimalloc": 0.024786562616541025,
+        "nomimalloc": 0.024819862416685098,
+        "reference": 0.02859982506207087,
+        "reference-mimalloc": 0.01883000627589439,
+        "reference-nolto": 0.016754818189854123,
+        "reference-nolto-mimalloc": 0.027383405723357308,
+        "seplto": 0.02177661617788515,
+        "seplto-nomimalloc": 0.020894570157432808
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1045166821930996,
+        "nolto": 0.9863289785087715,
+        "nolto-nomimalloc": 1.014689547793452,
+        "nomimalloc": 1.0764967900814388,
+        "reference": 1,
+        "reference-mimalloc": 0.9797112032054345,
+        "reference-nolto": 0.8856945169160698,
+        "reference-nolto-mimalloc": 0.8663625999186176,
+        "seplto": 1.0946923501714485,
+        "seplto-nomimalloc": 1.0911835573224047
+      }
+    },
+    {
+      "benchmark": "coroutines",
+      "min_s": {
+        "default": 0.023598305251653073,
+        "nolto": 0.02655001825041836,
+        "nolto-nomimalloc": 0.028664806246524677,
+        "nomimalloc": 0.024649042876262683,
+        "reference": 0.028402145253494382,
+        "reference-mimalloc": 0.028482921501563396,
+        "reference-nolto": 0.03174214725004276,
+        "reference-nolto-mimalloc": 0.03112516900000628,
+        "seplto": 0.021563205624261172,
+        "seplto-nomimalloc": 0.021200584502366837
+      },
+      "spread": {
+        "default": 0.02418293886305002,
+        "nolto": 0.04922745191664587,
+        "nolto-nomimalloc": 0.006430359155280126,
+        "nomimalloc": 0.01939107237928832,
+        "reference": 0.08726824059565384,
+        "reference-mimalloc": 0.028503334819563467,
+        "reference-nolto": 0.04707046073869136,
+        "reference-nolto-mimalloc": 0.07089613719027406,
+        "seplto": 0.07896970559256404,
+        "seplto-nomimalloc": 0.03371685327735893
+      },
+      "ratio_vs_baseline": {
+        "default": 1.203567160887742,
+        "nolto": 1.0697599144982446,
+        "nolto-nomimalloc": 0.990836812543879,
+        "nomimalloc": 1.152261586629231,
+        "reference": 1,
+        "reference-mimalloc": 0.9971640462490977,
+        "reference-nolto": 0.8947770618591696,
+        "reference-nolto-mimalloc": 0.9125137683104195,
+        "seplto": 1.3171578358246785,
+        "seplto-nomimalloc": 1.3396868963836144
+      }
+    },
+    {
+      "benchmark": "coverage",
+      "min_s": {
+        "default": 0.2935490029922221,
+        "nolto": 0.6372406840091571,
+        "nolto-nomimalloc": 0.6692745890177321,
+        "nomimalloc": 0.615583417005837,
+        "reference": 0.6603574740001932,
+        "reference-mimalloc": 0.69431163900299,
+        "reference-nolto": 0.8049507539835759,
+        "reference-nolto-mimalloc": 0.8328478439943865,
+        "seplto": 0.5761411699932069,
+        "seplto-nomimalloc": 0.6179514620162081
+      },
+      "spread": {
+        "default": 0.08985675892791146,
+        "nolto": 0.025844126708493242,
+        "nolto-nomimalloc": 0.055858624530602606,
+        "nomimalloc": 0.09161502476442997,
+        "reference": 0.017181927110635202,
+        "reference-mimalloc": 0.062055841478176915,
+        "reference-nolto": 0.02342613622545497,
+        "reference-nolto-mimalloc": 0.017364561973469816,
+        "seplto": 0.039066397571690024,
+        "seplto-nomimalloc": 0.029802188532311164
+      },
+      "ratio_vs_baseline": {
+        "default": 2.2495646970999594,
+        "nolto": 1.0362763875112277,
+        "nolto-nomimalloc": 0.9866764476586117,
+        "nomimalloc": 1.0727343455938672,
+        "reference": 1,
+        "reference-mimalloc": 0.9510966501273781,
+        "reference-nolto": 0.8203700297591957,
+        "reference-nolto-mimalloc": 0.7928908968930993,
+        "seplto": 1.146173036042502,
+        "seplto-nomimalloc": 1.06862353209041
+      }
+    },
+    {
+      "benchmark": "create_gc_cycles",
+      "min_s": {
+        "default": 0.0014814629225838871,
+        "nolto": 0.0016160897857844247,
+        "nolto-nomimalloc": 0.0017013607348417281,
+        "nomimalloc": 0.0014784593818149006,
+        "reference": 0.0015176400534073764,
+        "reference-mimalloc": 0.001515004696102551,
+        "reference-nolto": 0.001761463499860838,
+        "reference-nolto-mimalloc": 0.0017296930273005273,
+        "seplto": 0.0014751800781596103,
+        "seplto-nomimalloc": 0.0014822335556345934
+      },
+      "spread": {
+        "default": 0.022874170534307826,
+        "nolto": 0.026379814340472624,
+        "nolto-nomimalloc": 0.024423178255050804,
+        "nomimalloc": 0.019129826416094328,
+        "reference": 0.0190439664453123,
+        "reference-mimalloc": 0.01488944499278117,
+        "reference-nolto": 0.020565176313964387,
+        "reference-nolto-mimalloc": 0.0149930046183041,
+        "seplto": 0.022269469633116996,
+        "seplto-nomimalloc": 0.02200677402421143
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0244198692198054,
+        "nolto": 0.9390815205670876,
+        "nolto-nomimalloc": 0.8920154452421623,
+        "nomimalloc": 1.0265010131995504,
+        "reference": 1,
+        "reference-mimalloc": 1.0017395043801547,
+        "reference-nolto": 0.8615790526044255,
+        "reference-nolto-mimalloc": 0.8774042731593278,
+        "seplto": 1.0287829098808994,
+        "seplto-nomimalloc": 1.023887259628004
+      }
+    },
+    {
+      "benchmark": "crypto_pyaes",
+      "min_s": {
+        "default": 0.07083962550677825,
+        "nolto": 0.07650081098836381,
+        "nolto-nomimalloc": 0.07931837900832761,
+        "nomimalloc": 0.07292890350800008,
+        "reference": 0.08753414399689063,
+        "reference-mimalloc": 0.08737147999636363,
+        "reference-nolto": 0.09094075449684169,
+        "reference-nolto-mimalloc": 0.09248672900139354,
+        "seplto": 0.07099016550637316,
+        "seplto-nomimalloc": 0.07412825249775779
+      },
+      "spread": {
+        "default": 0.023766606520479776,
+        "nolto": 0.02271817744867795,
+        "nolto-nomimalloc": 0.015641727714628077,
+        "nomimalloc": 0.03039892129534047,
+        "reference": 0.016811496913507848,
+        "reference-mimalloc": 0.026268486022451895,
+        "reference-nolto": 0.02197558751879388,
+        "reference-nolto-mimalloc": 0.030207063398535784,
+        "seplto": 0.034993776668319806,
+        "seplto-nomimalloc": 0.040544204024248756
+      },
+      "ratio_vs_baseline": {
+        "default": 1.2356663854542114,
+        "nolto": 1.1442250463227777,
+        "nolto-nomimalloc": 1.1035795876224406,
+        "nomimalloc": 1.2002668323031678,
+        "reference": 1,
+        "reference-mimalloc": 1.0018617516898394,
+        "reference-nolto": 0.9625403316829819,
+        "reference-nolto-mimalloc": 0.9464508577827605,
+        "seplto": 1.2330460616975494,
+        "seplto-nomimalloc": 1.1808472619739465
+      }
+    },
+    {
+      "benchmark": "decimal_factorial",
+      "min_s": {
+        "default": 0.24392154201632366,
+        "nolto": 0.2510164739796892,
+        "nolto-nomimalloc": 0.2630574649956543,
+        "nomimalloc": 0.24498640501406044,
+        "reference": 0.2852982300100848,
+        "reference-mimalloc": 0.285013112006709,
+        "reference-nolto": 0.3059022259840276,
+        "reference-nolto-mimalloc": 0.3108676190022379,
+        "seplto": 0.23876690701581538,
+        "seplto-nomimalloc": 0.24213366000913084
+      },
+      "spread": {
+        "default": 0.019444379350078648,
+        "nolto": 0.020971583793658197,
+        "nolto-nomimalloc": 0.00930307760993881,
+        "nomimalloc": 0.0066862608248171055,
+        "reference": 0.007939414862726174,
+        "reference-mimalloc": 0.018512839482146548,
+        "reference-nolto": 0.018771543769982815,
+        "reference-nolto-mimalloc": 0.041999308386506055,
+        "seplto": 0.011998639259516919,
+        "seplto-nomimalloc": 0.0075251660778916825
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1696311348793955,
+        "nolto": 1.1365717376508504,
+        "nolto-nomimalloc": 1.0845471730475238,
+        "nomimalloc": 1.1645471918889163,
+        "reference": 1,
+        "reference-mimalloc": 1.00100036802296,
+        "reference-nolto": 0.9326451584075147,
+        "reference-nolto-mimalloc": 0.9177483036855986,
+        "seplto": 1.1948817931925018,
+        "seplto-nomimalloc": 1.1782675320702056
+      }
+    },
+    {
+      "benchmark": "decimal_pi",
+      "min_s": {
+        "default": 0.27667891801684164,
+        "nolto": 0.3114870520075783,
+        "nolto-nomimalloc": 0.31406956500723027,
+        "nomimalloc": 0.27134660398587584,
+        "reference": 0.38722450300701894,
+        "reference-mimalloc": 0.3822216219850816,
+        "reference-nolto": 0.41141910501755774,
+        "reference-nolto-mimalloc": 0.4212193720159121,
+        "seplto": 0.285083353985101,
+        "seplto-nomimalloc": 0.2651978869980667
+      },
+      "spread": {
+        "default": 0.04613102099529749,
+        "nolto": 0.01632060768821484,
+        "nolto-nomimalloc": 0.01532678278264004,
+        "nomimalloc": 0.01926639556036902,
+        "reference": 0.013028922358511158,
+        "reference-mimalloc": 0.016013199319191943,
+        "reference-nolto": 0.05055943860847795,
+        "reference-nolto-mimalloc": 0.046950822547864944,
+        "seplto": 0.012269071336044282,
+        "seplto-nomimalloc": 0.04617889356272072
+      },
+      "ratio_vs_baseline": {
+        "default": 1.399544662753988,
+        "nolto": 1.2431479912609593,
+        "nolto-nomimalloc": 1.2329259060746767,
+        "nomimalloc": 1.4270475374262461,
+        "reference": 1,
+        "reference-mimalloc": 1.0130889534609653,
+        "reference-nolto": 0.9411923225842751,
+        "reference-nolto-mimalloc": 0.9192941463109894,
+        "seplto": 1.3582852088489743,
+        "seplto-nomimalloc": 1.4601341940927375
+      }
+    },
+    {
+      "benchmark": "deepcopy",
+      "min_s": {
+        "default": 0.00027106606353299867,
+        "nolto": 0.00030665930847817435,
+        "nolto-nomimalloc": 0.00029579821801917205,
+        "nomimalloc": 0.00027377373140780037,
+        "reference": 0.00030600089246490825,
+        "reference-mimalloc": 0.0003198458495603518,
+        "reference-nolto": 0.00037211653267377187,
+        "reference-nolto-mimalloc": 0.00038938659645282314,
+        "seplto": 0.0002720212297049329,
+        "seplto-nomimalloc": 0.00027393657359198187
+      },
+      "spread": {
+        "default": 0.023339667949506374,
+        "nolto": 0.02196964815690785,
+        "nolto-nomimalloc": 0.02084994497213552,
+        "nomimalloc": 0.02226817133773685,
+        "reference": 0.01884822071784881,
+        "reference-mimalloc": 0.02646363132523601,
+        "reference-nolto": 0.0126298331071341,
+        "reference-nolto-mimalloc": 0.021583195830102136,
+        "seplto": 0.026507505849586502,
+        "seplto-nomimalloc": 0.027060162456468476
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1288793900519263,
+        "nolto": 0.9978529397443255,
+        "nolto-nomimalloc": 1.0344920078087654,
+        "nomimalloc": 1.117714584563644,
+        "reference": 1,
+        "reference-mimalloc": 0.9567136571743098,
+        "reference-nolto": 0.8223254426945172,
+        "reference-nolto-mimalloc": 0.7858536869334236,
+        "seplto": 1.1249154810337185,
+        "seplto-nomimalloc": 1.1170501567296558
+      }
+    },
+    {
+      "benchmark": "deepcopy_memo",
+      "min_s": {
+        "default": 0.000029991812745322477,
+        "nolto": 0.00003319350585684333,
+        "nolto-nomimalloc": 0.0000327680212350856,
+        "nomimalloc": 0.00003153665014110629,
+        "reference": 0.000033574164554295294,
+        "reference-mimalloc": 0.000035069054931113897,
+        "reference-nolto": 0.00003625970337139961,
+        "reference-nolto-mimalloc": 0.000037799846190011976,
+        "seplto": 0.000030724341556265244,
+        "seplto-nomimalloc": 0.000031708136233987716
+      },
+      "spread": {
+        "default": 0.05352264709443917,
+        "nolto": 0.03947608375287153,
+        "nolto-nomimalloc": 0.028627064140624086,
+        "nomimalloc": 0.030006026520075144,
+        "reference": 0.02535007722885936,
+        "reference-mimalloc": 0.027610591242780456,
+        "reference-nolto": 0.020632892877894243,
+        "reference-nolto-mimalloc": 0.019034830674635857,
+        "seplto": 0.02983474286687581,
+        "seplto-nomimalloc": 0.026012598969300565
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1194443243358647,
+        "nolto": 1.0114678666090189,
+        "nolto-nomimalloc": 1.0246015257810728,
+        "nomimalloc": 1.0646078262615855,
+        "reference": 1,
+        "reference-mimalloc": 0.9573729494634226,
+        "reference-nolto": 0.9259359959568071,
+        "reference-nolto-mimalloc": 0.8882090256538331,
+        "seplto": 1.0927545670201326,
+        "seplto-nomimalloc": 1.058850142012049
+      }
+    },
+    {
+      "benchmark": "deepcopy_reduce",
+      "min_s": {
+        "default": 0.0000029099751892580628,
+        "nolto": 0.000003326677521009458,
+        "nolto-nomimalloc": 0.000003147458495611488,
+        "nomimalloc": 0.000002950244110344613,
+        "reference": 0.000003242860443286588,
+        "reference-mimalloc": 0.000003476366058130509,
+        "reference-nolto": 0.0000040996473691379265,
+        "reference-nolto-mimalloc": 0.000004352532531726183,
+        "seplto": 0.000002940134536721928,
+        "seplto-nomimalloc": 0.000002925681823473525
+      },
+      "spread": {
+        "default": 0.051088859034746546,
+        "nolto": 0.03857482044699942,
+        "nolto-nomimalloc": 0.04011091383125108,
+        "nomimalloc": 0.0311305828428028,
+        "reference": 0.03204949427098499,
+        "reference-mimalloc": 0.027701012222173586,
+        "reference-nolto": 0.02862224122842958,
+        "reference-nolto-mimalloc": 0.024024856499335168,
+        "seplto": 0.0363102859657706,
+        "seplto-nomimalloc": 0.035133923172075726
+      },
+      "ratio_vs_baseline": {
+        "default": 1.114394533416417,
+        "nolto": 0.9748045678628219,
+        "nolto-nomimalloc": 1.0303107881511764,
+        "nomimalloc": 1.099183769883976,
+        "reference": 1,
+        "reference-mimalloc": 0.9328305446148863,
+        "reference-nolto": 0.7910096043134794,
+        "reference-nolto-mimalloc": 0.7450513970082823,
+        "seplto": 1.1029632837489747,
+        "seplto-nomimalloc": 1.1084118639519358
+      }
+    },
+    {
+      "benchmark": "deltablue",
+      "min_s": {
+        "default": 0.0029670869998881244,
+        "nolto": 0.0032054631255959976,
+        "nolto-nomimalloc": 0.003079995062762464,
+        "nomimalloc": 0.0029760347656520025,
+        "reference": 0.0030682189376420865,
+        "reference-mimalloc": 0.0031059855468811293,
+        "reference-nolto": 0.003491355687401665,
+        "reference-nolto-mimalloc": 0.003836783437691338,
+        "seplto": 0.0031889588753983844,
+        "seplto-nomimalloc": 0.003016113890680572
+      },
+      "spread": {
+        "default": 0.03414220949236174,
+        "nolto": 0.034621917876141675,
+        "nolto-nomimalloc": 0.031884760836254376,
+        "nomimalloc": 0.026558399060018622,
+        "reference": 0.031584916065491686,
+        "reference-mimalloc": 0.04969020617883887,
+        "reference-nolto": 0.03358554791085753,
+        "reference-nolto-mimalloc": 0.04895612817680504,
+        "seplto": 0.02590534902504065,
+        "seplto-nomimalloc": 0.03357164025735185
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0340845879334766,
+        "nolto": 0.9571842873942301,
+        "nolto-nomimalloc": 0.9961765766241796,
+        "nomimalloc": 1.0309755023879528,
+        "reference": 1,
+        "reference-mimalloc": 0.9878407002643763,
+        "reference-nolto": 0.8788044565936263,
+        "reference-nolto-mimalloc": 0.7996852018023435,
+        "seplto": 0.9621381327028827,
+        "seplto-nomimalloc": 1.0172755568423704
+      }
+    },
+    {
+      "benchmark": "docutils",
+      "min_s": {
+        "default": 2.4108470719947945,
+        "nolto": 2.5738008848857135,
+        "nolto-nomimalloc": 2.6363334826310165,
+        "nomimalloc": 2.508638228086056,
+        "reference": 2.393877191178035,
+        "reference-mimalloc": 2.4466581871383823,
+        "reference-nolto": 2.7259449690463953,
+        "reference-nolto-mimalloc": 2.7754772260668688,
+        "seplto": 2.4080660346662626,
+        "seplto-nomimalloc": 2.5092438251012936
+      },
+      "spread": {
+        "default": 0.038162810970664346,
+        "nolto": 0.03880500069829856,
+        "nolto-nomimalloc": 0.04514320381876701,
+        "nomimalloc": 0.05144092577884486,
+        "reference": 0.05105328471480789,
+        "reference-mimalloc": 0.04852340895190513,
+        "reference-nolto": 0.045632544750729816,
+        "reference-nolto-mimalloc": 0.05566193677120653,
+        "seplto": 0.04446303747960768,
+        "seplto-nomimalloc": 0.04514362011683894
+      },
+      "ratio_vs_baseline": {
+        "default": 0.9929610297501292,
+        "nolto": 0.9300941674376385,
+        "nolto-nomimalloc": 0.9080327685968567,
+        "nomimalloc": 0.9542536521913815,
+        "reference": 1,
+        "reference-mimalloc": 0.978427311081782,
+        "reference-nolto": 0.8781825085836101,
+        "reference-nolto-mimalloc": 0.8625101185104662,
+        "seplto": 0.9941077847185391,
+        "seplto-nomimalloc": 0.9540233464882188
+      }
+    },
+    {
+      "benchmark": "fannkuch",
+      "min_s": {
+        "default": 0.39820777100976557,
+        "nolto": 0.4381074629491195,
+        "nolto-nomimalloc": 0.4303061190294102,
+        "nomimalloc": 0.38274435402126983,
+        "reference": 0.4679999770014547,
+        "reference-mimalloc": 0.47489783202763647,
+        "reference-nolto": 0.5762728169793263,
+        "reference-nolto-mimalloc": 0.5656963619985618,
+        "seplto": 0.37618289701640606,
+        "seplto-nomimalloc": 0.37927938799839467
+      },
+      "spread": {
+        "default": 0.027439710657124194,
+        "nolto": 0.025754802252638015,
+        "nolto-nomimalloc": 0.03752685410395469,
+        "nomimalloc": 0.026353765565087586,
+        "reference": 0.01602822510411956,
+        "reference-mimalloc": 0.021104524567099138,
+        "reference-nolto": 0.024892657783036756,
+        "reference-nolto-mimalloc": 0.04977228939953857,
+        "seplto": 0.04062062378251951,
+        "seplto-nomimalloc": 0.027282840411118083
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1752658061260626,
+        "nolto": 1.068231008554645,
+        "nolto-nomimalloc": 1.0875977735502949,
+        "nomimalloc": 1.2227482184503942,
+        "reference": 1,
+        "reference-mimalloc": 0.9854750757721287,
+        "reference-nolto": 0.81211530929845,
+        "reference-nolto-mimalloc": 0.8272988982075945,
+        "seplto": 1.244075636381322,
+        "seplto-nomimalloc": 1.233918825568859
+      }
+    },
+    {
+      "benchmark": "float",
+      "min_s": {
+        "default": 0.07062666901038028,
+        "nolto": 0.07883302299887873,
+        "nolto-nomimalloc": 0.07749990100273862,
+        "nomimalloc": 0.07153515101526864,
+        "reference": 0.08606526500079781,
+        "reference-mimalloc": 0.08501924099982716,
+        "reference-nolto": 0.10099194396752864,
+        "reference-nolto-mimalloc": 0.1005931890103966,
+        "seplto": 0.0707144110056106,
+        "seplto-nomimalloc": 0.06996893050381914
+      },
+      "spread": {
+        "default": 0.03945233479027848,
+        "nolto": 0.04608206534628541,
+        "nolto-nomimalloc": 0.044941618584116876,
+        "nomimalloc": 0.040754704885660464,
+        "reference": 0.03491622911658903,
+        "reference-mimalloc": 0.04035010725348497,
+        "reference-nolto": 0.07894268307377422,
+        "reference-nolto-mimalloc": 0.08288902141846019,
+        "seplto": 0.03781011455089388,
+        "seplto-nomimalloc": 0.04684119769744078
+      },
+      "ratio_vs_baseline": {
+        "default": 1.2185944234202586,
+        "nolto": 1.0917412744912998,
+        "nolto-nomimalloc": 1.1105209669591256,
+        "nomimalloc": 1.203118519766986,
+        "reference": 1,
+        "reference-mimalloc": 1.0123033796664072,
+        "reference-nolto": 0.8521993103575656,
+        "reference-nolto-mimalloc": 0.8555774585484383,
+        "seplto": 1.2170823991444861,
+        "seplto-nomimalloc": 1.2300497432371083
+      }
+    },
+    {
+      "benchmark": "gc_traversal",
+      "min_s": {
+        "default": 0.003986900306699681,
+        "nolto": 0.003960055437346455,
+        "nolto-nomimalloc": 0.0042684653781179804,
+        "nomimalloc": 0.003997093223006232,
+        "reference": 0.003918144497220055,
+        "reference-mimalloc": 0.003873926125379512,
+        "reference-nolto": 0.004505410279307398,
+        "reference-nolto-mimalloc": 0.004303002098822617,
+        "seplto": 0.003916304316589958,
+        "seplto-nomimalloc": 0.003983083963248646
+      },
+      "spread": {
+        "default": 0.07547518660463548,
+        "nolto": 0.05105854973913255,
+        "nolto-nomimalloc": 0.2448372385634517,
+        "nomimalloc": 0.06875521468821867,
+        "reference": 0.11783058460659679,
+        "reference-mimalloc": 0.10734363549882517,
+        "reference-nolto": 0.22260776575691382,
+        "reference-nolto-mimalloc": 0.11454218920262865,
+        "seplto": 0.05424584656814493,
+        "seplto-nomimalloc": 0.06699381797674821
+      },
+      "ratio_vs_baseline": {
+        "default": 0.9827545701696913,
+        "nolto": 0.9894165774218345,
+        "nolto-nomimalloc": 0.9179281428183012,
+        "nomimalloc": 0.9802484652267383,
+        "reference": 1,
+        "reference-mimalloc": 1.0114143559813524,
+        "reference-nolto": 0.8696532067712995,
+        "reference-nolto-mimalloc": 0.9105606753694435,
+        "seplto": 1.0004698768229787,
+        "seplto-nomimalloc": 0.983696184507337
+      }
+    },
+    {
+      "benchmark": "generators",
+      "min_s": {
+        "default": 0.02706946550460998,
+        "nolto": 0.0285073897393886,
+        "nolto-nomimalloc": 0.029507600498618558,
+        "nomimalloc": 0.029897728498326614,
+        "reference": 0.031302282251999713,
+        "reference-mimalloc": 0.033379919739672914,
+        "reference-nolto": 0.03322307024791371,
+        "reference-nolto-mimalloc": 0.033675616257824004,
+        "seplto": 0.02836196025600657,
+        "seplto-nomimalloc": 0.028729365250910632
+      },
+      "spread": {
+        "default": 0.030493527628371236,
+        "nolto": 0.0645250945580039,
+        "nolto-nomimalloc": 0.018961639958466097,
+        "nomimalloc": 0.02910676783229754,
+        "reference": 0.023462402666238655,
+        "reference-mimalloc": 0.02604175683074058,
+        "reference-nolto": 0.01758477610309516,
+        "reference-nolto-mimalloc": 0.032874669132881715,
+        "seplto": 0.05450471252136564,
+        "seplto-nomimalloc": 0.030423105189128205
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1563686858415758,
+        "nolto": 1.098040982992891,
+        "nolto-nomimalloc": 1.060820999439286,
+        "nomimalloc": 1.0469786108918513,
+        "reference": 1,
+        "reference-mimalloc": 0.9377578644922901,
+        "reference-nolto": 0.9421851146934677,
+        "reference-nolto-mimalloc": 0.9295236652047049,
+        "seplto": 1.1036713248820818,
+        "seplto-nomimalloc": 1.0895570430678947
+      }
+    },
+    {
+      "benchmark": "genshi_text",
+      "min_s": {
+        "default": 0.02245470412162831,
+        "nolto": 0.024321515375049785,
+        "nolto-nomimalloc": 0.02420335749775404,
+        "nomimalloc": 0.02324471974861808,
+        "reference": 0.024444304501230363,
+        "reference-mimalloc": 0.025672136995126493,
+        "reference-nolto": 0.02902759175049141,
+        "reference-nolto-mimalloc": 0.030157089247950353,
+        "seplto": 0.02237234425410861,
+        "seplto-nomimalloc": 0.023567105250549503
+      },
+      "spread": {
+        "default": 0.04711720954382908,
+        "nolto": 0.0381332528472695,
+        "nolto-nomimalloc": 0.034827296222253876,
+        "nomimalloc": 0.04339451656614447,
+        "reference": 0.04069851919846131,
+        "reference-mimalloc": 0.05958115214413201,
+        "reference-nolto": 0.030153612654800984,
+        "reference-nolto-mimalloc": 0.05116286205032729,
+        "seplto": 0.0345124369268666,
+        "seplto-nomimalloc": 0.04388468539872602
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0886050588253209,
+        "nolto": 1.0050485804147935,
+        "nolto-nomimalloc": 1.0099551065796835,
+        "nomimalloc": 1.0516067634105848,
+        "reference": 1,
+        "reference-mimalloc": 0.952172563813865,
+        "reference-nolto": 0.8421058388633478,
+        "reference-nolto-mimalloc": 0.8105657777595938,
+        "seplto": 1.0926125677125338,
+        "seplto-nomimalloc": 1.0372213405658044
+      }
+    },
+    {
+      "benchmark": "go",
+      "min_s": {
+        "default": 0.11477056902367622,
+        "nolto": 0.11961746402084827,
+        "nolto-nomimalloc": 0.11995480803307146,
+        "nomimalloc": 0.11655025300569832,
+        "reference": 0.12297120899893343,
+        "reference-mimalloc": 0.12397863203659654,
+        "reference-nolto": 0.1294019750203006,
+        "reference-nolto-mimalloc": 0.13120549800805748,
+        "seplto": 0.11694113799603656,
+        "seplto-nomimalloc": 0.11565719195641577
+      },
+      "spread": {
+        "default": 0.032895375863829075,
+        "nolto": 0.014565289354480114,
+        "nolto-nomimalloc": 0.023649314311880724,
+        "nomimalloc": 0.03321949893975388,
+        "reference": 0.025144105216331935,
+        "reference-mimalloc": 0.026646962575432056,
+        "reference-nolto": 0.016899657168992176,
+        "reference-nolto-mimalloc": 0.012644690927903263,
+        "seplto": 0.02842699354494024,
+        "seplto-nomimalloc": 0.025315658810452085
+      },
+      "ratio_vs_baseline": {
+        "default": 1.071452464207662,
+        "nolto": 1.028037251964317,
+        "nolto-nomimalloc": 1.0251461447466979,
+        "nomimalloc": 1.0550917379211624,
+        "reference": 1,
+        "reference-mimalloc": 0.991874220411097,
+        "reference-nolto": 0.9503039577227604,
+        "reference-nolto-mimalloc": 0.9372412807836882,
+        "seplto": 1.051565010450824,
+        "seplto-nomimalloc": 1.0632387568710286
+      }
+    },
+    {
+      "benchmark": "hexiom",
+      "min_s": {
+        "default": 0.006041040187483304,
+        "nolto": 0.006257080563955242,
+        "nolto-nomimalloc": 0.005972481467324542,
+        "nomimalloc": 0.005932016561928322,
+        "reference": 0.006128006687504239,
+        "reference-mimalloc": 0.006395193937350996,
+        "reference-nolto": 0.006739041687978897,
+        "reference-nolto-mimalloc": 0.007177777501055971,
+        "seplto": 0.006185124029798317,
+        "seplto-nomimalloc": 0.005880156781131518
+      },
+      "spread": {
+        "default": 0.027195544108420816,
+        "nolto": 0.016759438302118394,
+        "nolto-nomimalloc": 0.02711153262321858,
+        "nomimalloc": 0.022590210110514482,
+        "reference": 0.015336298193380034,
+        "reference-mimalloc": 0.032819626407301315,
+        "reference-nolto": 0.018276216848958544,
+        "reference-nolto-mimalloc": 0.014797424573380392,
+        "seplto": 0.01575771772867645,
+        "seplto-nomimalloc": 0.0272585685810464
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0143959479364373,
+        "nolto": 0.9793715495378867,
+        "nolto-nomimalloc": 1.026040301846155,
+        "nomimalloc": 1.0330393759912577,
+        "reference": 1,
+        "reference-mimalloc": 0.9582206180978727,
+        "reference-nolto": 0.9093290962178462,
+        "reference-nolto-mimalloc": 0.8537470946407446,
+        "seplto": 0.9907653683226236,
+        "seplto-nomimalloc": 1.0421502207505813
+      }
+    },
+    {
+      "benchmark": "html5lib",
+      "min_s": {
+        "default": 0.06875065650092438,
+        "nolto": 0.07205152549431659,
+        "nolto-nomimalloc": 0.0725081764976494,
+        "nomimalloc": 0.07013388452469371,
+        "reference": 0.07051630449132062,
+        "reference-mimalloc": 0.07334868749603629,
+        "reference-nolto": 0.07858813702478074,
+        "reference-nolto-mimalloc": 0.08007617748808116,
+        "seplto": 0.0689907694759313,
+        "seplto-nomimalloc": 0.07039974851068109
+      },
+      "spread": {
+        "default": 0.026513986593748023,
+        "nolto": 0.024481410966159398,
+        "nolto-nomimalloc": 0.025087915225601817,
+        "nomimalloc": 0.037952559991877736,
+        "reference": 0.02374532419540893,
+        "reference-mimalloc": 0.03413262846591597,
+        "reference-nolto": 0.028360775266163995,
+        "reference-nolto-mimalloc": 0.018411461907692443,
+        "seplto": 0.03591513815752093,
+        "seplto-nomimalloc": 0.03250388043501816
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0256819073483685,
+        "nolto": 0.9786927342278539,
+        "nolto-nomimalloc": 0.9725290015203547,
+        "nomimalloc": 1.0054527133242173,
+        "reference": 1,
+        "reference-mimalloc": 0.9613846804706802,
+        "reference-nolto": 0.8972894276535036,
+        "reference-nolto-mimalloc": 0.8806152679030732,
+        "seplto": 1.0221121611916726,
+        "seplto-nomimalloc": 1.0016556306393885
+      }
+    },
+    {
+      "benchmark": "json_dumps",
+      "min_s": {
+        "default": 0.010319606939447112,
+        "nolto": 0.011136009623442078,
+        "nolto-nomimalloc": 0.011722058749001008,
+        "nomimalloc": 0.010504735622816952,
+        "reference": 0.012740311249217484,
+        "reference-mimalloc": 0.012283646123250946,
+        "reference-nolto": 0.013400878502579872,
+        "reference-nolto-mimalloc": 0.013634919378091581,
+        "seplto": 0.010077286813611863,
+        "seplto-nomimalloc": 0.010696772562369006
+      },
+      "spread": {
+        "default": 0.030492234220603275,
+        "nolto": 0.07506216564874887,
+        "nolto-nomimalloc": 0.01595656153912564,
+        "nomimalloc": 0.02954076046263124,
+        "reference": 0.041432317904498646,
+        "reference-mimalloc": 0.036748036756334694,
+        "reference-nolto": 0.04031384920581589,
+        "reference-nolto-mimalloc": 0.028685088475714153,
+        "seplto": 0.03117900255421912,
+        "seplto-nomimalloc": 0.026479190262825303
+      },
+      "ratio_vs_baseline": {
+        "default": 1.2345733053569252,
+        "nolto": 1.1440643174731313,
+        "nolto-nomimalloc": 1.0868663536004932,
+        "nomimalloc": 1.2128159819219744,
+        "reference": 1,
+        "reference-mimalloc": 1.037176675506969,
+        "reference-nolto": 0.9507071679490849,
+        "reference-nolto-mimalloc": 0.9343884548146619,
+        "seplto": 1.2642600617468334,
+        "seplto-nomimalloc": 1.1910425481081648
+      }
+    },
+    {
+      "benchmark": "json_loads",
+      "min_s": {
+        "default": 0.000025945355662315706,
+        "nolto": 0.000029710620503919925,
+        "nolto-nomimalloc": 0.00004749682811961975,
+        "nomimalloc": 0.00002818474082459943,
+        "reference": 0.000031458331443445785,
+        "reference-mimalloc": 0.0000328302636717126,
+        "reference-nolto": 0.00003433147519444901,
+        "reference-nolto-mimalloc": 0.00003467646230319588,
+        "seplto": 0.00002710010527380291,
+        "seplto-nomimalloc": 0.00002636217558347198
+      },
+      "spread": {
+        "default": 0.045873907503252924,
+        "nolto": 0.031161869561196556,
+        "nolto-nomimalloc": 0.029446686903911383,
+        "nomimalloc": 0.03804123064508006,
+        "reference": 0.036990517671876416,
+        "reference-mimalloc": 0.03621147377414357,
+        "reference-nolto": 0.11178632517400176,
+        "reference-nolto-mimalloc": 0.07386693932548291,
+        "seplto": 0.025595913579660817,
+        "seplto-nomimalloc": 0.03500875090216982
+      },
+      "ratio_vs_baseline": {
+        "default": 1.2124841090206133,
+        "nolto": 1.0588244509836229,
+        "nolto-nomimalloc": 0.6623248896582873,
+        "nomimalloc": 1.1161476218361812,
+        "reference": 1,
+        "reference-mimalloc": 0.9582113551695625,
+        "reference-nolto": 0.9163116721687573,
+        "reference-nolto-mimalloc": 0.9071955255524004,
+        "seplto": 1.1608195291350354,
+        "seplto-nomimalloc": 1.1933131749250956
+      }
+    },
+    {
+      "benchmark": "logging_format",
+      "min_s": {
+        "default": 0.0000069818569841118006,
+        "nolto": 0.0000073293196265922235,
+        "nolto-nomimalloc": 0.0000071424617175352975,
+        "nomimalloc": 0.000006896970651837364,
+        "reference": 0.000007449145996929474,
+        "reference-mimalloc": 0.000007504859570417466,
+        "reference-nolto": 0.00000883106621074603,
+        "reference-nolto-mimalloc": 0.000008687530174711355,
+        "seplto": 0.000006877672558402992,
+        "seplto-nomimalloc": 0.000006721918506968905
+      },
+      "spread": {
+        "default": 0.13440917460500887,
+        "nolto": 0.0700781350691883,
+        "nolto-nomimalloc": 0.11564766735620596,
+        "nomimalloc": 0.11713107850267508,
+        "reference": 0.05389066146119141,
+        "reference-mimalloc": 0.11783452897288585,
+        "reference-nolto": 0.051834638726502326,
+        "reference-nolto-mimalloc": 0.07798626815775418,
+        "seplto": 0.10581950370750794,
+        "seplto-nomimalloc": 0.08746123207204995
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0669290439321595,
+        "nolto": 1.0163489077352414,
+        "nolto-nomimalloc": 1.0429381761530823,
+        "nomimalloc": 1.0800605617982453,
+        "reference": 1,
+        "reference-mimalloc": 0.9925763336455218,
+        "reference-nolto": 0.8435160397580334,
+        "reference-nolto-mimalloc": 0.8574526760912198,
+        "seplto": 1.0830911087542643,
+        "seplto-nomimalloc": 1.1081874898076525
+      }
+    },
+    {
+      "benchmark": "mako",
+      "min_s": {
+        "default": 0.009916079998220084,
+        "nolto": 0.010979469247104134,
+        "nolto-nomimalloc": 0.014060323373996653,
+        "nomimalloc": 0.013043498620390892,
+        "reference": 0.013862972125934903,
+        "reference-mimalloc": 0.01088738993712468,
+        "reference-nolto": 0.014319242996862158,
+        "reference-nolto-mimalloc": 0.013340406374481972,
+        "seplto": 0.009796469126740703,
+        "seplto-nomimalloc": 0.013099200623400975
+      },
+      "spread": {
+        "default": 0.12545731278222325,
+        "nolto": 0.05935508918590579,
+        "nolto-nomimalloc": 0.025037270960153287,
+        "nomimalloc": 0.013214514899663342,
+        "reference": 0.05965889695228931,
+        "reference-mimalloc": 0.07978803387810197,
+        "reference-nolto": 0.04353876324900739,
+        "reference-nolto-mimalloc": 0.027033275171059957,
+        "seplto": 0.08898655739811774,
+        "seplto-nomimalloc": 0.026239254167722197
+      },
+      "ratio_vs_baseline": {
+        "default": 1.398029476206654,
+        "nolto": 1.2626268004340282,
+        "nolto-nomimalloc": 0.9859639609408462,
+        "nomimalloc": 1.062826204026497,
+        "reference": 1,
+        "reference-mimalloc": 1.273305374933238,
+        "reference-nolto": 0.9681358245664774,
+        "reference-nolto-mimalloc": 1.039171651656168,
+        "seplto": 1.415098842918227,
+        "seplto-nomimalloc": 1.0583067260737646
+      }
+    },
+    {
+      "benchmark": "many_optionals",
+      "min_s": {
+        "default": 0.0008728978514227492,
+        "nolto": 0.0009321797342636273,
+        "nolto-nomimalloc": 0.0009286835938837612,
+        "nomimalloc": 0.0008895969765490008,
+        "reference": 0.00096538353136566,
+        "reference-mimalloc": 0.000969845632880606,
+        "reference-nolto": 0.0010921918592430302,
+        "reference-nolto-mimalloc": 0.001106785101683272,
+        "seplto": 0.0008708531327101809,
+        "seplto-nomimalloc": 0.0008961696407823183
+      },
+      "spread": {
+        "default": 0.013787149974667531,
+        "nolto": 0.015503682564298338,
+        "nolto-nomimalloc": 0.01716707525771194,
+        "nomimalloc": 0.017796041382690406,
+        "reference": 0.01543788948792896,
+        "reference-mimalloc": 0.011755317903868402,
+        "reference-nolto": 0.011931869380641624,
+        "reference-nolto-mimalloc": 0.01254381225166807,
+        "seplto": 0.011393891615245715,
+        "seplto-nomimalloc": 0.01869605374584558
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1059524660212727,
+        "nolto": 1.035619522589452,
+        "nolto-nomimalloc": 1.0395182360532713,
+        "nomimalloc": 1.085192010331079,
+        "reference": 1,
+        "reference-mimalloc": 0.9953991631619841,
+        "reference-nolto": 0.8838955566238539,
+        "reference-nolto-mimalloc": 0.8722411693990468,
+        "seplto": 1.1085491859704186,
+        "seplto-nomimalloc": 1.0772330231170528
+      }
+    },
+    {
+      "benchmark": "mdp",
+      "min_s": {
+        "default": 1.1865379679948092,
+        "nolto": 1.3317302140058018,
+        "nolto-nomimalloc": 1.31240361003438,
+        "nomimalloc": 1.1876744430046529,
+        "reference": 1.3915076379780658,
+        "reference-mimalloc": 1.4018823590013199,
+        "reference-nolto": 1.6900948669645004,
+        "reference-nolto-mimalloc": 1.6972818240174092,
+        "seplto": 1.2289560090284795,
+        "seplto-nomimalloc": 1.1998218820081092
+      },
+      "spread": {
+        "default": 0.023625946055117673,
+        "nolto": 0.03065615360330903,
+        "nolto-nomimalloc": 0.02110932928610637,
+        "nomimalloc": 0.025804343229323495,
+        "reference": 0.015163920371938809,
+        "reference-mimalloc": 0.02448557525901469,
+        "reference-nolto": 0.01498458903172071,
+        "reference-nolto-mimalloc": 0.01994573470370093,
+        "seplto": 0.01676363012242192,
+        "seplto-nomimalloc": 0.021773790249516388
+      },
+      "ratio_vs_baseline": {
+        "default": 1.172745984968054,
+        "nolto": 1.0448870374371513,
+        "nolto-nomimalloc": 1.060274162109028,
+        "nomimalloc": 1.171623794865656,
+        "reference": 1,
+        "reference-mimalloc": 0.9925994353544438,
+        "reference-nolto": 0.8233310834659163,
+        "reference-nolto-mimalloc": 0.8198447766820561,
+        "seplto": 1.1322680614728329,
+        "seplto-nomimalloc": 1.159761843690613
+      }
+    },
+    {
+      "benchmark": "meteor_contest",
+      "min_s": {
+        "default": 0.0984410165110603,
+        "nolto": 0.10119301901431754,
+        "nolto-nomimalloc": 0.09941145998891443,
+        "nomimalloc": 0.09619945200392976,
+        "reference": 0.1079629190498963,
+        "reference-mimalloc": 0.10622518602758646,
+        "reference-nolto": 0.11140030401293188,
+        "reference-nolto-mimalloc": 0.11337042099330574,
+        "seplto": 0.09826483950018883,
+        "seplto-nomimalloc": 0.09697589199640788
+      },
+      "spread": {
+        "default": 0.019246347051401408,
+        "nolto": 0.012058589046898202,
+        "nolto-nomimalloc": 0.012977895399492257,
+        "nomimalloc": 0.012321067897432272,
+        "reference": 0.008105106516314542,
+        "reference-mimalloc": 0.007426110236924629,
+        "reference-nolto": 0.01325337482681766,
+        "reference-nolto-mimalloc": 0.0148309673517374,
+        "seplto": 0.00951695418342273,
+        "seplto-nomimalloc": 0.014792846811072
+      },
+      "ratio_vs_baseline": {
+        "default": 1.096726983083989,
+        "nolto": 1.0669008603708217,
+        "nolto-nomimalloc": 1.0860208577757078,
+        "nomimalloc": 1.1222820587947424,
+        "reference": 1,
+        "reference-mimalloc": 1.016358954851428,
+        "reference-nolto": 0.9691438457597337,
+        "reference-nolto-mimalloc": 0.9523023563286517,
+        "seplto": 1.0986932823483504,
+        "seplto-nomimalloc": 1.1132964784061528
+      }
+    },
+    {
+      "benchmark": "nbody",
+      "min_s": {
+        "default": 0.09684094550902955,
+        "nolto": 0.11448998498963192,
+        "nolto-nomimalloc": 0.10922983597265556,
+        "nomimalloc": 0.0965200760110747,
+        "reference": 0.1334670190117322,
+        "reference-mimalloc": 0.13472325599286705,
+        "reference-nolto": 0.14916836802149191,
+        "reference-nolto-mimalloc": 0.14997541799675673,
+        "seplto": 0.09481298900209367,
+        "seplto-nomimalloc": 0.0933464645058848
+      },
+      "spread": {
+        "default": 0.03104022772441862,
+        "nolto": 0.029502370978723103,
+        "nolto-nomimalloc": 0.07977889878190697,
+        "nomimalloc": 0.06675186909848896,
+        "reference": 0.027774344457971164,
+        "reference-mimalloc": 0.02373629527978119,
+        "reference-nolto": 0.04055578292552664,
+        "reference-nolto-mimalloc": 0.03212755816406671,
+        "seplto": 0.08961806896401098,
+        "seplto-nomimalloc": 0.019922382597403004
+      },
+      "ratio_vs_baseline": {
+        "default": 1.3782085491852987,
+        "nolto": 1.1657527863578532,
+        "nolto-nomimalloc": 1.2218915997012403,
+        "nomimalloc": 1.3827902393738085,
+        "reference": 1,
+        "reference-mimalloc": 0.9906754259175463,
+        "reference-nolto": 0.8947407602696471,
+        "reference-nolto-mimalloc": 0.8899259678317313,
+        "seplto": 1.4076870734323643,
+        "seplto-nomimalloc": 1.4298026145737752
+      }
+    },
+    {
+      "benchmark": "nqueens",
+      "min_s": {
+        "default": 0.07676707452628762,
+        "nolto": 0.08960364598897286,
+        "nolto-nomimalloc": 0.08563656752812676,
+        "nomimalloc": 0.07668860899866559,
+        "reference": 0.09347452249494381,
+        "reference-mimalloc": 0.09779566948418505,
+        "reference-nolto": 0.11485201702453196,
+        "reference-nolto-mimalloc": 0.12234995700418949,
+        "seplto": 0.07917345251189545,
+        "seplto-nomimalloc": 0.08048518450232223
+      },
+      "spread": {
+        "default": 0.031971883774611354,
+        "nolto": 0.01810558024490132,
+        "nolto-nomimalloc": 0.017476476418900506,
+        "nomimalloc": 0.013562235925172814,
+        "reference": 0.014048020423512716,
+        "reference-mimalloc": 0.012635902392378214,
+        "reference-nolto": 0.020780479027793827,
+        "reference-nolto-mimalloc": 0.03229034229720906,
+        "seplto": 0.022515103753292527,
+        "seplto-nomimalloc": 0.017409582908507037
+      },
+      "ratio_vs_baseline": {
+        "default": 1.2176382006446658,
+        "nolto": 1.04319998883134,
+        "nolto-nomimalloc": 1.0915257954990165,
+        "nomimalloc": 1.2188840522139384,
+        "reference": 1,
+        "reference-mimalloc": 0.9558145364510232,
+        "reference-nolto": 0.813869228565468,
+        "reference-nolto-mimalloc": 0.7639930963910602,
+        "seplto": 1.180629611685807,
+        "seplto-nomimalloc": 1.1613879383260506
+      }
+    },
+    {
+      "benchmark": "pathlib",
+      "min_s": {
+        "default": 0.022023017751052976,
+        "nolto": 0.02334938549756771,
+        "nolto-nomimalloc": 0.0231771880062297,
+        "nomimalloc": 0.022100086251157336,
+        "reference": 0.023722009122138843,
+        "reference-mimalloc": 0.023872119876614306,
+        "reference-nolto": 0.027346696238964796,
+        "reference-nolto-mimalloc": 0.027906528499443084,
+        "seplto": 0.02232840812939685,
+        "seplto-nomimalloc": 0.022362414754752535
+      },
+      "spread": {
+        "default": 0.0195653021925867,
+        "nolto": 0.011317787236978658,
+        "nolto-nomimalloc": 0.013346927278996782,
+        "nomimalloc": 0.019448657238555336,
+        "reference": 0.016433689562878804,
+        "reference-mimalloc": 0.022906841882850824,
+        "reference-nolto": 0.01128167385883834,
+        "reference-nolto-mimalloc": 0.015129819888037204,
+        "seplto": 0.014952336411153351,
+        "seplto-nomimalloc": 0.01565667204598064
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0771461654479497,
+        "nolto": 1.015958605189415,
+        "nolto-nomimalloc": 1.023506782434638,
+        "nomimalloc": 1.0733898887338764,
+        "reference": 1,
+        "reference-mimalloc": 0.9937118799984531,
+        "reference-nolto": 0.8674542955700317,
+        "reference-nolto-mimalloc": 0.8500523138380416,
+        "seplto": 1.0624138086631991,
+        "seplto-nomimalloc": 1.0607981911746522
+      }
+    },
+    {
+      "benchmark": "pickle",
+      "min_s": {
+        "default": 0.000010878814549641902,
+        "nolto": 0.00001249330673545046,
+        "nolto-nomimalloc": 0.00001286662812844952,
+        "nomimalloc": 0.00001134450527615627,
+        "reference": 0.000013058853414804617,
+        "reference-mimalloc": 0.000013260756446697997,
+        "reference-nolto": 0.00001499453632618497,
+        "reference-nolto-mimalloc": 0.000014021315331547158,
+        "seplto": 0.000010874655373527276,
+        "seplto-nomimalloc": 0.00001145378417959364
+      },
+      "spread": {
+        "default": 0.028485545198199982,
+        "nolto": 0.02305554048878194,
+        "nolto-nomimalloc": 0.03038750786883516,
+        "nomimalloc": 0.019183209139418917,
+        "reference": 0.053891794513937594,
+        "reference-mimalloc": 0.06175294216336956,
+        "reference-nolto": 0.033725559024422994,
+        "reference-nolto-mimalloc": 0.16346270326263043,
+        "seplto": 0.025443226952247287,
+        "seplto-nomimalloc": 0.02731759583587702
+      },
+      "ratio_vs_baseline": {
+        "default": 1.2003930534172471,
+        "nolto": 1.0452679735901613,
+        "nolto-nomimalloc": 1.0149398338427196,
+        "nomimalloc": 1.1511170471445362,
+        "reference": 1,
+        "reference-mimalloc": 0.9847743955855811,
+        "reference-nolto": 0.8709074512694288,
+        "reference-nolto-mimalloc": 0.9313572304748716,
+        "seplto": 1.2008521618620158,
+        "seplto-nomimalloc": 1.1401344053671458
+      }
+    },
+    {
+      "benchmark": "pidigits",
+      "min_s": {
+        "default": 0.1832700869999826,
+        "nolto": 0.18469380598980933,
+        "nolto-nomimalloc": 0.3273445229860954,
+        "nomimalloc": 0.32909094699425623,
+        "reference": 0.1992614900227636,
+        "reference-mimalloc": 0.1980563240358606,
+        "reference-nolto": 0.1926680020405911,
+        "reference-nolto-mimalloc": 0.19713827199302614,
+        "seplto": 0.1834656199789606,
+        "seplto-nomimalloc": 0.32527777599170804
+      },
+      "spread": {
+        "default": 0.001393484452168507,
+        "nolto": 0.0015268189244535995,
+        "nolto-nomimalloc": 0.01701606006890562,
+        "nomimalloc": 0.0160702385211928,
+        "reference": 0.0015916468771739309,
+        "reference-mimalloc": 0.0016751042117066697,
+        "reference-nolto": 0.0032413217871077025,
+        "reference-nolto-mimalloc": 0.010918468415263118,
+        "seplto": 0.0015157282058619601,
+        "seplto-nomimalloc": 0.017090509723576786
+      },
+      "ratio_vs_baseline": {
+        "default": 1.087255936222601,
+        "nolto": 1.0788747838883024,
+        "nolto-nomimalloc": 0.6087210141934394,
+        "nomimalloc": 0.6054906458008442,
+        "reference": 1,
+        "reference-mimalloc": 1.0060849659447622,
+        "reference-nolto": 1.0342220187697977,
+        "reference-nolto-mimalloc": 1.010770197020965,
+        "seplto": 1.0860971665733037,
+        "seplto-nomimalloc": 0.6125887002739565
+      }
+    },
+    {
+      "benchmark": "pprint_pformat",
+      "min_s": {
+        "default": 1.5812199439969845,
+        "nolto": 1.8095504619996063,
+        "nolto-nomimalloc": 1.7540386320324615,
+        "nomimalloc": 1.6009569360176101,
+        "reference": 1.7550081409863196,
+        "reference-mimalloc": 1.8216846050345339,
+        "reference-nolto": 2.1074311790289357,
+        "reference-nolto-mimalloc": 2.199858788982965,
+        "seplto": 1.5707439460093156,
+        "seplto-nomimalloc": 1.5902500209631398
+      },
+      "spread": {
+        "default": 0.02113146315024259,
+        "nolto": 0.029561924968924777,
+        "nolto-nomimalloc": 0.029508175038165056,
+        "nomimalloc": 0.03017040055204627,
+        "reference": 0.024912831464538432,
+        "reference-mimalloc": 0.02241295492044835,
+        "reference-nolto": 0.04198644771639521,
+        "reference-nolto-mimalloc": 0.016699393706054885,
+        "seplto": 0.018211039455535333,
+        "seplto-nomimalloc": 0.03488694062720899
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1099076682210547,
+        "nolto": 0.9698586349711321,
+        "nolto-nomimalloc": 1.0005527295329493,
+        "nomimalloc": 1.0962244527025897,
+        "reference": 1,
+        "reference-mimalloc": 0.9633984588419189,
+        "reference-nolto": 0.8327712707539014,
+        "reference-nolto-mimalloc": 0.7977821802815316,
+        "seplto": 1.1173101417612665,
+        "seplto-nomimalloc": 1.1036051676474077
+      }
+    },
+    {
+      "benchmark": "pprint_safe_repr",
+      "min_s": {
+        "default": 0.7710351750138216,
+        "nolto": 0.889588778023608,
+        "nolto-nomimalloc": 0.8582311919890344,
+        "nomimalloc": 0.7867772340541705,
+        "reference": 0.8558827139786445,
+        "reference-mimalloc": 0.8894651180016808,
+        "reference-nolto": 1.0317937840009108,
+        "reference-nolto-mimalloc": 1.0760866609634832,
+        "seplto": 0.7611889370018616,
+        "seplto-nomimalloc": 0.7788612589938566
+      },
+      "spread": {
+        "default": 0.030318190058980454,
+        "nolto": 0.018486348284245006,
+        "nolto-nomimalloc": 0.024981551839881738,
+        "nomimalloc": 0.020128761012863906,
+        "reference": 0.030877269265940394,
+        "reference-mimalloc": 0.025843809361673912,
+        "reference-nolto": 0.029115836380926945,
+        "reference-nolto-mimalloc": 0.01844498752220372,
+        "seplto": 0.02288281023800051,
+        "seplto-nomimalloc": 0.036099144369379416
+      },
+      "ratio_vs_baseline": {
+        "default": 1.11004366819361,
+        "nolto": 0.9621105111961415,
+        "nolto-nomimalloc": 0.9972635834815708,
+        "nomimalloc": 1.0878336038885892,
+        "reference": 1,
+        "reference-mimalloc": 0.9622442709181397,
+        "reference-nolto": 0.8295094690916348,
+        "reference-nolto-mimalloc": 0.7953659728597721,
+        "seplto": 1.1244024609051186,
+        "seplto-nomimalloc": 1.0988898267764469
+      }
+    },
+    {
+      "benchmark": "pyflate",
+      "min_s": {
+        "default": 0.41076759598217905,
+        "nolto": 0.44114655698649585,
+        "nolto-nomimalloc": 0.47057278896681964,
+        "nomimalloc": 0.44522456801496446,
+        "reference": 0.4365285700187087,
+        "reference-mimalloc": 0.4501384350005537,
+        "reference-nolto": 0.4859224389656447,
+        "reference-nolto-mimalloc": 0.49098744901129976,
+        "seplto": 0.4116683619795367,
+        "seplto-nomimalloc": 0.4495491289999336
+      },
+      "spread": {
+        "default": 0.03760233571613655,
+        "nolto": 0.017195766052930626,
+        "nolto-nomimalloc": 0.010467154429617265,
+        "nomimalloc": 0.010352169030547625,
+        "reference": 0.027939227394167647,
+        "reference-mimalloc": 0.01676318083158843,
+        "reference-nolto": 0.02882330363152967,
+        "reference-nolto-mimalloc": 0.032944646562936566,
+        "seplto": 0.035658866172699186,
+        "seplto-nomimalloc": 0.02149177563170102
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0627142313281384,
+        "nolto": 0.9895318530890664,
+        "nolto-nomimalloc": 0.9276536600791181,
+        "nomimalloc": 0.9804682880932943,
+        "reference": 1,
+        "reference-mimalloc": 0.9697651568415208,
+        "reference-nolto": 0.8983503024637474,
+        "reference-nolto-mimalloc": 0.8890829508936435,
+        "seplto": 1.0603889206341481,
+        "seplto-nomimalloc": 0.9710364048303455
+      }
+    },
+    {
+      "benchmark": "python_startup",
+      "min_s": {
+        "default": 0.011594228002650198,
+        "nolto": 0.01203345006069867,
+        "nolto-nomimalloc": 0.013867172128811944,
+        "nomimalloc": 0.0134711318751215,
+        "reference": 0.012686053625657223,
+        "reference-mimalloc": 0.013329624627658632,
+        "reference-nolto": 0.01405036187497899,
+        "reference-nolto-mimalloc": 0.014567509875632823,
+        "seplto": 0.011630481374595547,
+        "seplto-nomimalloc": 0.013522933622880373
+      },
+      "spread": {
+        "default": 0.0036968335816440897,
+        "nolto": 0.004586086225405768,
+        "nolto-nomimalloc": 0.0075924900425437805,
+        "nomimalloc": 0.0036278036182167965,
+        "reference": 0.014541854621275808,
+        "reference-mimalloc": 0.010581927832510407,
+        "reference-nolto": 0.00522698271615462,
+        "reference-nolto-mimalloc": 0.010763996698354228,
+        "seplto": 0.003521726461656136,
+        "seplto-nomimalloc": 0.006864348477155123
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0941697560853088,
+        "nolto": 1.0542324571645467,
+        "nolto-nomimalloc": 0.9148262895864182,
+        "nomimalloc": 0.9417214338971649,
+        "reference": 1,
+        "reference-mimalloc": 0.9517187452776416,
+        "reference-nolto": 0.9028987109754562,
+        "reference-nolto-mimalloc": 0.8708457199591315,
+        "seplto": 1.0907591196841915,
+        "seplto-nomimalloc": 0.9381140201851486
+      }
+    },
+    {
+      "benchmark": "quadtree_nbody",
+      "min_s": {
+        "default": 0.8844463869754691,
+        "nolto": 1.000703637022525,
+        "nolto-nomimalloc": 1.0086122849897947,
+        "nomimalloc": 0.9086924369912595,
+        "reference": 1.1700106939824764,
+        "reference-mimalloc": 1.1663960570003837,
+        "reference-nolto": 1.3455715419841,
+        "reference-nolto-mimalloc": 1.3729265709989704,
+        "seplto": 0.8924473549996037,
+        "seplto-nomimalloc": 0.87496417897637
+      },
+      "spread": {
+        "default": 0.01670731460837483,
+        "nolto": 0.01871918047013217,
+        "nolto-nomimalloc": 0.02967610197930545,
+        "nomimalloc": 0.014546070216625023,
+        "reference": 0.01658562106987112,
+        "reference-mimalloc": 0.018229249722797904,
+        "reference-nolto": 0.016629868656347437,
+        "reference-nolto-mimalloc": 0.029304339248691885,
+        "seplto": 0.012080974779509276,
+        "seplto-nomimalloc": 0.022324213381063513
+      },
+      "ratio_vs_baseline": {
+        "default": 1.3228735073287463,
+        "nolto": 1.1691880100123393,
+        "nolto-nomimalloc": 1.1600202688333454,
+        "nomimalloc": 1.2875761328623565,
+        "reference": 1,
+        "reference-mimalloc": 1.0030989790821039,
+        "reference-nolto": 0.8695269314757118,
+        "reference-nolto-mimalloc": 0.8522019448797993,
+        "seplto": 1.3110136832474515,
+        "seplto-nomimalloc": 1.3372098219509791
+      }
+    },
+    {
+      "benchmark": "raytrace",
+      "min_s": {
+        "default": 0.2885766220279038,
+        "nolto": 0.3184043789515272,
+        "nolto-nomimalloc": 0.31432309397496283,
+        "nomimalloc": 0.2874022150062956,
+        "reference": 0.3306935209548101,
+        "reference-mimalloc": 0.3309298439999111,
+        "reference-nolto": 0.40195093397051096,
+        "reference-nolto-mimalloc": 0.3971563989762217,
+        "seplto": 0.28775862796464935,
+        "seplto-nomimalloc": 0.28352465003263205
+      },
+      "spread": {
+        "default": 0.012412148790149872,
+        "nolto": 0.01531782981004971,
+        "nolto-nomimalloc": 0.011153383603393246,
+        "nomimalloc": 0.016887500330613016,
+        "reference": 0.038022332617190235,
+        "reference-mimalloc": 0.014832312953623587,
+        "reference-nolto": 0.018868424952334966,
+        "reference-nolto-mimalloc": 0.03822134570373517,
+        "seplto": 0.012624605198907683,
+        "seplto-nomimalloc": 0.024144507191355
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1459470231196822,
+        "nolto": 1.0385960207072207,
+        "nolto-nomimalloc": 1.052081527872563,
+        "nomimalloc": 1.150629687901209,
+        "reference": 1,
+        "reference-mimalloc": 0.9992858817378191,
+        "reference-nolto": 0.8227211159535988,
+        "reference-nolto-mimalloc": 0.8326531356595596,
+        "seplto": 1.1492045374758848,
+        "seplto-nomimalloc": 1.1663660317251046
+      }
+    },
+    {
+      "benchmark": "regex_compile",
+      "min_s": {
+        "default": 0.13215411599958315,
+        "nolto": 0.14586619002511725,
+        "nolto-nomimalloc": 0.14308849297231063,
+        "nomimalloc": 0.13712217297870666,
+        "reference": 0.15212381299352273,
+        "reference-mimalloc": 0.14901361998636276,
+        "reference-nolto": 0.16587742598494515,
+        "reference-nolto-mimalloc": 0.16993584000738338,
+        "seplto": 0.13432428502710536,
+        "seplto-nomimalloc": 0.13542360998690128
+      },
+      "spread": {
+        "default": 0.01499073270624809,
+        "nolto": 0.013316286584183617,
+        "nolto-nomimalloc": 0.014074130112624882,
+        "nomimalloc": 0.013111686759567424,
+        "reference": 0.014687043287625993,
+        "reference-mimalloc": 0.014362244348161905,
+        "reference-nolto": 0.008483849098530777,
+        "reference-nolto-mimalloc": 0.012366131514936114,
+        "seplto": 0.04211141692871394,
+        "seplto-nomimalloc": 0.014525347463393748
+      },
+      "ratio_vs_baseline": {
+        "default": 1.151109156479111,
+        "nolto": 1.0428997491970413,
+        "nolto-nomimalloc": 1.063144979959783,
+        "nomimalloc": 1.1094034588931554,
+        "reference": 1,
+        "reference-mimalloc": 1.0208718706883613,
+        "reference-nolto": 0.917085685953008,
+        "reference-nolto-mimalloc": 0.895183811648639,
+        "seplto": 1.1325116151768506,
+        "seplto-nomimalloc": 1.12331825305969
+      }
+    },
+    {
+      "benchmark": "regex_dna",
+      "min_s": {
+        "default": 0.18242043699137866,
+        "nolto": 0.18578928301576525,
+        "nolto-nomimalloc": 0.21167132700793445,
+        "nomimalloc": 0.2123762769624591,
+        "reference": 0.17841337295249104,
+        "reference-mimalloc": 0.17570242699002847,
+        "reference-nolto": 0.18252581800334156,
+        "reference-nolto-mimalloc": 0.18245925701921806,
+        "seplto": 0.1858372130081989,
+        "seplto-nomimalloc": 0.20971667999401689
+      },
+      "spread": {
+        "default": 0.025215551909710796,
+        "nolto": 0.027713853623822223,
+        "nolto-nomimalloc": 0.03608558194283985,
+        "nomimalloc": 0.023964442289397307,
+        "reference": 0.026649818743315578,
+        "reference-mimalloc": 0.024870163004850718,
+        "reference-nolto": 0.026049432656099197,
+        "reference-nolto-mimalloc": 0.04483915545645989,
+        "seplto": 0.03484595933558403,
+        "seplto-nomimalloc": 0.03579868811910609
+      },
+      "ratio_vs_baseline": {
+        "default": 0.9780339083439593,
+        "nolto": 0.960299593477368,
+        "nolto-nomimalloc": 0.8428792669958707,
+        "nomimalloc": 0.8400814606239118,
+        "reference": 1,
+        "reference-mimalloc": 1.0154291890493716,
+        "reference-nolto": 0.9774692419086969,
+        "reference-nolto-mimalloc": 0.9778258218693674,
+        "seplto": 0.9600519189050671,
+        "seplto-nomimalloc": 0.8507352536649975
+      }
+    },
+    {
+      "benchmark": "regex_effbot",
+      "min_s": {
+        "default": 0.003069702224456705,
+        "nolto": 0.0030393513501621784,
+        "nolto-nomimalloc": 0.003219806474226061,
+        "nomimalloc": 0.0032328732006135395,
+        "reference": 0.0028050469496520235,
+        "reference-mimalloc": 0.002908555624890141,
+        "reference-nolto": 0.003099776375165675,
+        "reference-nolto-mimalloc": 0.003056533074413892,
+        "seplto": 0.0032309666756191293,
+        "seplto-nomimalloc": 0.0030995018998510203
+      },
+      "spread": {
+        "default": 0.06478834443072855,
+        "nolto": 0.06601841176432086,
+        "nolto-nomimalloc": 0.07995138153342474,
+        "nomimalloc": 0.06565292293835663,
+        "reference": 0.08369420519326023,
+        "reference-mimalloc": 0.07581182201560814,
+        "reference-nolto": 0.06714470668723135,
+        "reference-nolto-mimalloc": 0.09188775925728111,
+        "seplto": 0.07260609541391624,
+        "seplto-nomimalloc": 0.08506116711771325
+      },
+      "ratio_vs_baseline": {
+        "default": 0.9137847076188239,
+        "nolto": 0.9229097351651521,
+        "nolto-nomimalloc": 0.8711849522963232,
+        "nomimalloc": 0.8676637701471488,
+        "reference": 1,
+        "reference-mimalloc": 0.9644123446179486,
+        "reference-nolto": 0.9049191329171612,
+        "reference-nolto-mimalloc": 0.917721772138817,
+        "seplto": 0.8681757601583775,
+        "seplto-nomimalloc": 0.9049992677168064
+      }
+    },
+    {
+      "benchmark": "regex_v8",
+      "min_s": {
+        "default": 0.02252518575551221,
+        "nolto": 0.02330659749713959,
+        "nolto-nomimalloc": 0.0249661885027308,
+        "nomimalloc": 0.024493289631209336,
+        "reference": 0.02283978862396907,
+        "reference-mimalloc": 0.023276505744433962,
+        "reference-nolto": 0.02507183224952314,
+        "reference-nolto-mimalloc": 0.024136141124472488,
+        "seplto": 0.022606679376622196,
+        "seplto-nomimalloc": 0.02534847350034397
+      },
+      "spread": {
+        "default": 0.028224345141330664,
+        "nolto": 0.017590641367147494,
+        "nolto-nomimalloc": 0.030600695739031934,
+        "nomimalloc": 0.027527192330537784,
+        "reference": 0.03871738434767738,
+        "reference-mimalloc": 0.019084044859023867,
+        "reference-nolto": 0.020125144371424108,
+        "reference-nolto-mimalloc": 0.0250726336173653,
+        "seplto": 0.023921237689387972,
+        "seplto-nomimalloc": 0.03109656630557383
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0139667158296295,
+        "nolto": 0.9799709557249696,
+        "nolto-nomimalloc": 0.9148288142369371,
+        "nomimalloc": 0.9324916729383147,
+        "reference": 1,
+        "reference-mimalloc": 0.9812378573803191,
+        "reference-nolto": 0.9109740523412874,
+        "reference-nolto-mimalloc": 0.9462899850552746,
+        "seplto": 1.0103115209210218,
+        "seplto-nomimalloc": 0.9010321123936375
+      }
+    },
+    {
+      "benchmark": "richards",
+      "min_s": {
+        "default": 0.04687957599526271,
+        "nolto": 0.050032247992930934,
+        "nolto-nomimalloc": 0.04956554700038396,
+        "nomimalloc": 0.04996139751165174,
+        "reference": 0.05050594950444065,
+        "reference-mimalloc": 0.05067211951245554,
+        "reference-nolto": 0.055247371492441744,
+        "reference-nolto-mimalloc": 0.05611345748184249,
+        "seplto": 0.04898995174153242,
+        "seplto-nomimalloc": 0.04770184449444059
+      },
+      "spread": {
+        "default": 0.07008198525102124,
+        "nolto": 0.08659380036769126,
+        "nolto-nomimalloc": 0.04960962053494103,
+        "nomimalloc": 0.051701796348209546,
+        "reference": 0.03881000190223854,
+        "reference-mimalloc": 0.021893202589270574,
+        "reference-nolto": 0.0766942826605673,
+        "reference-nolto-mimalloc": 0.06409208559242846,
+        "seplto": 0.030123876316833817,
+        "seplto-nomimalloc": 0.033479339804939695
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0773550833639023,
+        "nolto": 1.0094679237993993,
+        "nolto-nomimalloc": 1.0189729068066051,
+        "nomimalloc": 1.0108994547772991,
+        "reference": 1,
+        "reference-mimalloc": 0.9967206817158292,
+        "reference-nolto": 0.9141783245081668,
+        "reference-nolto-mimalloc": 0.9000683930549753,
+        "seplto": 1.030945075653606,
+        "seplto-nomimalloc": 1.058783995455917
+      }
+    },
+    {
+      "benchmark": "richards_super",
+      "min_s": {
+        "default": 0.0547151385108009,
+        "nolto": 0.0584550935018342,
+        "nolto-nomimalloc": 0.05695829901378602,
+        "nomimalloc": 0.05557943999883719,
+        "reference": 0.056823320977855474,
+        "reference-mimalloc": 0.05691567700705491,
+        "reference-nolto": 0.06445391898159869,
+        "reference-nolto-mimalloc": 0.0651324175123591,
+        "seplto": 0.055758361995685846,
+        "seplto-nomimalloc": 0.05526340549113229
+      },
+      "spread": {
+        "default": 0.05098503027857728,
+        "nolto": 0.06114914507573792,
+        "nolto-nomimalloc": 0.028555653958554004,
+        "nomimalloc": 0.025875845388981293,
+        "reference": 0.043842272579618834,
+        "reference-mimalloc": 0.04344687838735327,
+        "reference-nolto": 0.05492827409223828,
+        "reference-nolto-mimalloc": 0.06120721653028169,
+        "seplto": 0.05423160595233201,
+        "seplto-nomimalloc": 0.03789131350192314
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0385301495058523,
+        "nolto": 0.9720850241403254,
+        "nolto-nomimalloc": 0.9976302305674916,
+        "nomimalloc": 1.0223802359117744,
+        "reference": 1,
+        "reference-mimalloc": 0.9983773182705358,
+        "reference-nolto": 0.8816115742175162,
+        "reference-nolto-mimalloc": 0.8724276350877511,
+        "seplto": 1.0190995385096144,
+        "seplto-nomimalloc": 1.028226915675211
+      }
+    },
+    {
+      "benchmark": "scimark_fft",
+      "min_s": {
+        "default": 0.32887074997415766,
+        "nolto": 0.40359427203657106,
+        "nolto-nomimalloc": 0.3821733699878678,
+        "nomimalloc": 0.3260351099888794,
+        "reference": 0.4772615510155447,
+        "reference-mimalloc": 0.46797804202651605,
+        "reference-nolto": 0.5326959119993262,
+        "reference-nolto-mimalloc": 0.5580215189838782,
+        "seplto": 0.327344281016849,
+        "seplto-nomimalloc": 0.3167373660253361
+      },
+      "spread": {
+        "default": 0.06521704962029899,
+        "nolto": 0.03766716726249142,
+        "nolto-nomimalloc": 0.032841848639988985,
+        "nomimalloc": 0.0368611864751056,
+        "reference": 0.020584886758183905,
+        "reference-mimalloc": 0.0404505196130312,
+        "reference-nolto": 0.028469349299245623,
+        "reference-nolto-mimalloc": 0.041956647258697875,
+        "seplto": 0.03047095847647984,
+        "seplto-nomimalloc": 0.14029923129482813
+      },
+      "ratio_vs_baseline": {
+        "default": 1.4512131317639145,
+        "nolto": 1.1825280587042086,
+        "nolto-nomimalloc": 1.2488090183538836,
+        "nomimalloc": 1.4638348337141462,
+        "reference": 1,
+        "reference-mimalloc": 1.01983748841896,
+        "reference-nolto": 0.8959361997434445,
+        "reference-nolto-mimalloc": 0.8552744558751205,
+        "seplto": 1.4579804160103202,
+        "seplto-nomimalloc": 1.506805328984671
+      }
+    },
+    {
+      "benchmark": "shortest_path",
+      "min_s": {
+        "default": 0.4537072560051456,
+        "nolto": 0.45612476801034063,
+        "nolto-nomimalloc": 0.48248658602824435,
+        "nomimalloc": 0.47928268695250154,
+        "reference": 0.45267318398691714,
+        "reference-mimalloc": 0.44686834304593503,
+        "reference-nolto": 0.460101887001656,
+        "reference-nolto-mimalloc": 0.4541265630396083,
+        "seplto": 0.4493856909684837,
+        "seplto-nomimalloc": 0.4800198479788378
+      },
+      "spread": {
+        "default": 0.03043809369371601,
+        "nolto": 0.04048117602363875,
+        "nolto-nomimalloc": 0.006636008266789419,
+        "nomimalloc": 0.00725109855122294,
+        "reference": 0.015119051135765964,
+        "reference-mimalloc": 0.03236587055681439,
+        "reference-nolto": 0.01539483147669094,
+        "reference-nolto-mimalloc": 0.030115835649722807,
+        "seplto": 0.033699649001965155,
+        "seplto-nomimalloc": 0.005805251626628466
+      },
+      "ratio_vs_baseline": {
+        "default": 0.9977208387026176,
+        "nolto": 0.9924328072810437,
+        "nolto-nomimalloc": 0.938208847863012,
+        "nomimalloc": 0.9444805671267206,
+        "reference": 1,
+        "reference-mimalloc": 1.0129900473625302,
+        "reference-nolto": 0.9838542218047628,
+        "reference-nolto-mimalloc": 0.9967996167346758,
+        "seplto": 1.0073155266945606,
+        "seplto-nomimalloc": 0.9430301390514039
+      }
+    },
+    {
+      "benchmark": "spectral_norm",
+      "min_s": {
+        "default": 0.10312137403525412,
+        "nolto": 0.11630519095342606,
+        "nolto-nomimalloc": 0.11304980597924441,
+        "nomimalloc": 0.10228149296017364,
+        "reference": 0.13168984599178657,
+        "reference-mimalloc": 0.12994571297895163,
+        "reference-nolto": 0.15353420900646597,
+        "reference-nolto-mimalloc": 0.15851310401922092,
+        "seplto": 0.09482728649163619,
+        "seplto-nomimalloc": 0.10806475899880752
+      },
+      "spread": {
+        "default": 0.03005081108867537,
+        "nolto": 0.07324052328011188,
+        "nolto-nomimalloc": 0.032673651933669175,
+        "nomimalloc": 0.024775186307053203,
+        "reference": 0.038087879824498655,
+        "reference-mimalloc": 0.04003594212072846,
+        "reference-nolto": 0.05315316419062509,
+        "reference-nolto-mimalloc": 0.0402567158237684,
+        "seplto": 0.08480405067083634,
+        "seplto-nomimalloc": 0.07220868382749329
+      },
+      "ratio_vs_baseline": {
+        "default": 1.277037347725465,
+        "nolto": 1.132278318037595,
+        "nolto-nomimalloc": 1.164883432139321,
+        "nomimalloc": 1.2875236974010924,
+        "reference": 1,
+        "reference-mimalloc": 1.0134220127224778,
+        "reference-nolto": 0.8577231539730703,
+        "reference-nolto-mimalloc": 0.8307820782805324,
+        "seplto": 1.3887336742826832,
+        "seplto-nomimalloc": 1.2186197166574881
+      }
+    },
+    {
+      "benchmark": "sphinx",
+      "min_s": {
+        "default": 0.9638963759643957,
+        "nolto": 1.0406837629852816,
+        "nolto-nomimalloc": 1.051640496996697,
+        "nomimalloc": 1.0006188430124894,
+        "reference": 0.9851910989964381,
+        "reference-mimalloc": 1.013591684983112,
+        "reference-nolto": 1.1391762450220995,
+        "reference-nolto-mimalloc": 1.1553563289926387,
+        "seplto": 0.9663154419977218,
+        "seplto-nomimalloc": 1.0040590629796498
+      },
+      "spread": {
+        "default": 0.1380699589300068,
+        "nolto": 0.11291343362610685,
+        "nolto-nomimalloc": 0.1114705370421053,
+        "nomimalloc": 0.10912394339103706,
+        "reference": 0.12012676739627741,
+        "reference-mimalloc": 0.11392634309338857,
+        "reference-nolto": 0.10365517142498859,
+        "reference-nolto-mimalloc": 0.10244583254611579,
+        "seplto": 0.11738488494859048,
+        "seplto-nomimalloc": 0.10607825567592595
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0220923364409755,
+        "nolto": 0.9466767273954015,
+        "nolto-nomimalloc": 0.9368135801255021,
+        "nomimalloc": 0.9845817974308737,
+        "reference": 1,
+        "reference-mimalloc": 0.9719802496336115,
+        "reference-nolto": 0.8648276360233669,
+        "reference-nolto-mimalloc": 0.852716235047097,
+        "seplto": 1.0195336389944194,
+        "seplto-nomimalloc": 0.9812083126591985
+      }
+    },
+    {
+      "benchmark": "sqlglot_v2_parse",
+      "min_s": {
+        "default": 0.0012686619461419468,
+        "nolto": 0.0013685079120477894,
+        "nolto-nomimalloc": 0.0013328711033864238,
+        "nomimalloc": 0.0012829845018131891,
+        "reference": 0.0013689887814507529,
+        "reference-mimalloc": 0.0014072750645937049,
+        "reference-nolto": 0.0015904247047728859,
+        "reference-nolto-mimalloc": 0.0015885360953689087,
+        "seplto": 0.001268791656002577,
+        "seplto-nomimalloc": 0.0012836671567129088
+      },
+      "spread": {
+        "default": 0.026212955464751442,
+        "nolto": 0.01957712014639727,
+        "nolto-nomimalloc": 0.022886045697501523,
+        "nomimalloc": 0.020667171647665426,
+        "reference": 0.01938460608149737,
+        "reference-mimalloc": 0.013625916153532347,
+        "reference-nolto": 0.022216157163037663,
+        "reference-nolto-mimalloc": 0.032199496260967596,
+        "seplto": 0.022636005743270297,
+        "seplto-nomimalloc": 0.027875111130686536
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0790808265463498,
+        "nolto": 1.00035138226,
+        "nolto-nomimalloc": 1.0270976525581244,
+        "nomimalloc": 1.0670345429083652,
+        "reference": 1,
+        "reference-mimalloc": 0.9727940300327813,
+        "reference-nolto": 0.8607693135942865,
+        "reference-nolto-mimalloc": 0.8617926816027621,
+        "seplto": 1.0789705110166428,
+        "seplto-nomimalloc": 1.0664670933517746
+      }
+    },
+    {
+      "benchmark": "sqlite_synth",
+      "min_s": {
+        "default": 0.0000026923095548525566,
+        "nolto": 0.000003040205140081298,
+        "nolto-nomimalloc": 0.000002816592987286981,
+        "nomimalloc": 0.0000026776565089647875,
+        "reference": 0.0000030361245730858855,
+        "reference-mimalloc": 0.0000031188173217344684,
+        "reference-nolto": 0.000003625678955287981,
+        "reference-nolto-mimalloc": 0.0000038083538207445145,
+        "seplto": 0.000002763795959204174,
+        "seplto-nomimalloc": 0.0000027889234006650554
+      },
+      "spread": {
+        "default": 0.030361221303600357,
+        "nolto": 0.028639597474972092,
+        "nolto-nomimalloc": 0.021389022731067575,
+        "nomimalloc": 0.028874478052198855,
+        "reference": 0.050016378935316075,
+        "reference-mimalloc": 0.02903146089218527,
+        "reference-nolto": 0.048770726226223804,
+        "reference-nolto-mimalloc": 0.0364466148392991,
+        "seplto": 0.026503298860893636,
+        "seplto-nomimalloc": 0.018887797487167363
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1277026327131086,
+        "nolto": 0.9986577987973195,
+        "nolto-nomimalloc": 1.0779422468172668,
+        "nomimalloc": 1.133873804545485,
+        "reference": 1,
+        "reference-mimalloc": 0.9734858633520109,
+        "reference-nolto": 0.8373947639952396,
+        "reference-nolto-mimalloc": 0.7972275465971116,
+        "seplto": 1.0985342687743591,
+        "seplto-nomimalloc": 1.0886367737320723
+      }
+    },
+    {
+      "benchmark": "telco",
+      "min_s": {
+        "default": 0.006864943625259912,
+        "nolto": 0.008501083626470063,
+        "nolto-nomimalloc": 0.008592230435169768,
+        "nomimalloc": 0.007536587123468053,
+        "reference": 0.009330185312137473,
+        "reference-mimalloc": 0.009560782560583903,
+        "reference-nolto": 0.010733828938100487,
+        "reference-nolto-mimalloc": 0.011791923312557628,
+        "seplto": 0.007025943625194486,
+        "seplto-nomimalloc": 0.007589667562569957
+      },
+      "spread": {
+        "default": 0.05900892424197207,
+        "nolto": 0.030283462896927262,
+        "nolto-nomimalloc": 0.021163655253952102,
+        "nomimalloc": 0.05205504462202519,
+        "reference": 0.03628615657516263,
+        "reference-mimalloc": 0.034580687830910804,
+        "reference-nolto": 0.057457409197652194,
+        "reference-nolto-mimalloc": 0.035321061749822746,
+        "seplto": 0.023674799950129156,
+        "seplto-nomimalloc": 0.03008622386469519
+      },
+      "ratio_vs_baseline": {
+        "default": 1.3591058894943548,
+        "nolto": 1.097528941261772,
+        "nolto-nomimalloc": 1.0858862995511742,
+        "nomimalloc": 1.2379854646786164,
+        "reference": 1,
+        "reference-mimalloc": 0.9758809232418788,
+        "reference-nolto": 0.8692317872720441,
+        "reference-nolto-mimalloc": 0.7912352433806481,
+        "seplto": 1.3279618809749847,
+        "seplto-nomimalloc": 1.2293272709533742
+      }
+    },
+    {
+      "benchmark": "tomli_loads",
+      "min_s": {
+        "default": 2.23253251099959,
+        "nolto": 2.3505271860049106,
+        "nolto-nomimalloc": 2.311710596026387,
+        "nomimalloc": 2.170485492039006,
+        "reference": 2.3353496650233865,
+        "reference-mimalloc": 2.506460361997597,
+        "reference-nolto": 2.6607046800199896,
+        "reference-nolto-mimalloc": 2.7876725700334646,
+        "seplto": 2.2275546029559337,
+        "seplto-nomimalloc": 2.240316489012912
+      },
+      "spread": {
+        "default": 0.04036809343366573,
+        "nolto": 0.043538104806377216,
+        "nolto-nomimalloc": 0.03760526344898339,
+        "nomimalloc": 0.04015503964833226,
+        "reference": 0.035422489474917836,
+        "reference-mimalloc": 0.045458137182534414,
+        "reference-nolto": 0.037950360201178854,
+        "reference-nolto-mimalloc": 0.028859363830430262,
+        "seplto": 0.07073314020723662,
+        "seplto-nomimalloc": 0.042587112320850495
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0460540455815182,
+        "nolto": 0.9935429289770008,
+        "nolto-nomimalloc": 1.0102257908224468,
+        "nomimalloc": 1.0759572794147096,
+        "reference": 1,
+        "reference-mimalloc": 0.9317321352579305,
+        "reference-nolto": 0.8777184790781971,
+        "reference-nolto-mimalloc": 0.8377417384407351,
+        "seplto": 1.0483916586935333,
+        "seplto-nomimalloc": 1.0424195315601799
+      }
+    },
+    {
+      "benchmark": "tornado_http",
+      "min_s": {
+        "default": 0.10244722000788897,
+        "nolto": 0.10636724199866876,
+        "nolto-nomimalloc": 0.14813374704681337,
+        "nomimalloc": 0.1457552060019225,
+        "reference": 0.11323318397626281,
+        "reference-mimalloc": 0.11043062596581876,
+        "reference-nolto": 0.12494699197122827,
+        "reference-nolto-mimalloc": 0.12053565197857097,
+        "seplto": 0.10369062499376014,
+        "seplto-nomimalloc": 0.1460596889955923
+      },
+      "spread": {
+        "default": 0.04016435032733803,
+        "nolto": 0.041618170539541324,
+        "nolto-nomimalloc": 0.05430302096020528,
+        "nomimalloc": 0.046660919844866755,
+        "reference": 0.04405985783949412,
+        "reference-mimalloc": 0.06451251161598105,
+        "reference-nolto": 0.03293001251641118,
+        "reference-nolto-mimalloc": 0.06401694336140022,
+        "seplto": 0.04846395705543815,
+        "seplto-nomimalloc": 0.041580829545420354
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1052831298647563,
+        "nolto": 1.0645494030735514,
+        "nolto-nomimalloc": 0.7643982970367903,
+        "nomimalloc": 0.776872312710184,
+        "reference": 1,
+        "reference-mimalloc": 1.0253784490120659,
+        "reference-nolto": 0.9062497799253717,
+        "reference-nolto-mimalloc": 0.9394165304419111,
+        "seplto": 1.0920291394046175,
+        "seplto-nomimalloc": 0.7752528076359241
+      }
+    },
+    {
+      "benchmark": "typing_runtime_protocols",
+      "min_s": {
+        "default": 0.00016441508591924503,
+        "nolto": 0.0001894752489874918,
+        "nolto-nomimalloc": 0.00018158264253997913,
+        "nomimalloc": 0.00016791235054824938,
+        "reference": 0.00019458132226191083,
+        "reference-mimalloc": 0.0002048330429715861,
+        "reference-nolto": 0.00024785438472463284,
+        "reference-nolto-mimalloc": 0.0002627263027079607,
+        "seplto": 0.00016603331050646375,
+        "seplto-nomimalloc": 0.00016167260548627382
+      },
+      "spread": {
+        "default": 0.08175666024636982,
+        "nolto": 0.04985913154300481,
+        "nolto-nomimalloc": 0.060683839166920384,
+        "nomimalloc": 0.04242301798065449,
+        "reference": 0.0459401930516873,
+        "reference-mimalloc": 0.04449815885339123,
+        "reference-nolto": 0.05661163283214194,
+        "reference-nolto-mimalloc": 0.054294702909213,
+        "seplto": 0.0421338998910937,
+        "seplto-nomimalloc": 0.09721142136341608
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1834760853847828,
+        "nolto": 1.026948497504052,
+        "nolto-nomimalloc": 1.0715854750217646,
+        "nomimalloc": 1.1588267428011387,
+        "reference": 1,
+        "reference-mimalloc": 0.9499508450348152,
+        "reference-nolto": 0.7850630622415311,
+        "reference-nolto-mimalloc": 0.7406236842536548,
+        "seplto": 1.1719414716743584,
+        "seplto-nomimalloc": 1.2035515953779257
+      }
+    },
+    {
+      "benchmark": "unpack_sequence_list",
+      "min_s": {
+        "default": 2.3156620940767425e-8,
+        "nolto": 2.087338378586878e-8,
+        "nolto-nomimalloc": 2.0874943240656306e-8,
+        "nomimalloc": 2.2873357545805105e-8,
+        "reference": 2.0692649993492295e-8,
+        "reference-mimalloc": 2.0690300139847295e-8,
+        "reference-nolto": 2.1226537780805188e-8,
+        "reference-nolto-mimalloc": 2.0970778651374645e-8,
+        "seplto": 2.2236259304975193e-8,
+        "seplto-nomimalloc": 2.082533920422236e-8
+      },
+      "spread": {
+        "default": 0.04776630697494526,
+        "nolto": 0.049533038856575354,
+        "nolto-nomimalloc": 0.07128180788040978,
+        "nomimalloc": 0.07262474970727935,
+        "reference": 0.0013350874177345017,
+        "reference-mimalloc": 0.11041348892070366,
+        "reference-nolto": 0.014185059677568956,
+        "reference-nolto-mimalloc": 0.013609767519129795,
+        "seplto": 0.011203303847149541,
+        "seplto-nomimalloc": 0.03245177631078255
+      },
+      "ratio_vs_baseline": {
+        "default": 0.8935954017825939,
+        "nolto": 0.9913414234016603,
+        "nolto-nomimalloc": 0.9912673656132883,
+        "nomimalloc": 0.9046616768899874,
+        "reference": 1,
+        "reference-mimalloc": 1.0001135727190575,
+        "reference-nolto": 0.9748480985064046,
+        "reference-nolto-mimalloc": 0.9867373232770201,
+        "seplto": 0.9305814305224653,
+        "seplto-nomimalloc": 0.9936284730141077
+      }
+    },
+    {
+      "benchmark": "urlsafe_base64_small",
+      "min_s": {
+        "default": 0.0006101801171780608,
+        "nolto": 0.0006015060038180309,
+        "nolto-nomimalloc": 0.0006051568711882283,
+        "nomimalloc": 0.0006050160976656116,
+        "reference": 0.0005382949452723551,
+        "reference-mimalloc": 0.0005469365233921053,
+        "reference-nolto": 0.000613426906170389,
+        "reference-nolto-mimalloc": 0.0005971558202872984,
+        "seplto": 0.000615526043020509,
+        "seplto-nomimalloc": 0.0006114350195502993
+      },
+      "spread": {
+        "default": 0.028019121700611244,
+        "nolto": 0.022374802808297234,
+        "nolto-nomimalloc": 0.02942915879181108,
+        "nomimalloc": 0.04388306529986466,
+        "reference": 0.0164384136380246,
+        "reference-mimalloc": 0.029039325957425456,
+        "reference-nolto": 0.019624715048188163,
+        "reference-nolto-mimalloc": 0.015536028327634975,
+        "seplto": 0.03399825048106263,
+        "seplto-nomimalloc": 0.04279974295952252
+      },
+      "ratio_vs_baseline": {
+        "default": 0.882190242058103,
+        "nolto": 0.8949120072876304,
+        "nolto-nomimalloc": 0.8895130682651105,
+        "nomimalloc": 0.8897200377796678,
+        "reference": 1,
+        "reference-mimalloc": 0.9842000346472475,
+        "reference-nolto": 0.8775209236140601,
+        "reference-nolto-mimalloc": 0.9014312964635852,
+        "seplto": 0.8745283020533697,
+        "seplto-nomimalloc": 0.8803796447057651
+      }
+    },
+    {
+      "benchmark": "xdsl_constant_fold",
+      "min_s": {
+        "default": 0.046665172252687626,
+        "nolto": 0.05129551698337309,
+        "nolto-nomimalloc": 0.05023040747619234,
+        "nomimalloc": 0.04658141349500511,
+        "reference": 0.05195414551417343,
+        "reference-mimalloc": 0.052763386513106525,
+        "reference-nolto": 0.06085062550846487,
+        "reference-nolto-mimalloc": 0.06217054801527411,
+        "seplto": 0.04680449399165809,
+        "seplto-nomimalloc": 0.04698558374366257
+      },
+      "spread": {
+        "default": 0.15846078350143053,
+        "nolto": 0.03270514850559113,
+        "nolto-nomimalloc": 0.050784169523566666,
+        "nomimalloc": 0.16651270704578583,
+        "reference": 0.027905847957149777,
+        "reference-mimalloc": 0.03099103562696005,
+        "reference-nolto": 0.036265847681084096,
+        "reference-nolto-mimalloc": 0.03356144608770735,
+        "seplto": 0.1576044012352151,
+        "seplto-nomimalloc": 0.15850192034378463
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1133387707827693,
+        "nolto": 1.012839884838549,
+        "nolto-nomimalloc": 1.034316624622209,
+        "nomimalloc": 1.1153406823892202,
+        "reference": 1,
+        "reference-mimalloc": 0.9846628305646743,
+        "reference-nolto": 0.8537980518695923,
+        "reference-nolto-mimalloc": 0.8356713455607517,
+        "seplto": 1.1100247237676184,
+        "seplto-nomimalloc": 1.1057465157316688
+      }
+    },
+    {
+      "benchmark": "xml_etree_parse",
+      "min_s": {
+        "default": 0.14623051101807505,
+        "nolto": 0.15736352099338546,
+        "nolto-nomimalloc": 0.17233779199887067,
+        "nomimalloc": 0.1653601789730601,
+        "reference": 0.17193630698602647,
+        "reference-mimalloc": 0.15593476098729298,
+        "reference-nolto": 0.16801328299334273,
+        "reference-nolto-mimalloc": 0.16824123699916527,
+        "seplto": 0.14599698700476438,
+        "seplto-nomimalloc": 0.15736037999158725
+      },
+      "spread": {
+        "default": 0.03679158965728752,
+        "nolto": 0.04271810222799097,
+        "nolto-nomimalloc": 0.024472096276993753,
+        "nomimalloc": 0.02144989231722868,
+        "reference": 0.039642010971400014,
+        "reference-mimalloc": 0.07217012996371946,
+        "reference-nolto": 0.055041689927926296,
+        "reference-nolto-mimalloc": 0.04133625673463679,
+        "seplto": 0.037503534523842405,
+        "seplto-nomimalloc": 0.034819463470161474
+      },
+      "ratio_vs_baseline": {
+        "default": 1.1757895516399721,
+        "nolto": 1.092605871428446,
+        "nolto-nomimalloc": 0.997670360005269,
+        "nomimalloc": 1.039768510495128,
+        "reference": 1,
+        "reference-mimalloc": 1.102616927088101,
+        "reference-nolto": 1.023349487152389,
+        "reference-nolto-mimalloc": 1.0219629268826615,
+        "seplto": 1.177670241786672,
+        "seplto-nomimalloc": 1.0926276804569135
+      }
+    },
+    {
+      "benchmark": "yaml",
+      "min_s": {
+        "default": 0.000344750521799142,
+        "nolto": 0.00036519548139040124,
+        "nolto-nomimalloc": 0.0003627375435826252,
+        "nomimalloc": 0.00034116162823920603,
+        "reference": 0.00036357452190713955,
+        "reference-mimalloc": 0.00037735605001216755,
+        "reference-nolto": 0.00042612758134055186,
+        "reference-nolto-mimalloc": 0.00042598154686857015,
+        "seplto": 0.00034240639051859035,
+        "seplto-nomimalloc": 0.000347008703101892
+      },
+      "spread": {
+        "default": 0.02993870576380986,
+        "nolto": 0.020850151566552518,
+        "nolto-nomimalloc": 0.015254082043281042,
+        "nomimalloc": 0.02931732635131943,
+        "reference": 0.022665444266823927,
+        "reference-mimalloc": 0.02539768992791801,
+        "reference-nolto": 0.01968260281302396,
+        "reference-nolto-mimalloc": 0.029179924513964645,
+        "seplto": 0.03581730791565706,
+        "seplto-nomimalloc": 0.03041850981935041
+      },
+      "ratio_vs_baseline": {
+        "default": 1.0546018030944846,
+        "nolto": 0.9955613922793068,
+        "nolto-nomimalloc": 1.0023073937046818,
+        "nomimalloc": 1.065695822193165,
+        "reference": 1,
+        "reference-mimalloc": 0.9634787143214383,
+        "reference-nolto": 0.853205795230088,
+        "reference-nolto-mimalloc": 0.8534982901954546,
+        "seplto": 1.0618216598016441,
+        "seplto-nomimalloc": 1.047738914491673
+      }
+    }
+  ],
+  "suite": {
+    "name": "pyperformance",
+    "pyperf": "2.10.0",
+    "pyperformance": "1.14.0"
+  }
+}
