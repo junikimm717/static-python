@@ -2,6 +2,53 @@
   "index_version": 1,
   "runs": [
     {
+      "id": "20260907T191130Z-amd64",
+      "stamp": "20260907T191130Z",
+      "arch": "amd64",
+      "protocol": 2,
+      "baseline": "reference",
+      "arms": [
+        "default",
+        "nomimalloc",
+        "nolto",
+        "nolto-nomimalloc",
+        "seplto",
+        "seplto-nomimalloc",
+        "reference",
+        "reference-nolto",
+        "reference-mimalloc",
+        "reference-nolto-mimalloc"
+      ],
+      "geomean_vs_baseline": {
+        "default": 1.1146188012670468,
+        "nolto": 1.0234697475954715,
+        "nolto-nomimalloc": 0.96405711456858,
+        "nomimalloc": 1.023957223731891,
+        "reference-mimalloc": 0.9870491065368013,
+        "reference-nolto": 0.8916155221133711,
+        "reference-nolto-mimalloc": 0.8728368766609663,
+        "seplto": 1.1049108006288753,
+        "seplto-nomimalloc": 1.0304243661297252
+      },
+      "skipped": 8,
+      "suite": {
+        "name": "pyperformance",
+        "pyperf": "2.10.0",
+        "pyperformance": "1.14.0"
+      },
+      "machine": {
+        "kernel": "Linux 6.12.94+deb13-amd64",
+        "cpu_model": "AMD Ryzen 5 3600 6-Core Processor",
+        "memory_bytes": 67355471872
+      },
+      "stale_protocol": false,
+      "fixture": false,
+      "git_revision": "dd9254a03cc19f599973fb8b61333ac2712b3ed2",
+      "python_version": "3.14.7",
+      "kit_version": "1",
+      "triple": "x86_64-linux-musl"
+    },
+    {
       "id": "20260907T091518Z-amd64",
       "stamp": "20260907T091518Z",
       "arch": "amd64",
