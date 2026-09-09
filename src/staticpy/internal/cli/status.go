@@ -13,7 +13,7 @@ import (
 var cmdStatus = &command{
 	Name:     "status",
 	Short:    "what exists, what is stale, what is building right now",
-	Synopsis: "staticpy status [--target TRIPLE]... [--todo] [--verify LEVEL] [--pack]",
+	Synopsis: "staticpy status [--target TRIPLE]... [--todo] [--verify LEVEL] [--pack] [--bundle NAME]",
 	Long: `Answers the question "what would a build actually do?". It resolves exactly the
 plan ` + "`staticpy build`" + ` would resolve for the same flags, then reports each job's
 state against dist/.
@@ -27,7 +27,8 @@ state against dist/.
 Because the state is a key comparison and not a timestamp, "stale" here means
 the recipe really did change: a flag, a pinned version, a patch, or a dependency
 that itself changed. Pass the same --verify/--pack you would pass to build, or
-the plan you are looking at is not the plan you would run.
+the plan you are looking at is not the plan you would run. The same is true of
+--bundle: without it the plan is the unbundled interpreter.
 
 Safe at any time, including mid-build and before anything has ever been built.
 
@@ -35,7 +36,8 @@ FLAGS
   --todo    list only the jobs that are not up to date
   --verify  include verification jobs at this level, as build would
   --pack    include the packaging jobs, as build would
-  --kit     show the plan for this named kit, as ` + "`staticpy kit`" + ` would`,
+  --kit     show the plan for this named kit, as staticpy kit would
+  --bundle  the same bundle a build would compile in`,
 	Run: runStatus,
 }
 
@@ -45,6 +47,7 @@ func runStatus(g *Global, args []string) error {
 	verify := fs.String("verify", "", "include verification jobs at this level: smoke|core|full")
 	pack := fs.Bool("pack", false, "include the packaging jobs")
 	kitName := fs.String("kit", "", "show the plan for this kit instead of a single profile")
+	bundle := fs.String("bundle", "", "python package bundle, as build would")
 	if err := parse(fs, args); err != nil {
 		return finish("status", err)
 	}
@@ -54,7 +57,7 @@ func runStatus(g *Global, args []string) error {
 		}
 	}
 
-	s, err := g.session(recipe.PlanOptions{Verify: *verify, Pack: *pack, Kit: *kitName}, false)
+	s, err := g.session(recipe.PlanOptions{Verify: *verify, Pack: *pack, Kit: *kitName, Bundle: *bundle}, false)
 	if err != nil {
 		return err
 	}

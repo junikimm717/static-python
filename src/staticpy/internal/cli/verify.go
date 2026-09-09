@@ -17,7 +17,7 @@ import (
 var cmdVerify = &command{
 	Name:     "verify",
 	Short:    "prove an already-built interpreter is what it claims to be",
-	Synopsis: "staticpy verify [--level smoke|core|full] [--target TRIPLE]... [--build]",
+	Synopsis: "staticpy verify [--level smoke|core|full] [--target TRIPLE]... [--bundle NAME] [--build]",
 	Long: `Runs the verification suite against interpreters that are already built:
 statically linked, ELF header matching the target, every promised module
 importable, and CPython's own tests in agreement with tests.toml.
@@ -50,6 +50,7 @@ func runVerify(g *Global, args []string) error {
 	fs := g.flagSet("verify")
 	level := fs.String("level", string(ensure.LevelSmoke), "how much to run: smoke|core|full")
 	build := fs.Bool("build", false, "build whatever is missing instead of refusing")
+	bundle := fs.String("bundle", "", "verify the interpreter built with this bundle")
 	if err := parse(fs, args); err != nil {
 		return finish("verify", err)
 	}
@@ -58,7 +59,7 @@ func runVerify(g *Global, args []string) error {
 		return usagef("%v", err)
 	}
 
-	s, err := g.session(recipe.PlanOptions{Verify: string(lv)}, true)
+	s, err := g.session(recipe.PlanOptions{Verify: string(lv), Bundle: *bundle}, true)
 	if err != nil {
 		return err
 	}

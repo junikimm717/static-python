@@ -3,6 +3,8 @@ package gen
 import (
 	"bytes"
 	"fmt"
+	"path"
+	"sort"
 	"strings"
 
 	"github.com/junikimm717/static-python/src/staticpy/internal/assets"
@@ -80,6 +82,109 @@ func orFull(m string) string {
 	return m
 }
 
+// BundleFile is written under Modules/ after the sdist is staged.
+type BundleFile struct {
+	Path    string
+	Content []byte
+}
+
+// RewriteModule prefixes sources with Modules/_bundle/<pkg>/ and adds -I for
+// each source directory. -Dname=value cannot go on the Setup.local line:
+// makesetup treats any `=` as a Makefile assignment and then `make` dies
+// with "missing separator". Those macros become a generated wrapper that
+// #defines them and #includes the real .c.
+func RewriteModule(pkg string, m config.PyModule) (config.PyModule, []BundleFile, error) {
+	if err := config.RelPath(pkg); err != nil {
+		return m, nil, fmt.Errorf("gen: package %q: %w", pkg, err)
+	}
+	var defines []string
+	if d := initRenameMacro(m); d != "" {
+		defines = append(defines, d)
+	}
+	var keep []string
+	for _, f := range m.CFlags {
+		if name, val, ok := cutDashD(f); ok {
+			if val == "" {
+				defines = append(defines, name)
+			} else {
+				defines = append(defines, name+" "+val)
+			}
+			continue
+		}
+		if strings.Contains(f, "=") {
+			return m, nil, fmt.Errorf("gen: module %q: flag %q contains =; makesetup would copy the line into the Makefile as an assignment", m.Name, f)
+		}
+		keep = append(keep, f)
+	}
+
+	out := m
+	out.Sources = make([]string, len(m.Sources))
+	dirs := map[string]struct{}{}
+	var files []BundleFile
+	for i, src := range m.Sources {
+		if err := config.RelPath(src); err != nil {
+			return m, nil, fmt.Errorf("gen: module %q source: %w", m.Name, err)
+		}
+		orig := path.Join("_bundle", pkg, src)
+		dirs[path.Dir(orig)] = struct{}{}
+		if len(defines) == 0 {
+			out.Sources[i] = orig
+			continue
+		}
+		wrap := path.Join("_bundle", pkg, "_w_"+strings.ReplaceAll(src, "/", "_"))
+		out.Sources[i] = wrap
+		files = append(files, BundleFile{Path: wrap, Content: wrapperSource(src, defines)})
+	}
+	var names []string
+	for d := range dirs {
+		names = append(names, d)
+	}
+	sort.Strings(names)
+	var cflags []string
+	for _, d := range names {
+		cflags = append(cflags, "-I$(srcdir)/Modules/"+d)
+	}
+	out.CFlags = append(cflags, keep...)
+	return out, files, nil
+}
+
+func initRenameMacro(m config.PyModule) string {
+	builtin := BuiltinName(m.Name)
+	leaf := m.Name
+	if i := strings.LastIndex(m.Name, "."); i >= 0 {
+		leaf = m.Name[i+1:]
+	}
+	if m.Init != "" {
+		leaf = m.Init
+	}
+	from, to := "PyInit_"+leaf, "PyInit_"+builtin
+	if from == to {
+		return ""
+	}
+	return from + " " + to
+}
+
+func cutDashD(f string) (name, val string, ok bool) {
+	rest, ok := strings.CutPrefix(f, "-D")
+	if !ok || rest == "" {
+		return "", "", false
+	}
+	name, val, _ = strings.Cut(rest, "=")
+	return name, val, true
+}
+
+func wrapperSource(include string, defines []string) []byte {
+	var b strings.Builder
+	b.WriteString("/* generated: makesetup cannot express -Dname=value */\n")
+	for _, d := range defines {
+		b.WriteString("#define ")
+		b.WriteString(d)
+		b.WriteString("\n")
+	}
+	fmt.Fprintf(&b, "#include %q\n", include)
+	return []byte(b.String())
+}
+
 // A dotted module is registered under its flattened builtin name; see
 // BuiltinName.
 func moduleLine(m config.PyModule) (string, error) {
@@ -94,7 +199,7 @@ func moduleLine(m config.PyModule) (string, error) {
 	parts = append(parts, m.CFlags...)
 	parts = append(parts, m.Libs...)
 	for _, p := range parts {
-		if strings.ContainsAny(p, " \t\n") {
+		if strings.ContainsAny(p, " \t\n=") {
 			return "", fmt.Errorf("gen: module %q: makesetup cannot express the argument %q", m.Name, p)
 		}
 	}

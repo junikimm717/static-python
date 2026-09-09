@@ -76,24 +76,33 @@ func Plan(cfg *config.Config, assets fs.FS, o PlanOptions) ([]core.Job, error) {
 		targets = []string{o.Host}
 	}
 
+	bundle := o.Bundle
+	if bundle == "" {
+		res, err := resolveScope(cfg, o.Profile, config.ScopePython)
+		if err != nil {
+			return nil, err
+		}
+		bundle = res.Bundle
+	}
+
 	var jobs []core.Job
 	for _, name := range targets {
 		t, ok := cfg.Targets[name]
 		if !ok {
 			return nil, fmt.Errorf("recipe: target %q is not in targets.toml", name)
 		}
-		interp, err := Interpreter(cfg, assets, host, t, o.Profile, o.Bundle)
+		interp, err := Interpreter(cfg, assets, host, t, o.Profile, bundle)
 		if err != nil {
 			return nil, err
 		}
 		final := interp
 		if o.Verify != "" {
-			if final, err = Verify(cfg, assets, t, o.Profile, o.Verify, interp); err != nil {
+			if final, err = Verify(cfg, assets, t, o.Profile, o.Verify, interp, bundle); err != nil {
 				return nil, err
 			}
 		}
 		if o.Pack {
-			if final, err = Pack(cfg, t, o.Profile, interp, final); err != nil {
+			if final, err = Pack(cfg, t, o.Profile, interp, final, bundle); err != nil {
 				return nil, err
 			}
 		}

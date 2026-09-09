@@ -34,12 +34,12 @@ var tarEpoch = time.Unix(0, 0).UTC()
 // Pack turns the interpreter prefix into the distributable tarball. after is
 // the last job that must succeed first — the verification, when there is one —
 // so an unverified interpreter is never packed.
-func Pack(cfg *config.Config, target config.Target, profile string, interp, after core.Job) (core.Job, error) {
+func Pack(cfg *config.Config, target config.Target, profile string, interp, after core.Job, bundle string) (core.Job, error) {
 	src, err := pythonSource(cfg)
 	if err != nil {
 		return nil, err
 	}
-	j := &pack{interp: interp, after: after, target: target, profile: profile, version: src.Version}
+	j := &pack{interp: interp, after: after, target: target, profile: profile, version: src.Version, bundle: bundle}
 	if after != nil && after.Slug() == interp.Slug() {
 		j.after = nil
 	}
@@ -52,11 +52,14 @@ type pack struct {
 	target  config.Target
 	profile string
 	version string
+	bundle  string
 }
 
 func (j *pack) Name() string { return "pack" }
 
-func (j *pack) Slug() string { return fmt.Sprintf("pack:%s:%s", j.profile, j.target.Triple) }
+func (j *pack) Slug() string {
+	return withBundle(fmt.Sprintf("pack:%s:%s", j.profile, j.target.Triple), j.bundle)
+}
 
 func (j *pack) Deps() []core.Job {
 	if j.after == nil {
@@ -66,7 +69,7 @@ func (j *pack) Deps() []core.Job {
 }
 
 func (j *pack) KeyInputs() map[string]string {
-	return map[string]string{
+	in := map[string]string{
 		"recipe_version": strconv.Itoa(Version),
 		"pack_version":   packVersion,
 		"python_version": j.version,
@@ -75,6 +78,10 @@ func (j *pack) KeyInputs() map[string]string {
 		"archive":        j.archiveName(),
 		"topdir":         j.topDir(),
 	}
+	if j.bundle != "" {
+		in["bundle"] = j.bundle
+	}
+	return in
 }
 
 func (j *pack) ArtifactDir(e *core.Env) string {
@@ -86,11 +93,19 @@ func (j *pack) ArtifactDir(e *core.Env) string {
 }
 
 func (j *pack) topDir() string {
-	return fmt.Sprintf("python-%s-%s", j.version, j.target.Triple)
+	name := fmt.Sprintf("python-%s-%s", j.version, j.target.Triple)
+	if j.bundle != "" {
+		name += "-" + j.bundle
+	}
+	return name
 }
 
 func (j *pack) archiveName() string {
-	return fmt.Sprintf("python-%s-%s-%s.tar.gz", j.version, j.target.Triple, j.profile)
+	name := fmt.Sprintf("python-%s-%s-%s", j.version, j.target.Triple, j.profile)
+	if j.bundle != "" {
+		name += "-" + j.bundle
+	}
+	return name + ".tar.gz"
 }
 
 func (j *pack) Build(ctx context.Context, e *core.Env, r *core.Runner, work, stage string) error {
