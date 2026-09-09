@@ -45,7 +45,7 @@ dist/                    everything generated; gitignored, safe to delete
 | change a package's configure flags | `config/packages.toml`. Only *decisions* live there: `--prefix`, `--exec-prefix`, `--host` are injected by the recipe because they are absolute or triple-derived |
 | change a compiler/linker flag | `config/profiles.toml`. Profile-wide, then scoped: `deps`, `deps.<pkg>`, `python`, `pyhost`. A scoped change rebuilds only what that scope reaches |
 | add a native library | a `[source.X]` in `config/sources.toml` + a `[package.X]` in `config/packages.toml` (`build` = autotools\|openssl\|make\|sources, `needs`, `provides`). `Deps` picks up every package automatically; `sysroot` composes them |
-| add a Python package / bundle | `config/bundles.toml`: a `[pkg.X]` with sdist + sha256 + `[[pkg.X.modules]]`, then a `[bundle.Y]` naming it. Nothing is defined yet. A static interpreter cannot dlopen, so a C module arrives at link time or not at all |
+| add a Python package / bundle | `config/bundles.toml`: a `[pkg.X]` with sdist + sha256 + `pure_paths` and/or `[[pkg.X.modules]]`, then a `[bundle.Y]` naming it. `--bundle NAME` compiles C modules in as Setup.local builtins and copies pure files into site-packages. A static interpreter cannot dlopen, so a C module arrives at link time or not at all |
 | add an architecture | a row in `config/targets.toml` **plus** `internal/assets/files/pyconfig/<triple>-patches.h` — see the `staticpy-add-target` skill |
 | where do artifacts land | `dist/artifacts/<slug>/` (published job outputs, incl. each interpreter prefix); `dist/out/<profile>/<triple>/` (tarballs); `dist/src/` (verified tarballs); `dist/srctrees/` |
 | logs for a failed job | `dist/logs/jobs/<slug>/latest/` — `NNN-<step>.log` per command plus `commands.sh`; read them with `staticpy logs <slug> --failed` |
@@ -264,18 +264,19 @@ Honest inventory, because the code reads more finished than it is:
   probe.** `probe` measures what is measurable; the fragments carry what is a
   decision (inline asm availability, atomics quirks). Adding a target without
   one is a hard error by design.
-- **Bundles are declared but empty.** `config/bundles.toml` defines no `[pkg.*]`,
-  so `--bundle` has nothing to select yet. It was believed that pyperformance
-  benchmarking waited on it "because there is no pip in a
-  `--with-ensurepip=no` interpreter". That is false, and the belief cost this
-  command its whole reason for existing: `--with-ensurepip=no` only skips
-  installing pip into the interpreter's prefix, leaving `ensurepip` and its
-  bundled wheel in the stdlib, so `-m venv` seeds a working pip even on the
-  fully static no-dlopen build. `./staticpy bench` now defaults to
-  pyperformance, installs it into each arm's venv, and installs each
-  benchmark's requirements; `--suite micro` selects the old stdlib-only suite,
-  which is the offline path. What a static interpreter genuinely cannot do is
-  load a C extension, which is a per-benchmark limit, not a suite-wide one.
+- **Bundles compile third-party packages into the interpreter.**
+  `config/bundles.toml` pins sdists (`six`, `idna`, `charset_normalizer`,
+  `markupsafe`, `ciso8601`) and groups them as `pure`, `speedups`, and `demo`.
+  `--bundle NAME` fetches each sdist as an `srctree`, stages C sources under
+  `Modules/_bundle/<pkg>/`, adds them to Setup.local as builtins (dotted names
+  get a `PyInit_*` rename and a site-packages shim), and copies `pure_paths`
+  into `lib/pythonX.Y/site-packages`. The bundle is part of the interpreter /
+  verify / pack slug, so an unbundled artifact is never overwritten. A static
+  interpreter still cannot dlopen an unlisted C extension.
+  `--with-ensurepip=no` only skips installing pip into the prefix; `ensurepip`
+  and its bundled wheel stay in the stdlib, so `-m venv` seeds a working pip.
+  `./staticpy bench` defaults to pyperformance and installs it into each arm's
+  venv; `--suite micro` is the offline stdlib-only path.
 
 ## Bench ETA weights
 

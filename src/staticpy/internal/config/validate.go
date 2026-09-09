@@ -273,9 +273,46 @@ func (c *Config) validatePyPackages() error {
 		if p.Name != key {
 			return fmt.Errorf("%s: name is %q; the table key and name must match", where, p.Name)
 		}
+		if _, ok := c.Sources[p.Name]; ok {
+			return fmt.Errorf("%s: name collides with a [source.*] entry", where)
+		}
+		if p.Version == "" || p.File == "" {
+			return fmt.Errorf("%s: version and file are required", where)
+		}
+		if p.TopDir == "" {
+			return fmt.Errorf("%s: topdir is required", where)
+		}
+		if len(p.URLs) == 0 {
+			return fmt.Errorf("%s: no urls", where)
+		}
+		if !isSHA256(p.SdistSHA256) {
+			return fmt.Errorf("%s: sdist_sha256 %q is not 64 lowercase hex digits", where, p.SdistSHA256)
+		}
+		if len(p.Modules) == 0 && len(p.PurePaths) == 0 {
+			return fmt.Errorf("%s: needs modules or pure_paths; an empty package installs nothing", where)
+		}
 		for _, n := range p.Needs {
 			if _, ok := c.Packages[n]; !ok {
 				return fmt.Errorf("%s: needs %q, which is not a package (have %s)", where, n, keysOf(c.Packages))
+			}
+		}
+		for i, m := range p.Modules {
+			mw := fmt.Sprintf("%s: module %d", where, i)
+			if m.Name == "" {
+				return fmt.Errorf("%s: name is required", mw)
+			}
+			if len(m.Sources) == 0 {
+				return fmt.Errorf("%s: %q has no sources", mw, m.Name)
+			}
+			for _, src := range m.Sources {
+				if err := RelPath(src); err != nil {
+					return fmt.Errorf("%s: source %v", mw, err)
+				}
+			}
+		}
+		for _, rel := range p.PurePaths {
+			if err := RelPath(rel); err != nil {
+				return fmt.Errorf("%s: pure_paths %v", where, err)
 			}
 		}
 	}
@@ -284,10 +321,18 @@ func (c *Config) validatePyPackages() error {
 
 func (c *Config) validateBundles() error {
 	for key, b := range c.Bundles {
+		if len(b.Packages) == 0 {
+			return fmt.Errorf("bundle %q: packages is empty", key)
+		}
+		seen := map[string]bool{}
 		for _, p := range b.Packages {
 			if _, ok := c.PyPackages[p]; !ok {
 				return fmt.Errorf("bundle %q: %q is not a [pkg.*] entry (have %s)", key, p, keysOf(c.PyPackages))
 			}
+			if seen[p] {
+				return fmt.Errorf("bundle %q: package %q is listed twice", key, p)
+			}
+			seen[p] = true
 		}
 	}
 	if err := c.validateExpect(); err != nil {

@@ -50,6 +50,9 @@ type Options struct {
 	// WantDynamic is the host-built reference: shared libpython, a PT_INTERP,
 	// no staticapi symbol table in the executable.
 	WantDynamic bool
+	// Bundle, when set, is part of the slug so two verifies of the same
+	// profile/target/level cannot share an artifact directory.
+	Bundle string
 }
 
 // A verification job depends on the job that produced the interpreter and
@@ -78,12 +81,16 @@ func NewJob(interp core.Job, target config.Target, profile string, level Level, 
 // checkerVersion invalidates stored reports when the checks themselves change.
 // Without it a green report written by a laxer checker outlives the fix that
 // tightened it, which is how a verification system lies.
-const checkerVersion = "3"
+const checkerVersion = "4"
 
 func (j *Job) Name() string { return "verify" }
 
 func (j *Job) Slug() string {
-	return fmt.Sprintf("verify:%s:%s:%s", j.profile, j.target.Triple, j.level)
+	s := fmt.Sprintf("verify:%s:%s:%s", j.profile, j.target.Triple, j.level)
+	if j.opts.Bundle != "" {
+		s += ":" + j.opts.Bundle
+	}
+	return s
 }
 
 func (j *Job) Deps() []core.Job { return []core.Job{j.interp} }
@@ -101,6 +108,12 @@ func (j *Job) KeyInputs() map[string]string {
 		// editing CoreTests has to invalidate it. checkerVersion covers the
 		// checking code; this covers what was checked.
 		"tests": testSetHash(j.level),
+	}
+	if j.opts.Bundle != "" {
+		in["bundle"] = j.opts.Bundle
+	}
+	if len(j.opts.Modules) > 0 {
+		in["modules"] = strings.Join(j.opts.Modules, ",")
 	}
 	// A skipped verification must never key the same as a real one, or the next
 	// build would reuse it and call the interpreter proven.

@@ -230,12 +230,17 @@ type Bundle struct {
 type PyPackage struct {
 	Name        string     `toml:"name"`
 	Version     string     `toml:"version"`
+	File        string     `toml:"file"`
+	TopDir      string     `toml:"topdir"`
 	SdistSHA256 string     `toml:"sdist_sha256"`
 	URLs        []string   `toml:"urls"`
 	Needs       []string   `toml:"needs"`
 	Modules     []PyModule `toml:"modules"`
-	// PurePaths are directories copied into site-packages verbatim.
+	// A directory `src/idna` lands as site-packages/idna; a file `six.py`
+	// lands as six.py.
 	PurePaths []string `toml:"pure_paths"`
+	// Empty means the package name plus every module name.
+	Imports []string `toml:"imports"`
 }
 
 type PyModule struct {
@@ -245,6 +250,9 @@ type PyModule struct {
 	Sources []string `toml:"sources"`
 	CFlags  []string `toml:"cflags"`
 	Libs    []string `toml:"libs"`
+	// Init is the PyInit_* suffix the C file actually exports, when that is
+	// not the last dotted component of Name. Empty means derive it.
+	Init string `toml:"init"`
 }
 
 // TestExpect declares what CPython's suite is expected to do on a given target

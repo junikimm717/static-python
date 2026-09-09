@@ -219,6 +219,7 @@ type pyBuild struct {
 	profile string
 	version string
 	bundle  string
+	bundled *bundlePlan
 	res     config.Resolved
 	setup   []byte
 
@@ -239,11 +240,11 @@ func newPyBuild(cfg *config.Config, srcAssets fs.FS, host, target config.Target,
 	if bundle == "" {
 		bundle = res.Bundle
 	}
-	extra, err := bundleModules(cfg, bundle)
+	bundled, err := planBundle(cfg, bundle)
 	if err != nil {
 		return nil, err
 	}
-	setup, err := gen.SetupLocal(res, extra)
+	setup, err := gen.SetupLocal(res, bundled.Modules)
 	if err != nil {
 		return nil, fmt.Errorf("recipe: Setup.local for %s: %w", target.Triple, err)
 	}
@@ -281,6 +282,7 @@ func newPyBuild(cfg *config.Config, srcAssets fs.FS, host, target config.Target,
 		profile:      profile,
 		version:      src.Version,
 		bundle:       bundle,
+		bundled:      bundled,
 		res:          res,
 		setup:        setup,
 	}
@@ -297,15 +299,18 @@ func (j *pyBuild) Name() string {
 
 func (j *pyBuild) Slug() string {
 	if j.cross {
-		return fmt.Sprintf("pycross:%s:%s:%s", j.profile, j.host.Triple, j.target.Triple)
+		return withBundle(fmt.Sprintf("pycross:%s:%s:%s", j.profile, j.host.Triple, j.target.Triple), j.bundle)
 	}
-	return fmt.Sprintf("pynative:%s:%s", j.profile, j.target.Triple)
+	return withBundle(fmt.Sprintf("pynative:%s:%s", j.profile, j.target.Triple), j.bundle)
 }
 
 func (j *pyBuild) Deps() []core.Job {
 	deps := []core.Job{j.srctree, j.sysroot, j.staticapi, j.probe}
 	if j.buildPython != nil {
 		deps = append(deps, j.buildPython)
+	}
+	if j.bundled != nil {
+		deps = append(deps, j.bundled.Trees...)
 	}
 	return deps
 }
@@ -335,6 +340,11 @@ func (j *pyBuild) KeyInputs() map[string]string {
 	}
 	if j.tgtPatchHash != "none" {
 		in["target_patches"] = j.tgtPatchHash
+	}
+	if j.bundled != nil {
+		if spec := j.bundled.specHash(); spec != "" {
+			in["bundle_spec"] = spec
+		}
 	}
 	for k, v := range j.res.KeyInputs() {
 		in["profile_"+k] = v
@@ -399,6 +409,9 @@ func (j *pyBuild) Build(ctx context.Context, e *core.Env, r *core.Runner, work, 
 		return err
 	}
 	if err := os.WriteFile(filepath.Join(src, "Modules", "Setup.local"), j.setup, 0o644); err != nil {
+		return err
+	}
+	if err := stageBundle(src, e, j.bundled); err != nil {
 		return err
 	}
 
@@ -479,7 +492,10 @@ func (j *pyBuild) Build(ctx context.Context, e *core.Env, r *core.Runner, work, 
 	if err := r.Run(ctx, te.cmd(j.Name()+"-make", src, makeArgs, extra)); err != nil {
 		return err
 	}
-	return installPrefix(ctx, r, te, src, work, stage, prefix, extra)
+	if err := installPrefix(ctx, r, te, src, work, stage, prefix, extra); err != nil {
+		return err
+	}
+	return j.installBundled(e, stage)
 }
 
 // --prefix is the final artifact path rather than the stage, because it is
@@ -614,25 +630,15 @@ func pyhostInterpreter(dir string) (string, error) {
 	return "", fmt.Errorf("recipe: pyhost artifact %s holds no interpreter", dir)
 }
 
-// A static interpreter cannot dlopen anything, so a bundled C module either
-// arrives as a builtin or not at all.
-func bundleModules(cfg *config.Config, bundle string) ([]config.PyModule, error) {
-	if bundle == "" {
-		return nil, nil
+func (j *pyBuild) installBundled(e *core.Env, stage string) error {
+	if j.bundled == nil || j.bundled.Name == "" {
+		return nil
 	}
-	b, ok := cfg.Bundles[bundle]
-	if !ok {
-		return nil, fmt.Errorf("recipe: unknown bundle %q", bundle)
+	abi, err := pythonABIFromVersion(j.version)
+	if err != nil {
+		return err
 	}
-	var out []config.PyModule
-	for _, name := range b.Packages {
-		pkg, ok := cfg.PyPackages[name]
-		if !ok {
-			return nil, fmt.Errorf("recipe: bundle %q names package %q, which no [pkg.*] table declares", bundle, name)
-		}
-		out = append(out, pkg.Modules...)
-	}
-	return out, nil
+	return installBundle(stage, abi, e, j.bundled)
 }
 
 // Inline-asm availability and the atomics quirks are decisions rather than

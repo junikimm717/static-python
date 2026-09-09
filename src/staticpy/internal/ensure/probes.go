@@ -35,6 +35,7 @@ const probeScriptName = "staticpy_probe.py"
 // covers the whole smoke tier — under qemu, process startup dominates
 // everything else here.
 const probeScript = `
+import importlib
 import sys
 
 _BITS = int(sys.argv[1])
@@ -59,7 +60,8 @@ def guard(name, fn):
 
 for _name in _MODULES:
     def _do(_name=_name):
-        mod = __import__(_name)
+        # __import__("a.b") returns a; import_module loads the leaf.
+        mod = importlib.import_module(_name)
         return True, getattr(mod, "__file__", None) or "builtin"
     guard("import:" + _name, _do)
 

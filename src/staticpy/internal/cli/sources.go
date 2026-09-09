@@ -17,7 +17,8 @@ var cmdSources = &command{
 	Name:     "sources",
 	Short:    "list, download and re-check the pinned upstream tarballs",
 	Synopsis: "staticpy sources [list|fetch|verify] [NAME]...",
-	Long: `Every input to the build is pinned by sha256 in sources.toml, which is embedded
+	Long: `Every input to the build is pinned by sha256: native-library tarballs in
+sources.toml, and Python package sdists in bundles.toml. Both are embedded
 in this binary. A tarball is used only once its hash matches the pin; one that
 does not match is deleted rather than left for the next run to reuse.
 
@@ -74,13 +75,25 @@ func runSources(g *Global, args []string) error {
 	return listSources(g, e, cfg, names)
 }
 
+func pinnedSources(cfg *config.Config) map[string]config.Source {
+	out := make(map[string]config.Source, len(cfg.Sources)+len(cfg.PyPackages))
+	for k, v := range cfg.Sources {
+		out[k] = v
+	}
+	for _, p := range cfg.PyPackages {
+		out[p.Name] = p.AsSource()
+	}
+	return out
+}
+
 func selectSources(cfg *config.Config, want []string) ([]string, error) {
+	all := pinnedSources(cfg)
 	if len(want) == 0 {
-		return sortedKeys(cfg.Sources), nil
+		return sortedKeys(all), nil
 	}
 	for _, n := range want {
-		if _, ok := cfg.Sources[n]; !ok {
-			return nil, fmt.Errorf("unknown source %q.\nPinned sources: %s", n, strings.Join(sortedKeys(cfg.Sources), ", "))
+		if _, ok := all[n]; !ok {
+			return nil, fmt.Errorf("unknown source %q.\nPinned sources: %s", n, strings.Join(sortedKeys(all), ", "))
 		}
 	}
 	return want, nil
@@ -97,8 +110,9 @@ func listSources(g *Global, e *core.Env, cfg *config.Config, names []string) err
 		URLs    []string `json:"urls"`
 	}
 	var rows []row
+	all := pinnedSources(cfg)
 	for _, n := range names {
-		s := cfg.Sources[n]
+		s := all[n]
 		rows = append(rows, row{s.Name, s.Version, s.File, s.SHA256, sources.Path(e, s), sources.Fetched(e, s), s.URLs})
 	}
 	if g.JSON {
@@ -125,9 +139,10 @@ func listSources(g *Global, e *core.Env, cfg *config.Config, names []string) err
 func fetchSources(g *Global, e *core.Env, cfg *config.Config, names []string) error {
 	ctx, stop := signalContext()
 	defer stop()
+	all := pinnedSources(cfg)
 	fetched := 0
 	for _, n := range names {
-		s := cfg.Sources[n]
+		s := all[n]
 		if sources.Fetched(e, s) {
 			continue
 		}
@@ -155,10 +170,11 @@ func verifySources(g *Global, e *core.Env, cfg *config.Config, names []string) e
 		Status string `json:"status"`
 		Actual string `json:"actual,omitempty"`
 	}
+	all := pinnedSources(cfg)
 	var rows []row
 	bad := 0
 	for _, n := range names {
-		s := cfg.Sources[n]
+		s := all[n]
 		path := sources.Path(e, s)
 		r := row{Name: s.Name, Path: path}
 		sum, err := hashFile(path)

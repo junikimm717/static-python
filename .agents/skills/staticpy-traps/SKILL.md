@@ -477,6 +477,18 @@ produce loadable `.so` files.
 generated `site-packages` shim doing `sys.modules[...] = _mangled` is the
 reliable fix.
 
+**`Makefile: missing separator` after adding a bundled C module.** makesetup
+treats any Setup.local token containing `=` as a Makefile assignment and
+copies the whole line into the "Definitions added by makesetup" block.
+`-DPyInit_md=PyInit__pkg_md` and `-DCISO8601_VERSION=2.3.3` both trip it.
+Put those macros in a generated wrapper that `#include`s the real `.c`;
+leave only space-free, equals-free flags on the Setup line.
+
+**Smoke `probe:import:a.b` reported the parent package.** `__import__("a.b")`
+returns `a`, so `markupsafe._speedups` passed as long as `markupsafe` imported.
+`importlib.import_module` loads the leaf; bump `checkerVersion` when changing
+the probe script.
+
 **`ctypes.pythonapi` is a bespoke mechanism.** It resolves through a compiled-in
 name→address table, not `dlsym`. Consequences: a symbol missing from
 `Misc/stable_abi.toml` is missing from the table; data symbols need a different

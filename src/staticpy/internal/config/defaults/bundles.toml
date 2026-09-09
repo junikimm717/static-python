@@ -1,18 +1,66 @@
-# Sets of Python packages compiled into the interpreter as builtins. A static
-# interpreter cannot dlopen an extension, so a C module either arrives this way
-# or not at all.
+# Sets of Python packages compiled into the interpreter. A static interpreter
+# cannot dlopen an extension, so a C module either arrives as a Setup.local
+# builtin or not at all. Pure-Python files are copied into site-packages.
 #
-# Bundles are a later phase; nothing is defined yet. A bundle names keys from
-# [pkg.*], which no config file declares so far.
-#
-# [pkg.charset_normalizer]
-# name = "charset_normalizer"
-# version = "3.4.0"
-# sdist_sha256 = "..."
-# urls = ["https://files.pythonhosted.org/.../charset_normalizer-3.4.0.tar.gz"]
-# [[pkg.charset_normalizer.modules]]
-# name = "charset_normalizer.md"
-# sources = ["src/charset_normalizer/md.c"]
-#
-# [bundle.requests]
-# packages = ["charset_normalizer", "idna", "urllib3", "certifi", "requests"]
+# `--bundle NAME` selects one of the [bundle.*] tables. Changing a pin here
+# invalidates only interpreters that named that bundle.
+
+[pkg.six]
+name = "six"
+version = "1.17.0"
+file = "six-1.17.0.tar.gz"
+topdir = "six-1.17.0"
+sdist_sha256 = "ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81"
+urls = ["https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz"]
+pure_paths = ["six.py"]
+
+[pkg.idna]
+name = "idna"
+version = "3.15"
+file = "idna-3.15.tar.gz"
+topdir = "idna-3.15"
+sdist_sha256 = "ca962446ea538f7092a95e057da437618e886f4d349216d2b1e294abfdb65fdc"
+urls = ["https://files.pythonhosted.org/packages/82/77/7b3966d0b9d1d31a36ddf1746926a11dface89a83409bf1483f0237aa758/idna-3.15.tar.gz"]
+pure_paths = ["idna"]
+
+[pkg.charset_normalizer]
+name = "charset_normalizer"
+version = "3.4.3"
+file = "charset_normalizer-3.4.3.tar.gz"
+topdir = "charset_normalizer-3.4.3"
+sdist_sha256 = "6fce4b8500244f6fcb71465d4a4930d132ba9ab8e71a7859e6a5d59851068d14"
+urls = ["https://files.pythonhosted.org/packages/83/2d/5fd176ceb9b2fc619e63405525573493ca23441330fcdaee6bef9460e924/charset_normalizer-3.4.3.tar.gz"]
+pure_paths = ["src/charset_normalizer"]
+
+[pkg.markupsafe]
+name = "markupsafe"
+version = "3.0.3"
+file = "markupsafe-3.0.3.tar.gz"
+topdir = "markupsafe-3.0.3"
+sdist_sha256 = "722695808f4b6457b320fdc131280796bdceb04ab50fe1795cd540799ebe1698"
+urls = ["https://files.pythonhosted.org/packages/7e/99/7690b6d4034fffd95959cbe0c02de8deb3098cc577c67bb6a24fe5d7caa7/markupsafe-3.0.3.tar.gz"]
+pure_paths = ["src/markupsafe"]
+[[pkg.markupsafe.modules]]
+name = "markupsafe._speedups"
+sources = ["src/markupsafe/_speedups.c"]
+
+[pkg.ciso8601]
+name = "ciso8601"
+version = "2.3.3"
+file = "ciso8601-2.3.3.tar.gz"
+topdir = "ciso8601-2.3.3"
+sdist_sha256 = "db5d78d9fb0de8686fbad1c1c2d168ed52efb6e8bf8774ae26226e5034a46dae"
+urls = ["https://files.pythonhosted.org/packages/c1/8a/075724aea06c98626109bfd670c27c248c87b9ba33e637f069bf46e8c4c3/ciso8601-2.3.3.tar.gz"]
+[[pkg.ciso8601.modules]]
+name = "ciso8601"
+sources = ["module.c", "timezone.c", "isocalendar.c"]
+cflags = ["-DCISO8601_VERSION=2.3.3", "-DCISO8601_CACHING_ENABLED=1"]
+
+[bundle.pure]
+packages = ["six", "idna", "charset_normalizer"]
+
+[bundle.speedups]
+packages = ["markupsafe", "ciso8601"]
+
+[bundle.demo]
+packages = ["six", "idna", "charset_normalizer", "markupsafe", "ciso8601"]

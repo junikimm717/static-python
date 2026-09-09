@@ -32,9 +32,8 @@ func TestBuildStagesApplyAndRenderFlags(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// No [bundle.*] is defined in the embedded config, so no bundle stage.
-	if len(stages) != 4 {
-		t.Fatalf("got %d stages, want 4 (target, profile, verify, pack)", len(stages))
+	if len(stages) != 5 {
+		t.Fatalf("got %d stages, want 5 (target, profile, verify, pack, bundle)", len(stages))
 	}
 
 	answers := map[string][]string{
@@ -42,6 +41,7 @@ func TestBuildStagesApplyAndRenderFlags(t *testing.T) {
 		"--profile": {"default"},
 		"--verify":  {"core"},
 		"--pack":    {"yes"},
+		"--bundle":  {"none"},
 	}
 	var args []string
 	for _, s := range stages {
@@ -71,6 +71,7 @@ func TestBuildStagesAnswerOfDefaultsRendersNoFlag(t *testing.T) {
 		"--profile": {"default"},
 		"--verify":  {"none"},
 		"--pack":    {"no"},
+		"--bundle":  {"none"},
 	}
 	var args []string
 	for _, s := range stages {
@@ -83,6 +84,32 @@ func TestBuildStagesAnswerOfDefaultsRendersNoFlag(t *testing.T) {
 	}
 	if verify != "" || pack {
 		t.Fatalf("verify=%q pack=%v", verify, pack)
+	}
+}
+
+func TestBuildStagesRendersSelectedBundle(t *testing.T) {
+	g, cfg := wizardGlobal(t)
+	verify, pack, bundle := "", false, ""
+	stages, err := buildStages(g, cfg, wizHost, buildOpts{&verify, &pack, &bundle})
+	if err != nil {
+		t.Fatal(err)
+	}
+	answers := map[string][]string{
+		"--target":  {wizHost},
+		"--profile": {"default"},
+		"--verify":  {"none"},
+		"--pack":    {"no"},
+		"--bundle":  {"demo"},
+	}
+	var args []string
+	for _, s := range stages {
+		args = append(args, s.Apply(answers[s.Menu().Flag])...)
+	}
+	if got, want := strings.Join(args, " "), "--target "+wizHost+" --bundle demo"; got != want {
+		t.Fatalf("rendered %q, want %q", got, want)
+	}
+	if bundle != "demo" {
+		t.Fatalf("bundle=%q", bundle)
 	}
 }
 
@@ -100,7 +127,7 @@ func TestBuildStagesSkipFlagsAlreadyGiven(t *testing.T) {
 			open = append(open, s.Menu().Flag)
 		}
 	}
-	if got, want := strings.Join(open, " "), "--target --verify"; got != want {
+	if got, want := strings.Join(open, " "), "--target --verify --bundle"; got != want {
 		t.Fatalf("open stages %q, want %q", got, want)
 	}
 }
