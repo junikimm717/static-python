@@ -121,7 +121,7 @@ func runLogs(g *Global, args []string) error {
 // jobLogBase accepts a slug in either spelling: core writes ':' as '_' in
 // paths, and both forms get pasted onto the command line.
 func jobLogBase(dist, slug string) string {
-	return filepath.Join(dist, core.DirLogs, "jobs", pathSlug(slug))
+	return filepath.Join(dist, core.DirLogs, "jobs", core.PathSlug(slug))
 }
 
 func latestAttempt(base string) (string, error) {

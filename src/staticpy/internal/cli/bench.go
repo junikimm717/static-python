@@ -211,7 +211,7 @@ func runBench(g *Global, args []string) error {
 		return fmt.Errorf("bench compares interpreters natively and only makes sense for this machine's own triple (%s); got --target %s.\nUnder qemu you would be measuring qemu, not the interpreter",
 			host, strings.Join(targets, " "))
 	}
-	abi, err := pythonABI(cfg)
+	abi, err := recipe.PythonABI(cfg)
 	if err != nil {
 		return err
 	}
@@ -483,18 +483,6 @@ func pinsOf(cfg *config.Config) bench.Pins {
 	return p
 }
 
-func pythonABI(cfg *config.Config) (string, error) {
-	s, err := lookupSource(cfg, "python")
-	if err != nil {
-		return "", err
-	}
-	parts := strings.SplitN(s.Version, ".", 3)
-	if len(parts) < 2 {
-		return "", fmt.Errorf("the pinned python version %q has no major.minor to take an ABI from", s.Version)
-	}
-	return parts[0] + "." + parts[1], nil
-}
-
 func isExecutable(p string) bool {
 	fi, err := os.Stat(p)
 	return err == nil && !fi.IsDir() && fi.Mode()&0o111 != 0
@@ -739,40 +727,6 @@ func runQuiet(path string, args []string) error {
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
 	return cmd.Run()
-}
-
-func applyPin(disabled bool) (bench.Pin, *bench.Topology) {
-	topo, err := bench.ReadTopology()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s cannot read cpu topology (%v); running unpinned\n", yellow("note:"), err)
-		return bench.Pin{}, nil
-	}
-	fmt.Fprintf(os.Stderr, "%s %s\n", bold("machine:"), topo.Describe())
-	if disabled {
-		if topo.Hybrid {
-			fmt.Fprintf(os.Stderr, "%s --no-pin on a hybrid cpu: runs that migrate between core classes are not comparable\n", yellow("warning:"))
-		}
-		return bench.Pin{}, topo
-	}
-	pin, err := topo.Apply()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s %v; running unpinned\n", yellow("note:"), err)
-		return pin, topo
-	}
-	fmt.Fprintf(os.Stderr, "%s %s\n", bold("affinity:"), pin.Describe())
-
-	busy, err := pin.CheckQuiet(300*time.Millisecond, 0.20)
-	if err == nil && len(busy) > 0 {
-		for _, b := range busy {
-			what := "the pinned cpu"
-			if b.CPU != pin.CPU {
-				what = "an SMT sibling of the pinned cpu"
-			}
-			fmt.Fprintf(os.Stderr, "%s cpu%d (%s) is %.0f%% busy; measurements taken now will be biased\n",
-				yellow("warning:"), b.CPU, what, b.Frac*100)
-		}
-	}
-	return pin, topo
 }
 
 func resolveKnownInterp(g *Global, cfg *config.Config, label, abi string, build bool) (string, error) {

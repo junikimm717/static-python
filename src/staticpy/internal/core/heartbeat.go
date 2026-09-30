@@ -26,7 +26,7 @@ type Heartbeat struct {
 }
 
 func (e *Env) HeartbeatPath(slug string) string {
-	return e.Path(DirState, "heartbeats", lockFileName(slug)+".json")
+	return e.Path(DirState, "heartbeats", PathSlug(slug)+".json")
 }
 
 func ReadHeartbeat(e *Env, slug string) (*Heartbeat, error) {

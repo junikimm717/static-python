@@ -26,15 +26,6 @@ const (
 	buildSources   = "sources"
 )
 
-// Each dependency is built into its own prefix, never a shared accumulator:
-// that is what let a stale libz.a from an older version survive a version
-// bump and link into everything afterwards.
-func Dep(cfg *config.Config, assets fs.FS, t config.Target, profile, name string) (core.Job, error) {
-	b := &depBuilder{cfg: cfg, assets: assets, target: t, profile: profile,
-		memo: map[string]*depJob{}, onStack: map[string]bool{}}
-	return b.job(name)
-}
-
 func Deps(cfg *config.Config, assets fs.FS, t config.Target, profile string) ([]core.Job, error) {
 	b := &depBuilder{cfg: cfg, assets: assets, target: t, profile: profile,
 		memo: map[string]*depJob{}, onStack: map[string]bool{}}

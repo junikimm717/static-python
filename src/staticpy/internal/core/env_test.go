@@ -15,7 +15,7 @@ func TestSlugFromScratchName(t *testing.T) {
 	if !ok {
 		t.Fatalf("slugFromScratchName(%q) failed", name)
 	}
-	want := lockFileName("pycross:default:x86_64-linux-musl:aarch64-linux-musl")
+	want := PathSlug("pycross:default:x86_64-linux-musl:aarch64-linux-musl")
 	if got != want {
 		t.Fatalf("slug = %q, want %q", got, want)
 	}
@@ -34,7 +34,7 @@ func TestGCStaleKeepsScratchWithLiveHeartbeat(t *testing.T) {
 	slug := "pynative_default_x86_64-linux-musl"
 	// A pid that is not alive in this namespace, and a dir older than StaleAge.
 	const deadPID = 2147483647
-	name := lockFileName(slug) + ".2147483647.abcd"
+	name := PathSlug(slug) + ".2147483647.abcd"
 	work := filepath.Join(e.Path(DirWork), name)
 	if err := os.MkdirAll(filepath.Join(work, "src"), 0o755); err != nil {
 		t.Fatal(err)

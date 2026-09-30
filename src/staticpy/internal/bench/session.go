@@ -21,7 +21,6 @@ type Session struct {
 	Dir      string
 	Stamp    string
 	timeline *os.File
-	quiet    *os.File
 }
 
 func NewSession(distDir, arch string, now time.Time) (*Session, error) {
@@ -41,9 +40,6 @@ func NewSessionIn(parent, arch string, now time.Time) (*Session, error) {
 	if s.timeline, err = os.Create(filepath.Join(dir, "timeline.jsonl")); err != nil {
 		return nil, err
 	}
-	if s.quiet, err = os.Create(filepath.Join(dir, "quiet.jsonl")); err != nil {
-		return nil, err
-	}
 	updateLatest(parent, stamp+"-"+arch)
 	return s, nil
 }
@@ -57,9 +53,6 @@ func updateLatest(base, name string) {
 func (s *Session) Close() error {
 	if s.timeline != nil {
 		s.timeline.Close()
-	}
-	if s.quiet != nil {
-		s.quiet.Close()
 	}
 	return nil
 }
@@ -90,15 +83,6 @@ func (s *Session) Record(e Event) {
 	}
 	s.timeline.Write(append(b, '\n'))
 	s.timeline.Sync()
-}
-
-func (s *Session) RecordQuiet(v any) {
-	if s.quiet == nil {
-		return
-	}
-	if b, err := json.Marshal(v); err == nil {
-		s.quiet.Write(append(b, '\n'))
-	}
 }
 
 func (s *Session) WriteJSON(name string, v any) error {

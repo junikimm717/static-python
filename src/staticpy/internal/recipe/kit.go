@@ -155,7 +155,7 @@ func (j *kitJob) Build(ctx context.Context, e *core.Env, r *core.Runner, work, s
 		return err
 	}
 
-	abi, err := pythonABI(j.cfg)
+	abi, err := PythonABI(j.cfg)
 	if err != nil {
 		return err
 	}
@@ -236,7 +236,7 @@ func (j *kitJob) Build(ctx context.Context, e *core.Env, r *core.Runner, work, s
 	return os.WriteFile(archive+".sha256", []byte(line), 0o644)
 }
 
-func pythonABI(cfg *config.Config) (string, error) {
+func PythonABI(cfg *config.Config) (string, error) {
 	s, err := pythonSource(cfg)
 	if err != nil {
 		return "", err

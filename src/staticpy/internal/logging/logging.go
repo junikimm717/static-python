@@ -42,20 +42,6 @@ func (l Level) String() string {
 	return "?"
 }
 
-func ParseLevel(s string) (Level, error) {
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "debug", "d":
-		return LevelDebug, nil
-	case "info", "i", "":
-		return LevelInfo, nil
-	case "warn", "warning", "w":
-		return LevelWarn, nil
-	case "error", "err", "e":
-		return LevelError, nil
-	}
-	return LevelInfo, fmt.Errorf("unknown log level %q (want debug|info|warn|error)", s)
-}
-
 // One JSONL line.
 type Event struct {
 	Time   time.Time      `json:"time"`

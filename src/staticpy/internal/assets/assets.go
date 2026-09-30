@@ -11,11 +11,9 @@ import (
 	"embed"
 	"encoding/hex"
 	"fmt"
-	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
 )
@@ -40,22 +38,6 @@ func MustGet(name string) []byte {
 		panic(err)
 	}
 	return b
-}
-
-func List(prefix string) []string {
-	var out []string
-	fs.WalkDir(embedded, "files", func(p string, d fs.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
-			return err
-		}
-		name := p[len("files/"):]
-		if strings.HasPrefix(name, prefix) {
-			out = append(out, name)
-		}
-		return nil
-	})
-	sort.Strings(out)
-	return out
 }
 
 func WriteTo(dir, name string) error {

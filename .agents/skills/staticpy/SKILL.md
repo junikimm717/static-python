@@ -23,7 +23,7 @@ src/staticpy/internal/
   sources/               fetch + sha256 + extract + patch + content-anchored edits
   core/                  Job, Env, Merkle keys, flock leases, atomic publish, Runner
   recipe/                the job families; recipe.go holds the DAG
-  gen/                   Setup.local, staticapi symbols, dotted-module shims
+  gen/                   Setup.local, staticapi symbols
   ensure/                verification: ELF identity, imports, CPython's suite
   assets/files/          go:embed'd: per-target pyconfig fragments, Setup, probe
   cli/                   commands; the `Long:` fields are the real docs

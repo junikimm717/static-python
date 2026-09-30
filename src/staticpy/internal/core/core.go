@@ -144,16 +144,16 @@ func (e *Env) MakeJobs() int {
 // Lock files are never deleted: removing one would break flock identity for
 // anyone holding it open.
 func (e *Env) LockPath(slug string) string {
-	return e.Path(DirLocks, lockFileName(slug)+".lock")
+	return e.Path(DirLocks, PathSlug(slug)+".lock")
 }
 
 func (e *Env) JobLogDir(slug string) string {
-	return e.Path(DirLogs, "jobs", lockFileName(slug))
+	return e.Path(DirLogs, "jobs", PathSlug(slug))
 }
 
 // Slugs carry ':' to stay readable in logs and on the CLI; paths get '_' so the
 // two never diverge by accident on a filesystem that dislikes colons.
-func lockFileName(slug string) string {
+func PathSlug(slug string) string {
 	out := []rune(slug)
 	for i, r := range out {
 		if r == ':' || r == '/' {

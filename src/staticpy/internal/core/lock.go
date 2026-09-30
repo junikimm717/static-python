@@ -94,23 +94,3 @@ func (ls leases) release() {
 		ls[i].release()
 	}
 }
-
-// Lets a reader of a published artifact tell "ready" apart from "being
-// republished right now" instead of racing the rename. ok=false means someone
-// holds it exclusively; the returned func must be called to release.
-func TryReadLease(e *Env, slug string) (release func(), ok bool, err error) {
-	path := e.LockPath(slug)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
-	if err != nil {
-		return nil, false, fmt.Errorf("open lock %s: %w", path, err)
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_SH|syscall.LOCK_NB); err != nil {
-		f.Close()
-		if err == syscall.EWOULDBLOCK || err == syscall.EAGAIN {
-			return nil, false, nil
-		}
-		return nil, false, fmt.Errorf("flock %s: %w", path, err)
-	}
-	l := &flockLease{f: f, path: path}
-	return l.release, true, nil
-}

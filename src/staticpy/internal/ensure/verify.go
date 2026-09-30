@@ -114,7 +114,7 @@ func testSetHash(level Level) string {
 }
 
 func (j *Job) ArtifactDir(e *core.Env) string {
-	return e.Path(core.DirArtifact, pathSlug(j.Slug())+hostPublishTail(j.interp.ArtifactDir(e)))
+	return e.Path(core.DirArtifact, core.PathSlug(j.Slug())+hostPublishTail(j.interp.ArtifactDir(e)))
 }
 
 func SkipRequested() bool { return os.Getenv(SkipEnv) == "1" }
@@ -243,18 +243,6 @@ func writeReport(stage string, rep *Report) error {
 		return fmt.Errorf("write verification report to %s: %w", path, err)
 	}
 	return nil
-}
-
-// Mirrors core's slug-to-path rule: ':' is readable in logs, '_' is
-// safe on every filesystem.
-func pathSlug(slug string) string {
-	out := []rune(slug)
-	for i, c := range out {
-		if c == ':' || c == '/' {
-			out[i] = '_'
-		}
-	}
-	return string(out)
 }
 
 // Matches recipe.hostPublishSuffix: a host-built interpreter dir ends in

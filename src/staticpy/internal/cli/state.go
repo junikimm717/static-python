@@ -92,16 +92,3 @@ func dirSize(root string) int64 {
 	})
 	return total
 }
-
-// Slugs carry ':' to stay readable on the CLI and in logs; core writes their
-// directories with '_', and both spellings are accepted here so a slug copied
-// out of either place works.
-func pathSlug(slug string) string {
-	out := []rune(slug)
-	for i, r := range out {
-		if r == ':' || r == '/' {
-			out[i] = '_'
-		}
-	}
-	return string(out)
-}

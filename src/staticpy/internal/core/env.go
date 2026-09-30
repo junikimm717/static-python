@@ -194,7 +194,7 @@ func (e *Env) resolvePath(v string) (string, error) {
 // The naming convention makes abandoned directories attributable to a dead
 // process.
 func scratchName(slug string) string {
-	return fmt.Sprintf("%s.%d.%s", lockFileName(slug), os.Getpid(), randHex(4))
+	return fmt.Sprintf("%s.%d.%s", PathSlug(slug), os.Getpid(), randHex(4))
 }
 
 func pidFromScratchName(name string) (int, bool) {

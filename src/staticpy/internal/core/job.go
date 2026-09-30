@@ -118,14 +118,6 @@ func ReadManifest(dir string) (*Manifest, error) {
 	return &m, nil
 }
 
-func IsValid(e *Env, j Job) (bool, error) {
-	k, err := Key(j)
-	if err != nil {
-		return false, err
-	}
-	return validAt(e, j.ArtifactDir(e), k), nil
-}
-
 func validAt(e *Env, dir, key string) bool {
 	m, err := ReadManifest(dir)
 	if err != nil {

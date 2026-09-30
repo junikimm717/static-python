@@ -171,23 +171,6 @@ func (c *Classified) Report(dur time.Duration) *Report {
 	return rep
 }
 
-func (c *Classified) Err() error {
-	if c.OK() {
-		return nil
-	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "%s suite on %s (%s): ", c.Level, c.Target, c.Runner)
-	var parts []string
-	if n := len(c.UnexpectedFailures); n > 0 {
-		parts = append(parts, fmt.Sprintf("%d unexpected failure(s): %s", n, joinTests(c.UnexpectedFailures)))
-	}
-	if n := len(c.UnexpectedPasses); n > 0 {
-		parts = append(parts, fmt.Sprintf("%d unexpected pass(es): %s", n, joinTests(c.UnexpectedPasses)))
-	}
-	b.WriteString(strings.Join(parts, "; "))
-	return fmt.Errorf("%s", b.String())
-}
-
 // Only test names are hashed: editing the reason attached to an entry changes
 // nothing about what the run will do, and forcing a re-verification for a
 // reworded comment would make people stop writing them.
