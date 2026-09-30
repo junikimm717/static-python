@@ -68,10 +68,8 @@ const (
 // Not one of core's provisioned kinds, and the only kind with no directory.
 const KindHost = "host"
 
-// ToolchainID is what a job folds into its key to stand for "the compiler that
-// produced this". Every recipe uses it, so re-publishing a toolchain
-// invalidates the whole tree below it rather than leaving artifacts that were
-// built by a compiler nobody can name any more.
+// Every recipe folds this into its key, so re-publishing a toolchain
+// invalidates the whole tree below it.
 type ToolchainID struct {
 	Triple string
 	Kind   string
@@ -112,8 +110,8 @@ func hostPublishSuffix(id ToolchainID) string {
 	return "_" + k
 }
 
-// Factor is the compact toolchain identity a bench session records, so a
-// later reader does not have to reconstruct it from a profile name.
+// Recorded by a bench session so a later reader does not have to reconstruct
+// the toolchain from a profile name.
 func (id ToolchainID) Factor() string {
 	if id.Triple == "" && id.Key == "" && id.Probe == "" {
 		return ""
@@ -270,10 +268,9 @@ func gccfactoryKey(dir string) (string, error) {
 		"re-publish the toolchain from gccfactory, or delete the file to fall back to fingerprinting the driver", path)
 }
 
-// probeToolchain fingerprints a compiler that did not come from gccfactory —
-// musl.cc, or something hand-built. It is weaker than a published key (the
-// driver can call a different cc1 tomorrow), which is why it is reported as
-// provenance rather than treated as equivalent.
+// A fingerprint is weaker than a published key (the driver can call a
+// different cc1 tomorrow), which is why it is reported as provenance rather
+// than treated as equivalent.
 func probeToolchain(id *ToolchainID) error {
 	version, err := ccOutput(id.CC, "-dumpversion")
 	if err != nil {
@@ -366,9 +363,6 @@ func pickTool(dir, triple string, names ...string) (string, error) {
 		names[0], triple, strings.Join(tried, ", "))
 }
 
-// toolenv is the compiler environment one job hands to every command it runs,
-// driven from the resolved profile and the composed dependency view rather than
-// from hard-coded paths.
 type toolenv struct {
 	target config.Target
 	tools  tools
@@ -475,11 +469,9 @@ func (te *toolenv) pkgConfigPath() string {
 			filepath.Join(v, "share", "pkgconfig"))
 	}
 	if len(dirs) == 0 {
-		// An *empty* PKG_CONFIG_LIBDIR does not mean "search nothing", it means
-		// "use the compiled-in default", which is the host's /usr/lib/pkgconfig.
-		// That is how pyhost -- a build with no sysroot at all -- came to detect
-		// the host's zlib, define USE_ZLIB_CRC32, and then fail compiling
-		// binascii.c against a toolchain that has no zlib.h.
+		// An *empty* PKG_CONFIG_LIBDIR means the compiled-in default (the host's
+		// /usr/lib/pkgconfig), not "search nothing"; that is how pyhost once
+		// picked up the host's zlib and failed on a toolchain with no zlib.h.
 		return filepath.Join(te.prefix, ".no-pkg-config")
 	}
 	return strings.Join(dirs, string(os.PathListSeparator))
@@ -515,14 +507,9 @@ func (te *toolenv) vars() map[string]string {
 		"PKG_CONFIG_PATH":        pc,
 		"PKG_CONFIG_SYSROOT_DIR": te.pcSysroot,
 		// The Runner substitutes PATH (toolchain first); composing one here
-		// would put the host gcc ahead of gccfactory.
-		//
-		// A host-built profile names no target, which is what keeps the
-		// provisioned toolchain's bin off the PATH. It has to: gcc resolves `ld`
-		// off the PATH it is run with, not from $LD, so leaving the musl
-		// toolchain first makes the host compiler link glibc objects with a musl
-		// linker -- which cannot find libm.so.6 and drops any extension module
-		// whose library needs it.
+		// would put the host gcc ahead of gccfactory. A host-built profile names
+		// no target so the musl toolchain stays off PATH: gcc resolves `ld` off
+		// PATH, not $LD, and a musl ld cannot find libm.so.6 for glibc objects.
 		"PATH": core.PathSentinel + te.pathTarget(),
 		// Deterministic diagnostics, and a few configure scripts parse them.
 		"LC_ALL": "C",
@@ -559,8 +546,7 @@ func sha256File(path string) (string, error) {
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
 
-// copyTree copies src to dst preserving modes, symlinks and mtimes. Build
-// trees are copied rather than hard-linked: configure and make write all over
+// Preserves modes, symlinks and mtimes. Build trees are copied rather than hard-linked: configure and make write all over
 // their source tree, and a hard link would edit the shared srctree artifact.
 func copyTree(src, dst string) error {
 	return filepath.WalkDir(src, func(p string, d os.DirEntry, err error) error {
@@ -616,12 +602,10 @@ func copyFile(src, dst string, mode os.FileMode) error {
 	return out.Close()
 }
 
-// maxRewrite bounds what we are willing to read into memory looking for baked
-// prefixes. Nothing that carries one (.pc, .la, a -config script) is large.
+// Nothing that carries a baked prefix (.pc, .la, a -config script) is large.
 const maxRewrite = 4 << 20
 
-// isText reports whether b is something a prefix rewrite can safely operate
-// on. Rewriting a binary would change its length and corrupt it.
+// A prefix rewrite on a binary would change its length and corrupt it.
 func isText(b []byte) bool {
 	if len(b) > maxRewrite || !utf8.Valid(b) {
 		return false

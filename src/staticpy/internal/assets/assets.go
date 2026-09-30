@@ -72,8 +72,7 @@ func WriteTo(dir, name string) error {
 
 var hashes sync.Map
 
-// Hash is the sha256 of an asset, for folding into a job key. It panics on an
-// unknown name: silently keying a job on the empty string would make a stale
+// Panics on an unknown name: silently keying a job on the empty string would make a stale
 // artifact look valid.
 func Hash(name string) string {
 	if v, ok := hashes.Load(name); ok {

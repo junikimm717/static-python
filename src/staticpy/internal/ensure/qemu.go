@@ -17,23 +17,17 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
-// The two ways a target binary can be executed, and the key half of an
-// expectation lookup. qemu-user has its own failures around signals, threads
-// and subprocesses that say nothing about whether the build is correct, so an
-// expectation recorded under qemu must never silence the same test running
-// natively.
+// Also half of an expectation key; see ExpectKey for why qemu is keyed apart.
 const (
 	RunnerNative = "native"
 	RunnerQemu   = "qemu"
 )
 
-// DefaultRunTimeout bounds a single target invocation. A probe run that hangs
-// under qemu would otherwise hold a build slot forever.
+// A probe run that hangs under qemu would otherwise hold a build slot forever.
 const DefaultRunTimeout = 10 * time.Minute
 
-// A non-zero ExitCode is a
-// normal outcome here — it becomes a failed Check — so it is reported rather
-// than returned as an error.
+// A non-zero ExitCode is a normal outcome here — it becomes a failed Check — so
+// it is reported rather than returned as an error.
 type RunResult struct {
 	Argv     []string      `json:"argv"`
 	Dir      string        `json:"dir,omitempty"`
@@ -41,15 +35,12 @@ type RunResult struct {
 	Stdout   string        `json:"-"`
 	Stderr   string        `json:"-"`
 	Dur      time.Duration `json:"-"`
-	// TimedOut distinguishes a hang from a crash; they look identical in the
-	// exit status alone.
+	// A hang and a crash look identical in the exit status alone.
 	TimedOut bool `json:"timed_out,omitempty"`
 }
 
 func (r RunResult) OK() bool { return r.ExitCode == 0 && !r.TimedOut }
 
-// Combined is stdout followed by stderr, labelled when both are non-empty, for
-// attaching to a failed check.
 func (r RunResult) Combined() string {
 	out := strings.TrimRight(r.Stdout, "\n")
 	errOut := strings.TrimRight(r.Stderr, "\n")
@@ -129,7 +120,6 @@ func QemuBinaryName(t config.Target) string {
 	return "qemu-" + name
 }
 
-// Sysroot is the target sysroot inside the provisioned toolchain,
 // <toolchain>/<triple>, matching the musl-cross-make layout gccfactory emits.
 func Sysroot(e *core.Env, t config.Target) (string, error) {
 	if e == nil {
@@ -223,7 +213,6 @@ func (l *Launcher) overlay() []string {
 	return env
 }
 
-// FailDetail explains a non-zero exit in the terms an operator can act on.
 func (l *Launcher) FailDetail(res RunResult) string {
 	var b strings.Builder
 	switch {
@@ -241,8 +230,7 @@ func (l *Launcher) FailDetail(res RunResult) string {
 	return b.String()
 }
 
-// runHint names the environmental failures that otherwise read as a mysterious
-// interpreter crash.
+// Environmental failures that otherwise read as a mysterious interpreter crash.
 func runHint(out string) string {
 	switch {
 	case strings.Contains(out, "Exec format error"), strings.Contains(out, "cannot execute binary file"):

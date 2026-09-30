@@ -13,9 +13,8 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
-// ProbeModules are the extension modules a static interpreter is expected to
-// have compiled in. Each is imported and reported as its own check, so one
-// missing module reads as one line rather than a wall of tracebacks.
+// Each is imported and reported as its own check, so one missing module reads
+// as one line rather than a wall of tracebacks.
 var ProbeModules = []string{
 	"ssl", "zlib", "sqlite3", "ctypes", "_lzma", "_hashlib", "readline", "curses", "uuid", "compression.zstd",
 }
@@ -31,8 +30,7 @@ type ProbeOptions struct {
 
 const probeScriptName = "staticpy_probe.py"
 
-// probeScript emits one PROBE line per check so a single interpreter start
-// covers the whole smoke tier — under qemu, process startup dominates
+// One PROBE line per check, so a single interpreter start covers the whole smoke tier — under qemu, process startup dominates
 // everything else here.
 const probeScript = `
 import sys
@@ -135,8 +133,8 @@ def _pythonapi():
 guard("ctypes.pythonapi", _pythonapi)
 `
 
-// RunProbes is the smoke tier: start the built interpreter, import everything
-// the recipe promised, and confirm it agrees with the target it was built for.
+// The smoke tier: import everything the recipe promised and confirm the
+// interpreter agrees with the target it was built for.
 func RunProbes(ctx context.Context, r *core.Runner, l *Launcher, t config.Target, python, work string, opts ProbeOptions) *Report {
 	rep := NewReport(fmt.Sprintf("smoke %s (%s)", t.Triple, l.Runner))
 	start := time.Now()

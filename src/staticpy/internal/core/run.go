@@ -10,15 +10,14 @@ import (
 	"time"
 )
 
-// errDepChanged means a dependency was republished with a different key while
-// we were waiting for its read lock; the job's own key is therefore stale and
+// A dependency was republished with a different key while we were waiting for its read lock; the job's own key is therefore stale and
 // the whole attempt must restart.
 var errDepChanged = errors.New("core: dependency changed under us")
 
 var errSkipped = errors.New("skipped: dependency failed")
 
-// trashWG tracks background deletions of replaced artifacts so Run can wait
-// for a quiet filesystem before returning.
+// Background deletions of replaced artifacts; Run waits for a quiet filesystem
+// before returning.
 var trashWG sync.WaitGroup
 
 // Provenancer is implemented by jobs that took an input on trust rather than
@@ -28,7 +27,7 @@ type Provenancer interface {
 	Provenance() map[string]string
 }
 
-// It reports each node's state in dependency-first order.
+// Reports each node's state in dependency-first order.
 func Plan(e *Env, jobs []Job) ([]PlanNode, error) {
 	nodes, err := resolve(jobs)
 	if err != nil {
@@ -120,7 +119,7 @@ func Run(ctx context.Context, e *Env, jobs []Job) error {
 	return nil
 }
 
-// It retries if a dependency is republished out from under us between our
+// Retries if a dependency is republished out from under us between our
 // validity check and taking its read lock.
 func buildNode(ctx context.Context, e *Env, n *node) error {
 	const attempts = 3
@@ -222,7 +221,7 @@ func tryBuild(ctx context.Context, e *Env, n *node) error {
 	return nil
 }
 
-// It is the last thing written, so a directory carrying a manifest is by
+// The manifest is the last thing written, so a directory carrying one is by
 // construction complete.
 func stampManifest(e *Env, n *node, stage string, dur time.Duration) error {
 	host, _ := os.Hostname()
@@ -252,9 +251,8 @@ func stampManifest(e *Env, n *node, stage string, dur time.Duration) error {
 	})
 }
 
-// publish swaps stage into place with renames only, so readers see either the
-// old artifact or the new one and never a half-populated directory. Caller
-// must hold the job's exclusive lock.
+// Renames only, so readers see either the old artifact or the new one and never
+// a half-populated directory. Caller must hold the job's exclusive lock.
 func publish(e *Env, stage, artifact string) error {
 	if err := os.MkdirAll(filepath.Dir(artifact), 0o755); err != nil {
 		return err

@@ -13,9 +13,8 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// Options selects which layers Load stacks.
 type Options struct {
-	// RepoRoot enables the <RepoRoot>/config layer when that directory exists.
+	// Not read by Load.
 	RepoRoot string
 	// Dir is an explicit --config directory, applied last. It must exist.
 	Dir string
@@ -26,8 +25,6 @@ type Options struct {
 	SourcesDir string
 }
 
-// OriginEmbedded is the Config.Origin value for a file that came from the
-// binary rather than from disk.
 const OriginEmbedded = "embedded"
 
 const (
@@ -87,7 +84,7 @@ func (l layer) tomls() ([]string, error) {
 	return out, nil
 }
 
-// Load stacks embedded defaults, <RepoRoot>/config and --config <dir>, with
+// Load stacks embedded defaults and --config <dir>, with
 // later layers winning per top-level table entry: a profile redefined on disk
 // replaces the embedded one of the same name, and profiles only the embedded
 // set knows about survive untouched.
@@ -197,8 +194,7 @@ func mergeInto[V any](dst, src map[string]V) {
 	}
 }
 
-// decodeScopes fills Profile.Scopes, which cannot be decoded directly: TOML
-// folds [profile.nolto.python] into the parent table, so a second pass over an
+// Profile.Scopes cannot be decoded directly: TOML folds [profile.nolto.python] into the parent table, so a second pass over an
 // untyped decode is what separates a scope from a profile-wide value.
 func decodeScopes(data string, cfg *Config, origin string) error {
 	var raw struct {
@@ -276,9 +272,8 @@ func profileFromTable(t map[string]any, origin, profile, scope string) (Profile,
 	return p, nil
 }
 
-// OpenAsset reads a file under patches/, from whichever layer sources.toml came
-// from. Names are slash-separated and relative to patches/, e.g.
-// "python-3.14.7/ctypes_patch_1.py".
+// Reads from whichever layer sources.toml came from. Names are slash-separated
+// and relative to patches/, e.g. "python-3.14.7/ctypes_patch_1.py".
 func (c *Config) OpenAsset(name string) ([]byte, error) {
 	clean := path.Clean(name)
 	if clean == ".." || strings.HasPrefix(clean, "../") || path.IsAbs(clean) {
@@ -304,8 +299,6 @@ func (c *Config) OpenAsset(name string) ([]byte, error) {
 // patches/.
 func AssetDir(s Source) string { return s.Name + "-" + s.Version }
 
-// EditText is the content an Edit inserts, read from patches/<source>/ when the
-// edit uses text_file.
 func (c *Config) EditText(s Source, e Edit) (string, error) {
 	if e.TextFile == "" {
 		return e.Text, nil

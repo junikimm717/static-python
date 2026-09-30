@@ -118,8 +118,6 @@ func ReadManifest(dir string) (*Manifest, error) {
 	return &m, nil
 }
 
-// IsValid reports whether the job's artifact exists and was built from exactly
-// this key.
 func IsValid(e *Env, j Job) (bool, error) {
 	k, err := Key(j)
 	if err != nil {
@@ -178,7 +176,6 @@ func randHex(n int) string {
 	return hex.EncodeToString(b)
 }
 
-// node is a resolved DAG vertex: one job, deduped by slug, with its key.
 type node struct {
 	job  Job
 	slug string
@@ -189,9 +186,7 @@ type node struct {
 	err  error
 }
 
-// resolve flattens the DAG rooted at jobs: dedupes by slug, detects cycles and
-// slug collisions, computes every key, and returns nodes in dependency-first
-// topological order.
+// Returns nodes in dependency-first topological order.
 func resolve(jobs []Job) ([]*node, error) {
 	byslug := map[string]*node{}
 	var order []*node
@@ -252,8 +247,8 @@ func resolve(jobs []Job) ([]*node, error) {
 	return order, nil
 }
 
-// sameJob guards against two different recipes claiming one slug, which would
-// silently make them share an artifact directory.
+// Two different recipes claiming one slug would silently share an artifact
+// directory.
 func sameJob(a, b Job) error {
 	if a == b {
 		return nil

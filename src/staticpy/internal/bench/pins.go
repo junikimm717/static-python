@@ -8,7 +8,6 @@ const (
 	DefaultPyperf        = "2.10.0"
 )
 
-// Pins are the suite versions recorded on every session manifest.
 type Pins struct {
 	Pyperformance string `json:"pyperformance"`
 	Pyperf        string `json:"pyperf"`
@@ -31,8 +30,8 @@ func (p Pins) withDefaults() Pins {
 	return p
 }
 
-// PyperformanceSpecs returns the pip requirement strings. Empty versions
-// fall back to the defaults so tests can assert the pin without a config.
+// Empty versions fall back to the defaults so tests can assert the pin
+// without a config.
 func PyperformanceSpecs(pyperformance, pyperf string) []string {
 	p := Pins{Pyperformance: pyperformance, Pyperf: pyperf}.withDefaults()
 	return []string{
@@ -41,8 +40,8 @@ func PyperformanceSpecs(pyperformance, pyperf string) []string {
 	}
 }
 
-// PipInstallArgs is the pip argv that installs the suite, still --no-deps:
-// pyperformance depends on psutil, a C extension that will not load here.
+// --no-deps: pyperformance depends on psutil, a C extension that will not load
+// here.
 // --no-deps does not skip PEP 517 build-system.requires; a --find-links
 // directory must also contain a setuptools wheel.
 func PipInstallArgs(pins Pins) []string {

@@ -35,7 +35,7 @@ func slugMutex(slug string) *sync.Mutex {
 	return m
 }
 
-// It polls with LOCK_NB rather than blocking in the kernel so that ctx
+// Polls with LOCK_NB rather than blocking in the kernel so that ctx
 // cancellation works and so that we can report who we are waiting on.
 func acquire(ctx context.Context, e *Env, slug string, excl bool) (*flockLease, error) {
 	path := e.LockPath(slug)
@@ -87,7 +87,6 @@ func (l *flockLease) release() {
 	l.f = nil
 }
 
-// leases is an ordered set of held locks, released as a group.
 type leases []*flockLease
 
 func (ls leases) release() {
@@ -96,7 +95,7 @@ func (ls leases) release() {
 	}
 }
 
-// It lets a reader of a published artifact tell "ready" apart from "being
+// Lets a reader of a published artifact tell "ready" apart from "being
 // republished right now" instead of racing the rename. ok=false means someone
 // holds it exclusively; the returned func must be called to release.
 func TryReadLease(e *Env, slug string) (release func(), ok bool, err error) {

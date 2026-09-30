@@ -62,10 +62,7 @@ qemu = "qemu-riscv32"
 status = "experimental"
 # OpenSSL ships no linux64-riscv32; linux32-riscv32 is the only config.
 maps.openssl = "linux32-riscv32"
-# GCC's riscv_can_inline_p compares x_target_flags wholesale before it honours
-# always_inline, and -fPIC flips MASK_EXPLICIT_RELOCS via the code model -- so
-# libmpdec's PIC objects refuse to inline into _decimal.c's non-PIC ones under
-# LTO. Nothing here is ever dlopened, so dropping CCSHARED removes the mismatch.
+# Same riscv_can_inline_p / -fPIC mismatch under LTO as riscv64.
 make_vars = ["CCSHARED="]
 
 [target.i386-linux-musl]

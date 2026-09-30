@@ -18,8 +18,7 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/sources"
 )
 
-// kitVersion is the archive layout generation. Bump it when run, kit.json,
-// or the python/<label>/ shape changes.
+// Bump when run, kit.json or the python/<label>/ shape changes.
 const kitVersion = "1"
 
 func planKit(cfg *config.Config, assets fs.FS, o PlanOptions) ([]core.Job, error) {

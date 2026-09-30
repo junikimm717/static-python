@@ -41,7 +41,7 @@ const stallTimeout = 90 * time.Second
 func backoff(attempt int) time.Duration { return time.Duration(1<<attempt) * time.Second }
 
 var client = &http.Client{
-	// No overall timeout: Python-3.13.tar.xz-sized downloads over a slow mirror
+	// No overall timeout: CPython-tarball-sized downloads over a slow mirror
 	// are legitimate. Progress is bounded by the dial, header and stall
 	// timeouts instead.
 	Transport: &http.Transport{
@@ -81,7 +81,6 @@ func ValidateSource(s config.Source) error {
 	return nil
 }
 
-// CacheDir is where every fetched archive lands.
 func CacheDir(e *core.Env) string { return e.Path(core.DirSrc) }
 
 // Re-pinning a version never collides with the file the old pin left behind.
@@ -102,14 +101,13 @@ func lockPath(e *core.Env, s config.Source) string {
 	return filepath.Join(CacheDir(e), "."+shortSum(s)+".lock")
 }
 
-// Without taking the lock or hashing anything.
+// Checks without taking the lock or hashing anything.
 func Fetched(e *core.Env, s config.Source) bool { return verified(e, s) }
 
-// Fetch downloads s into dist/src and returns the archive path, trying URLs in
-// order. It is idempotent and safe against concurrent workers and concurrent
-// staticpy processes: everything past the fast path happens under an exclusive
-// flock on a per-source lock file, and the download lands in a temp file in the
-// same directory that is verified before being renamed into place.
+// Idempotent and safe against concurrent workers and concurrent staticpy
+// processes: everything past the fast path happens under an exclusive flock on
+// a per-source lock file, and the download lands in a temp file in the same
+// directory that is verified before being renamed into place.
 func Fetch(ctx context.Context, e *core.Env, s config.Source) (string, error) {
 	if err := ValidateSource(s); err != nil {
 		return "", err
@@ -199,7 +197,6 @@ type permanentError struct{ error }
 
 func (e *permanentError) Unwrap() error { return e.error }
 
-// ChecksumError reports a body whose hash did not match the pin.
 type ChecksumError struct {
 	Source config.Source
 	URL    string
@@ -283,8 +280,8 @@ func verified(e *core.Env, s config.Source) bool {
 	return err == nil && fi.Mode().IsRegular()
 }
 
-// mark writes the .done marker. Every caller reaches it only after the bytes
-// on disk have been hashed against the pin.
+// Every caller reaches this only after the bytes on disk have been hashed
+// against the pin.
 func mark(e *core.Env, s config.Source) error {
 	p := donePath(e, s)
 	f, err := os.OpenFile(p, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
@@ -336,8 +333,8 @@ func lockExclusive(ctx context.Context, path string) (func(), error) {
 	}, nil
 }
 
-// stallReader restarts the stall timer on every successful read, so the
-// deadline measures silence rather than total transfer time: a slow mirror
+// Restarting the timer on every successful read makes the deadline measure
+// silence rather than total transfer time: a slow mirror
 // serving a large tarball is fine, a mute one is not.
 type stallReader struct {
 	r     io.Reader

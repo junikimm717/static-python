@@ -12,22 +12,19 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
-// Arm is one interpreter under comparison.
 type Arm struct {
 	Label  string
 	Python string
 	Env    map[string]string
 }
 
-// Results are keyed arm -> benchmark -> samples.
+// arm -> benchmark -> samples.
 type Results map[string]map[string][]float64
 
-// Failure is a measurement that produced no data.
-//
 // A benchmark that dies mid-run is exactly as absent from the table as one
 // whose dependencies never installed, so it has to reach the same accounting:
 // a geomean over a set nobody chose is the thing skipped.json exists to
-// prevent, and until now only the pre-run skips reached it.
+// prevent.
 type Failure struct {
 	Benchmark string
 	Arm       string
@@ -50,8 +47,6 @@ func reasonFor(err error) string {
 	return strings.SplitN(err.Error(), "\n", 2)[0]
 }
 
-// RunSuite measures every case on every arm, interleaved.
-//
 // Interleaving is per benchmark rather than per arm so that machine drift over
 // a long run hits all arms alike and cancels in the ratio. Running one arm to
 // completion and then the next folds hours of drift straight into the result.
@@ -87,10 +82,9 @@ func RunSuite(ctx context.Context, x Exec, s *Session, pin Pin, arms []Arm, case
 
 			before, _ := sampleCPUs(watch)
 			start := time.Now()
-			// The deadline is the point of --timeout, and it was accepted and
-			// then never applied: one benchmark that never returns would hold
-			// the whole suite open, and the run would look alive the entire
-			// time because a stalled measurement produces no output at all.
+			// Without a deadline one benchmark that never returns holds the
+			// whole suite open, and the run looks alive the entire time because
+			// a stalled measurement produces no output at all.
 			runCtx, cancel := context.WithTimeout(ctx, timeout)
 			runErr := x.Run(runCtx, core.Cmd{
 				Dir:    s.Dir,
@@ -157,9 +151,8 @@ func RunSuite(ctx context.Context, x Exec, s *Session, pin Pin, arms []Arm, case
 	return res, failures, nil
 }
 
-// Trace records one timeline event around fn: wall time, load, and how busy
-// the pinned core's SMT sibling was. Micro measures several benches in one
-// process, so one event is one invocation, not one report.json row.
+// Micro measures several benches in one process, so one event is one
+// invocation, not one report.json row.
 func (s *Session) Trace(pin Pin, arm, benchmark string, fn func() error) error {
 	watch := append([]int{pin.CPU}, pin.Siblings...)
 	before, _ := sampleCPUs(watch)
@@ -223,7 +216,6 @@ func busyFrac(before, after map[int]cpuTimes, cpu int) float64 {
 	return 1 - float64(b.idle-a.idle)/float64(total)
 }
 
-// Compare reduces raw samples to a ratio table against one baseline arm.
 type Row struct {
 	Benchmark string             `json:"benchmark"`
 	Min       map[string]float64 `json:"min_s"`
@@ -231,6 +223,7 @@ type Row struct {
 	Ratio     map[string]float64 `json:"ratio_vs_baseline"`
 }
 
+// Reduces raw samples to a ratio table against one baseline arm.
 func Compare(res Results, baseline string, arms []string) ([]Row, map[string]float64) {
 	names := map[string]bool{}
 	for _, a := range arms {

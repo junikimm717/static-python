@@ -9,20 +9,18 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
-// srctreeVersion is part of the job key. Bump it whenever the unpack, patch or
-// edit procedure changes in a way that would produce a different tree from the
-// same inputs; without it a fix to this package leaves every cached tree stale
-// and undetectably wrong.
+// Bump whenever the unpack, patch or edit procedure changes in a way that would
+// produce a different tree from the same inputs; without it a fix to this
+// package leaves every cached tree stale and undetectably wrong.
 const srctreeVersion = "2"
 
-// Options carries what the recipe layer knows and this package does not.
 type Options struct {
-	// Assets is the resolved patches/ and edit-text tree. Required only when the
-	// source declares patches or a text_file edit.
+	// The resolved patches/ and edit-text tree. Required only when the source
+	// declares patches or a text_file edit.
 	Assets Assets
 }
 
-// It is architecture-free and profile-free: one tree is built once and shared
+// A source tree is architecture-free and profile-free: one tree is built once and shared
 // by every target and every profile, which is why nothing about a triple or a
 // flag set appears in its key.
 func SrcTree(s config.Source, opts Options) core.Job {

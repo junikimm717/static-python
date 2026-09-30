@@ -16,13 +16,10 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/config"
 )
 
-// maxEntrySize caps a single decompressed member. Every source here is a
-// release tarball of known shape; a member in the gigabytes means a zip bomb or
+// Every source here is a release tarball of known shape; a member in the gigabytes means a zip bomb or
 // a corrupt archive, not a Python release.
 const maxEntrySize = 4 << 30
 
-// Extract unpacks archive into dst, stripping s.TopDir so the tree is flat.
-//
 // Pure Go on purpose: shelling out to tar makes the build depend on which tar
 // the host happens to have, and busybox tar and GNU tar disagree on enough
 // flags to matter. static-python's sources are all gzip or zip, so xz is
@@ -307,8 +304,7 @@ func within(root, p string) bool {
 	return rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
 }
 
-// writeSymlink refuses a link that would point out of the tree. Even a link
-// that is never followed by us is followed by configure and by make, which
+// A link out of the tree is refused: even one never followed by us is followed by configure and by make, which
 // would then read or clobber a host path.
 func writeSymlink(dst, target, link string) error {
 	if link == "" {

@@ -35,7 +35,6 @@ type Case struct {
 // required choice, e.g. {shortest_path,connected_components}.
 var positionalChoices = regexp.MustCompile(`\{([A-Za-z0-9_,]+)\}`)
 
-// Label is what the report calls this case.
 func (c Case) Label() string {
 	if c.Sub == "" {
 		return c.Name
@@ -165,11 +164,8 @@ func installPyperformance(ctx context.Context, x Exec, v *Venv, pins Pins, findL
 		return fmt.Errorf("%s: this interpreter's venv has no pip, so pyperformance cannot be installed.\n"+
 			"It needs the ensurepip module and its bundled wheel; a build configured with --without-ensurepip still has both", v.Label)
 	}
-	// --no-deps, and pyperf named explicitly: pyperformance depends on psutil,
-	// which is a C extension. It fails to build here and would be unloadable
-	// anyway, and nothing in this path needs it -- pyperformance is wanted for
-	// its data-files/benchmarks, and pyperf runs fine without psutil. Each
-	// benchmark's own requirements are installed separately, where a C
+	// --no-deps, and pyperf named explicitly, to skip psutil: a C extension
+	// that fails to build here, and pyperf runs fine without it. Each benchmark's own requirements are installed separately, so a C
 	// extension that genuinely matters fails against the benchmark that needs
 	// it rather than against the whole suite.
 	if err := v.Pip(ctx, x, "install-pyperformance", PipInstallArgsFrom(pins, findLinks)...); err != nil {
@@ -232,12 +228,9 @@ func InstallRequirements(ctx context.Context, x Exec, v *Venv, c Case) error {
 	return nil
 }
 
-// A hardcoded list of the scripts taking a required positional argument was
-// tried first and was wrong within the hour: it named bm_argparse,
-// bm_async_tree and bm_pickle, and bm_networkx failed the same way on the next
-// run. argparse already prints the answer under "positional arguments:", so
-// reading it costs one --help per benchmark and cannot go stale when
-// pyperformance adds another.
+// argparse prints a required positional choice under "positional arguments:",
+// so reading it costs one --help per benchmark and cannot go stale when
+// pyperformance adds another -- a hardcoded list did, within the hour.
 //
 // Choosing the first variant is a choice, so Label reports it: bm_pickle[pickle],
 // never a bare bm_pickle standing in for five different measurements.

@@ -135,13 +135,11 @@ func (b *depBuilder) job(name string) (*depJob, error) {
 	return j, nil
 }
 
-// A dep builds into a prefix it shares with every other dep, instead of its
-// own artifact. A shared library records where it was configured to live --
-// libtool writes an RPATH, OpenSSL writes OPENSSLDIR, ncurses writes its
-// terminfo directory -- and those strings are only correct when --prefix is the
-// path the files actually end up at. The per-dep prefixes the static build uses
-// cannot satisfy that, because nothing resolves a path at runtime there and a
-// stale one is inert.
+// A rootfs dep builds into a prefix shared with every other dep. A shared
+// library records where it was configured to live (libtool RPATH, OPENSSLDIR,
+// ncurses' terminfo dir), so --prefix must be where the files end up. The
+// static build's per-dep prefixes get away without this: nothing resolves a
+// path at runtime there.
 type rootfsMode struct {
 	// The final path, baked into everything installed.
 	prefix string
@@ -247,8 +245,7 @@ func (j *depJob) ArtifactDir(e *core.Env) string {
 
 func (j *depJob) Provenance() map[string]string { return j.tc.Provenance() }
 
-// view is every prefix this package compiles and links against: its direct
-// needs and theirs, deepest last so a direct need's headers win.
+// Deepest last, so a direct need's headers win.
 func (j *depJob) view(e *core.Env) []string {
 	if j.roots != nil {
 		// Everything already installed is in one place, so there is no chain of
@@ -511,8 +508,8 @@ func (j *depJob) fromSources(ctx context.Context, r *core.Runner, te *toolenv, s
 // pkg-config still points at the artifact. See staticpy-traps (seplto prefix).
 const keepablePrefix = "/usr"
 
-// opensslCertDir is OPENSSLDIR on every non-host openssl. /usr/ssl is empty
-// on Alpine/Debian/Fedora; /etc/ssl is where the CA bundle lives.
+// /usr/ssl is empty on Alpine/Debian/Fedora; /etc/ssl is where the CA bundle
+// lives.
 const opensslCertDir = "/etc/ssl"
 
 func (j *depJob) configurePrefix(artifact string) string {
@@ -580,7 +577,7 @@ func rewriteKeepableMetadata(root, from, to string) error {
 	})
 }
 
-// hoistDestdir lifts <stage><prefix> to <stage>, so the artifact is the
+// Lifts <stage><prefix> to <stage>, so the artifact is the
 // installed tree itself rather than a deep path mirroring the store.
 func hoistDestdir(stage, prefix, pkg string) error {
 	staged := destDirTree(stage, prefix)
@@ -612,8 +609,8 @@ func hoistDestdir(stage, prefix, pkg string) error {
 	return nil
 }
 
-// assertProvides is the postcondition that catches the failure mode a green
-// configure and a green make cannot: an install that produced no library.
+// Catches what a green configure and a green make cannot: an install that
+// produced no library.
 func (j *depJob) assertProvides(stage string) error {
 	for _, p := range j.pkg.Provides {
 		clean := filepath.Clean(filepath.FromSlash(p))
@@ -628,8 +625,8 @@ func (j *depJob) assertProvides(stage string) error {
 	return nil
 }
 
-// installedSummary lists what the install actually produced, so a missing
-// library is diagnosable from the error alone (wrong libdir, wrong name).
+// Makes a missing library diagnosable from the error alone (wrong libdir,
+// wrong name).
 func installedSummary(stage string) []string {
 	var out []string
 	for _, dir := range []string{"lib", "lib64", "include"} {

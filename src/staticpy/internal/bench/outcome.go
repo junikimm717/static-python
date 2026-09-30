@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 )
 
-// Accounting is the session sidecar every suite writes before (and after)
-// the numbers exist: what ran, on what host, which binaries.
+// Written before (and after) the numbers exist: what ran, on what host, which
+// binaries.
 type Accounting struct {
 	Baseline      string
 	SuiteName     string
@@ -19,7 +19,6 @@ type Accounting struct {
 	Extra         map[string]any
 }
 
-// Reports is the full session: accounting plus the comparison table.
 // WriteReports is what makes pyperformance and micro land as the same files.
 type Reports struct {
 	Accounting

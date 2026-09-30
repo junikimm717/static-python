@@ -28,7 +28,7 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/logging"
 )
 
-// Global holds every flag that is accepted on either side of the subcommand.
+// Every flag here is accepted on either side of the subcommand.
 type Global struct {
 	Dist       string
 	ConfigDir  string
@@ -247,8 +247,8 @@ func (g *Global) register(fs *flag.FlagSet) {
 		"commit the running executable was built from; the ./staticpy shim stamps this via -X and passes it here")
 }
 
-// flagSet returns a FlagSet that also understands the global flags, so they may
-// appear on either side of the subcommand name.
+// The global flags are registered too, so they may appear on either side of
+// the subcommand name.
 func (g *Global) flagSet(name string) *flag.FlagSet {
 	fs := flag.NewFlagSet("staticpy "+name, flag.ContinueOnError)
 	fs.SetOutput(io.Discard)

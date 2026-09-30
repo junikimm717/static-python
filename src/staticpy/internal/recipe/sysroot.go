@@ -14,9 +14,8 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
-// Sysroot composes the per-package prefixes into the single -I/-L view CPython
-// is configured against. The dependencies stay separately keyed artifacts; this
-// job is only the view of them, so bumping one library rebuilds one library.
+// The dependencies stay separately keyed artifacts; this job is only the -I/-L
+// view of them, so bumping one library rebuilds one library.
 func Sysroot(cfg *config.Config, assets fs.FS, t config.Target, profile string) (core.Job, error) {
 	b := &depBuilder{cfg: cfg, assets: assets, target: t, profile: profile,
 		memo: map[string]*depJob{}, onStack: map[string]bool{}}
@@ -158,10 +157,9 @@ func (c *composer) merge(d *depJob) error {
 	})
 }
 
-// place symlinks a file into the tree, unless it names one of the dependency
-// prefixes: pkg-config .pc files, libtool .la files and the *-config scripts
-// all record the prefix they were configured with, and a consumer reading one
-// out of the composed tree has to be pointed at the composed tree.
+// pkg-config .pc files, libtool .la files and the *-config scripts all record
+// the prefix they were configured with, and a consumer reading one out of the
+// composed tree has to be pointed at the composed tree.
 func (c *composer) place(d *depJob, src, dst, rel string, mode os.FileMode) error {
 	data, err := os.ReadFile(src)
 	if err != nil {
@@ -172,11 +170,9 @@ func (c *composer) place(d *depJob, src, dst, rel string, mode os.FileMode) erro
 		return os.Symlink(src, dst)
 	}
 	if !isText(data) {
-		// A sysroot exists to be compiled and linked against, so an executable
-		// that baked in its own prefix is not something any consumer reads --
-		// xz's lzmainfo carries the LOCALEDIR it was configured with. Leave it
-		// out rather than corrupting it or failing the build over it. A library
-		// or a header in the same position is a real problem and still is one.
+		// A sysroot is only compiled and linked against, so a program that baked
+		// in its own prefix (xz's lzmainfo, via LOCALEDIR) is left out rather
+		// than corrupted. A library or header in the same position is an error.
 		if isProgramDir(rel) {
 			c.skipped = append(c.skipped, rel)
 			return nil
@@ -216,8 +212,8 @@ func (c *composer) rewritten(data []byte) ([]byte, bool) {
 	return data, hit
 }
 
-// assertNoStalePrefix refuses to ship a file that still points into the store
-// after rewriting. Silently publishing one means a downstream configure gets
+// Refuses to ship a file that still points into the store after rewriting.
+// Silently publishing one means a downstream configure gets
 // -I and -L flags for a directory that belongs to somebody else, or to nobody.
 func (c *composer) assertNoStalePrefix(d *depJob, rel string, data []byte) error {
 	for _, root := range []string{c.e.Path(core.DirArtifact), c.e.Path(core.DirStaging)} {
@@ -240,7 +236,6 @@ func (c *composer) assertNoStalePrefix(d *depJob, rel string, data []byte) error
 	return nil
 }
 
-// quoteAround extracts the offending path for the error message.
 func quoteAround(data []byte, at int) string {
 	end := at
 	for end < len(data) && !strings.ContainsRune(" \t\r\n'\"", rune(data[end])) {

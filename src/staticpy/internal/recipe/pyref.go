@@ -14,28 +14,17 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/sources"
 )
 
-// PyRef builds the dynamic reference interpreter: stock CPython, compiled by
-// this machine's own gcc against shared copies of the same pinned dependency
-// versions the static build uses, so version skew can never explain a gap
-// between them.
+// The dynamic reference interpreter: stock CPython, built by this machine's gcc
+// against shared copies of the same pinned dependency versions the static
+// build uses, so version skew can never explain a gap between them.
 //
-// It is one job for every dependency plus CPython, which is not how the static
-// build works and is not an oversight. A shared library records where it was
-// configured to live: libtool writes an RPATH, OpenSSL writes OPENSSLDIR,
-// ncurses writes its terminfo directory. Those strings are only correct when
-// --prefix is the path the files end up at, so every package here is
-// configured with this job's own rootfs. The static build's per-dependency
-// prefixes cannot satisfy that, and it never notices, because static linking
-// copies the bytes in and a stale baked path is inert.
+// One job for every dependency plus CPython, because a shared library bakes in
+// its --prefix (see rootfsMode). Changing one library rebuilds the whole
+// baseline, but nothing depends on a measuring stick, so nothing else pays.
 //
-// The cost is that changing one library rebuilds the whole baseline. Nothing
-// depends on a measuring stick, so nothing else pays for that.
-//
-// After install, every ELF RUNPATH is rewritten to $ORIGIN-relative so the
-// rootfs can be copied. The configure-time --prefix stays the published
-// path: that is what make and libtool need while the artifact does not
-// exist yet. Shrinking the string in .dynstr is safe because $ORIGIN/../lib
-// is shorter than dist/artifacts/pyref_.../rootfs/lib.
+// After install every RUNPATH is rewritten $ORIGIN-relative so the rootfs can
+// be copied; shrinking the .dynstr string is safe because $ORIGIN/../lib is
+// shorter than dist/artifacts/pyref_.../rootfs/lib.
 func PyRef(cfg *config.Config, assets fs.FS, target config.Target, profile string) (core.Job, error) {
 	res, err := resolveScope(cfg, profile, config.ScopePython)
 	if err != nil {
@@ -303,11 +292,9 @@ func (j *pyRef) cpython(ctx context.Context, e *core.Env, r *core.Runner, work, 
 	// shrinks it to $ORIGIN.
 	extra := map[string]string{
 		"LDFLAGS_NODIST": "-Wl,-rpath," + filepath.Join(shadowRootfs, "lib") + ":" + filepath.Join(shadowRootfs, "lib64"),
-		// CPython imports every extension it builds. An import resolves
-		// through the loader, not -L. The rpath above names the shadow,
-		// which exists; LD_LIBRARY_PATH still covers any ELF that did
-		// not get our rpath, and stops a miss from succeeding against
-		// /lib64.
+		// CPython imports every extension it builds, through the loader, not
+		// -L. This covers any ELF that missed our rpath, and stops a miss from
+		// succeeding against /lib64.
 		"LD_LIBRARY_PATH": filepath.Join(shadowRootfs, "lib") + ":" + filepath.Join(shadowRootfs, "lib64"),
 	}
 	r.Step("configuring CPython")
@@ -400,16 +387,11 @@ func (j *pyRef) assertUsable(rootfs string) error {
 	return fmt.Errorf("recipe: pyref installed no libpython%s in %s, so --enable-shared did not take", j.abi, lib)
 }
 
-// The extension modules that exist only because a dependency was built into
-// the rootfs. CPython does not fail when configure cannot link one -- it
-// reports "necessary bits not found" and carries on -- so a baseline can
-// otherwise be published missing half of what it is supposed to be compared
-// against.
-//
-// The Python-level wrappers are listed alongside the C extensions on purpose:
-// _ctypes imports cleanly while ctypes does not, because the breakage is in the
-// .py that wraps it. Checking only the extension is how that reached a
-// published artifact once already.
+// Each exists only because a dependency was built into the rootfs, and CPython
+// does not fail when configure cannot link one -- it reports "necessary bits
+// not found" and carries on. The .py wrappers are listed too: _ctypes can
+// import cleanly while ctypes does not, and checking only the extension let
+// that reach a published artifact once.
 var modulesFromDeps = []string{
 	"_ssl", "_hashlib", "_sqlite3", "_lzma", "_bz2", "_zstd", "zlib",
 	"_ctypes", "_curses", "_uuid", "readline",
@@ -449,18 +431,11 @@ func (j *pyRef) assertModules(ctx context.Context, r *core.Runner, rootfs string
 	return fmt.Errorf("recipe: pyref's module probe could not run at all: %w", err)
 }
 
-// Undoes the two ctypes edits sources.toml applies for the static build.
-//
-// They live on the shared srctree, so this build inherits them even though
-// both exist only because a fully static interpreter has no libdl: pythonapi
-// is rebound onto a generated symbol table, and dlopen is stubbed out. Here
-// there is a real libdl and a real libpython, so stock ctypes is not merely
-// adequate, it is the thing being measured -- and leaving the rebinding in
-// place breaks `import ctypes` outright, since no staticapi module is built.
-//
-// Both replacements assert they matched, for the reason Edit.MustMatch exists:
-// if an upstream bump moves either line, that has to be a loud failure rather
-// than a reference interpreter quietly carrying the static build's ctypes.
+// Undoes the two ctypes edits sources.toml applies to the shared srctree for
+// the static build (pythonapi rebound onto staticapi, dlopen stubbed). Here
+// stock ctypes is the thing being measured, and the rebinding breaks `import
+// ctypes` outright since no staticapi module is built. Both replacements must
+// match exactly once, so an upstream move fails loudly.
 func unstaticCtypes(src string) error {
 	path := filepath.Join(src, "Lib", "ctypes", "__init__.py")
 	b, err := os.ReadFile(path)

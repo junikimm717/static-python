@@ -11,14 +11,13 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
-// Exec is the subset of core.Runner that bench needs, so every command it
-// spawns lands in dist/logs and in commands.sh.
+// A core.Runner subset, so every command bench spawns lands in dist/logs and
+// in commands.sh.
 type Exec interface {
 	Run(ctx context.Context, c core.Cmd) error
 	Output(ctx context.Context, c core.Cmd) (string, error)
 }
 
-// Venv is one interpreter's normalised environment.
 type Venv struct {
 	Label  string
 	Python string
@@ -32,9 +31,7 @@ type Venv struct {
 //
 // It is seeded with pip. --with-ensurepip=no means pip was not installed into
 // the interpreter's own prefix; it does not remove the ensurepip module or the
-// wheel it bundles, so `-m venv` can still seed one. Believing otherwise is why
-// this command ran its own micro-benchmarks instead of pyperformance: the thing
-// it was waiting for already worked.
+// wheel it bundles, so `-m venv` can still seed one.
 //
 // What a static interpreter genuinely cannot do is load a C extension, so a
 // requirement that ships one fails at import rather than at install.
@@ -63,8 +60,7 @@ func MakeVenv(ctx context.Context, x Exec, label, interp, root, pyperfSrc string
 	return &Venv{Label: label, Python: py, Dir: dir}, nil
 }
 
-// Env is the environment every measurement runs under. Cleared rather than
-// inherited: PYTHONPATH or PYTHONHOME leaking in from the caller's shell would
+// Cleared rather than inherited: PYTHONPATH or PYTHONHOME leaking in from the caller's shell would
 // apply to some arms and not others.
 func (v *Venv) Env() map[string]string {
 	return map[string]string{
@@ -92,7 +88,6 @@ func sitePackages(venvDir string) (string, error) {
 	return "", fmt.Errorf("no site-packages under %s", libDir)
 }
 
-// FindPyperf locates an importable pyperf package to copy into each venv.
 func FindPyperf(hint string) (string, error) {
 	if hint != "" {
 		if filepath.Base(hint) == "pyperf" {
@@ -142,8 +137,8 @@ func (v *Venv) Pip(ctx context.Context, x Exec, name string, args ...string) err
 	return v.pip(ctx, x, name, false, args)
 }
 
-// pipSoft is for installs whose failure skips a benchmark rather than
-// aborting the run. The Runner must not log those as ERROR.
+// For installs whose failure skips a benchmark rather than aborting the run,
+// which the Runner must not log as ERROR.
 func (v *Venv) pipSoft(ctx context.Context, x Exec, name string, args ...string) error {
 	return v.pip(ctx, x, name, true, args)
 }

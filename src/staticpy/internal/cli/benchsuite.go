@@ -14,8 +14,7 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
-// runPyperfSuite drives the pyperformance suite across the selected arms and
-// writes a session directory that can be re-read long after the run.
+// Writes a session directory that can be re-read long after the run.
 func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, paths map[string]string,
 	baseline, suiteRoot, pyperfHint string, useVenv bool, noPin bool, cpu int, timeout time.Duration, offline bool, pins bench.Pins, sessionParent, findLinks, outPath string, kit *bench.KitDoc) error {
 
@@ -59,7 +58,7 @@ func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, 
 		a := bench.Arm{Label: label, Python: paths[label]}
 		if useVenv {
 			runner.Step("venv-" + label)
-			// A copied pyperf tree is now the override, not the requirement:
+			// A copied pyperf tree is the override, not the requirement:
 			// installing pyperformance brings its own, pinned to the version
 			// its benchmarks were written against.
 			var pyperfSrc string

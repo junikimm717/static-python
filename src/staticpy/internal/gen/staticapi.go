@@ -117,7 +117,6 @@ func (j *StaticAPI) Build(ctx context.Context, e *core.Env, r *core.Runner, work
 	return assets.WriteTo(stage, "staticapi/symbols.h")
 }
 
-// abiItem is one entry of the dump the driver script produces.
 type abiItem struct {
 	Name    string `json:"name"`
 	Kind    string `json:"kind"`
@@ -202,8 +201,6 @@ func renderSymbols(items []abiItem, version, manifestSHA string) ([]byte, error)
 	return b.Bytes(), nil
 }
 
-// A public header that #defines a stable-ABI function over a PyAPI_FUNC
-// (Py_PACK_FULL_VERSION in 3.14) makes &name take the address of the macro.
 func writeUndefs(b *bytes.Buffer, items []abiItem) {
 	seen := map[string]bool{}
 	var names []string
@@ -272,8 +269,7 @@ func writeExterns(b *bytes.Buffer, funcs, data []abiItem) {
 	b.WriteString("\n")
 }
 
-// writeTable guards entries one by one rather than hoisting them into a block:
-// the table has to stay sorted however the feature macros resolve, or bsearch
+// Entries are guarded one by one rather than hoisted into a block: the table has to stay sorted however the feature macros resolve, or bsearch
 // silently misses symbols on some targets.
 func writeTable(b *bytes.Buffer, name string, items []abiItem, macro string) {
 	fmt.Fprintf(b, "ExportedSymbol %s[] = {\n", name)

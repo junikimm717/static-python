@@ -13,17 +13,13 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
-// Level is how much of CPython's own test suite to run.
 type Level string
 
 const (
-	// LevelSmoke is the import probes only: seconds, and it gates every target.
+	// Import probes only: seconds, and it gates every target.
 	LevelSmoke Level = "smoke"
-	// LevelCore is a curated subset covering the language core plus every
-	// extension module staticpy links in itself.
-	LevelCore Level = "core"
-	// LevelFull is the whole suite.
-	LevelFull Level = "full"
+	LevelCore  Level = "core"
+	LevelFull  Level = "full"
 )
 
 func Levels() []Level { return []Level{LevelSmoke, LevelCore, LevelFull} }
@@ -50,12 +46,12 @@ var CoreTests = []string{
 	"test_threading", "test_importlib", "test_zipimport",
 }
 
-// DefaultTestTimeout is handed to regrtest as --timeout, so a wedged test is
-// killed with a traceback instead of hanging the build.
+// Handed to regrtest as --timeout, so a wedged test is killed with a traceback
+// instead of hanging the build.
 const DefaultTestTimeout = 20 * time.Minute
 
-// DefaultSuiteTimeout bounds the whole run. It has to exceed DefaultTestTimeout,
-// or the suite kills runs regrtest still considers healthy.
+// Has to exceed DefaultTestTimeout, or the suite kills runs regrtest still
+// considers healthy.
 func DefaultSuiteTimeout(level Level) time.Duration {
 	if level == LevelFull {
 		return 8 * time.Hour
@@ -66,11 +62,11 @@ func DefaultSuiteTimeout(level Level) time.Duration {
 type SuiteOptions struct {
 	// Tests overrides the level's default set.
 	Tests []string
-	// Jobs is regrtest's -j. Zero or one runs serially.
+	// regrtest's -j. Zero or one runs serially.
 	Jobs int
-	// TestTimeout is regrtest's per-test --timeout.
+	// regrtest's per-test --timeout.
 	TestTimeout time.Duration
-	// Timeout bounds the whole suite run.
+	// Bounds the whole suite run.
 	Timeout time.Duration
 	// Ignore becomes one -i per entry, so an impossible method drops out of the
 	// run instead of failing the file it lives in.
@@ -81,7 +77,6 @@ type SuiteOptions struct {
 	PythonArgs []string
 }
 
-// Outcome is what CPython's runner reported, per test.
 type Outcome struct {
 	Level  Level  `json:"level"`
 	Runner string `json:"runner"`
@@ -93,31 +88,30 @@ type Outcome struct {
 	NoTests    []string `json:"ran_no_tests,omitempty"`
 	Passed     int      `json:"passed"`
 
-	// Requested is the set the run was asked for, nil for a full run where the
-	// suite chooses. It is what lets an expectation entry outside this level's
-	// scope be left alone rather than judged.
+	// Nil for a full run, where the suite chooses. It is what lets an
+	// expectation entry outside this level's scope be left alone rather than
+	// judged.
 	Requested []string `json:"requested,omitempty"`
 
 	Result RunResult     `json:"run"`
 	Dur    time.Duration `json:"-"`
 }
 
-// TestStatus is what the suite did with one test.
 type TestStatus string
 
 const (
 	TestPassed TestStatus = "passed"
 	TestFailed TestStatus = "failed"
-	// TestSkipped covers the suite's own skips: a missing resource, a platform
-	// guard, a test file that ran nothing.
+	// The suite's own skips: a missing resource, a platform guard, a test file
+	// that ran nothing.
 	TestSkipped TestStatus = "skipped"
-	// TestAbsent means the test was not part of this run at all.
+	// Not part of this run at all.
 	TestAbsent TestStatus = "absent"
 )
 
-// Env-changed counts as a failure: a test that
-// leaves the interpreter altered has found a real bug, and letting it pass
-// would hide exactly the kind of state corruption a static build introduces.
+// Env-changed counts as a failure: a test that leaves the interpreter altered
+// has found a real bug, and letting it pass would hide exactly the kind of
+// state corruption a static build introduces.
 func (o *Outcome) StatusOf(test string) TestStatus {
 	switch {
 	case contains(o.Failed, test), contains(o.EnvChanged, test):
@@ -131,9 +125,9 @@ func (o *Outcome) StatusOf(test string) TestStatus {
 	return TestAbsent
 }
 
-// A non-zero exit is
-// an expected outcome, so it lands in the Outcome rather than the error; the
-// error is reserved for not being able to run the suite at all.
+// A non-zero exit is an expected outcome, so it lands in the Outcome rather
+// than the error; the error is reserved for not being able to run the suite at
+// all.
 func RunSuite(ctx context.Context, r *core.Runner, l *Launcher, level Level, python, work string, opts SuiteOptions) (*Outcome, error) {
 	tests := opts.Tests
 	if tests == nil {
@@ -253,10 +247,9 @@ func (o *Outcome) Accounted() int {
 
 // StatusOf treats a requested test that landed in no bucket as passed, because
 // regrtest names the tests that did not pass and counts the ones that did. That
-// inference is only sound while every requested test is accounted for, so this
-// is the check that has to hold for the rest of the classification to mean
-// anything: regrtest prints a summary even when everything fails, so nothing at
-// all came back means the suite never ran.
+// inference is only sound while every requested test is accounted for. regrtest
+// prints a summary even when everything fails, so nothing at all coming back
+// means the suite never ran.
 func (o *Outcome) CheckCoverage() error {
 	n := o.Accounted()
 	if o.Result.TimedOut {

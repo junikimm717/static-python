@@ -14,13 +14,9 @@ import (
 	"time"
 )
 
-// Fingerprint is every host property that can move a number. It is written
-// onto manifest.json (and nested in env.json) so a later comparison can tell
-// "same machine" from "same cpu_model string".
-//
-// SHA256 covers the identity fields only. Snapshots that change while the
-// machine sits idle (load, current frequency, free RAM, this run's pin)
-// live under Telemetry and are excluded from the digest.
+// Every host property that can move a number, written onto manifest.json (and
+// nested in env.json) so a later comparison can tell "same machine" from "same
+// cpu_model string". SHA256 excludes Telemetry.
 type Fingerprint struct {
 	SHA256          string            `json:"sha256,omitempty"`
 	CPU             CPUInfo           `json:"cpu"`
@@ -39,9 +35,9 @@ type Fingerprint struct {
 	Telemetry       *Telemetry        `json:"telemetry,omitempty"`
 }
 
-// Telemetry is a point-in-time snapshot of the host, recorded so a
-// suspicious number can be audited, but not hashed: two runs on the same
-// silicon must compare equal even if load and current MHz moved.
+// Recorded so a suspicious number can be audited, but not hashed: two runs on
+// the same silicon must compare equal even if load, current MHz, free RAM or
+// this run's pin moved.
 type Telemetry struct {
 	CapturedUTC          string `json:"captured_utc,omitempty"`
 	CPUMHz               string `json:"cpu_mhz,omitempty"`

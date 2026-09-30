@@ -28,8 +28,7 @@ type Factors struct {
 	Toolchain string `json:"toolchain,omitempty"`
 }
 
-// FactorOpts is the resolved profile shape DeriveFactors reads. The
-// profile name is deliberately not an input.
+// The profile name is deliberately not an input.
 type FactorOpts struct {
 	HostBuilt       bool
 	LTOMode         string

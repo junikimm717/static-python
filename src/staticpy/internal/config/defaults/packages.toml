@@ -261,13 +261,11 @@ configure = [
   "--without-ada", "--without-manpages", "--without-tests",
   "--without-progs",
   "--enable-termcap",
-  # No database is installed either way -- the recipe neutralises tic with
-  # TIC_PATH=true -- so the terminfo path ncurses bakes in from --prefix points
-  # at nothing. In an archive that string is still LTO bitcode and the sysroot
-  # composer cannot see it; in a real .so it is a dependency prefix inside a
-  # binary, and the composer refuses to rewrite it. Saying so removes the
-  # string. No --with-fallbacks: that is the only thing that would need tic and
-  # infocmp off the host PATH, and termcap remains as the runtime path.
+  # TIC_PATH=true means no database is installed, so the terminfo path baked
+  # in from --prefix points at nothing -- and in a real .so it is a dependency
+  # prefix the sysroot composer refuses to rewrite. This removes the string.
+  # No --with-fallbacks: it would need tic and infocmp off the host PATH, and
+  # termcap remains as the runtime path.
   "--disable-database",
 ]
 provides = ["lib/libncursesw.so"]

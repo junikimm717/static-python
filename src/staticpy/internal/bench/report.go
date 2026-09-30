@@ -8,8 +8,8 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/buildinfo"
 )
 
-// SuiteReport is everything the markdown and HTML reports share, so the
-// two cannot drift on environment, pins, or identity the way they used to.
+// Everything the markdown and HTML reports share, so the two cannot drift on
+// environment, pins, or identity.
 type SuiteReport struct {
 	SuiteName     string
 	Baseline      string
@@ -25,9 +25,8 @@ type SuiteReport struct {
 	PythonVersion string
 }
 
-// Experiment is the packed lineup identity: which CPython, which
-// staticpy commit, which kit layout, which triple. Kit runs fill this
-// from kit.json; a local bench fills python_version from the pin.
+// Kit runs fill this from kit.json; a local bench fills python_version from
+// the pin.
 type Experiment struct {
 	PythonVersion string
 	GitRevision   string
@@ -107,7 +106,6 @@ func writeExperimentHTML(b *strings.Builder, row func(k, v string) string, e Exp
 	}
 }
 
-// EnvMarkdown is the provenance block every suite's report shares.
 func EnvMarkdown(m Machine, protocol int, pins Pins, suiteName string) string {
 	return envMarkdown(m, protocol, pins, suiteName, Experiment{}.withGit())
 }

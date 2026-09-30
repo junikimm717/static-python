@@ -20,7 +20,6 @@ func BuiltinName(dotted string) string {
 	return "_" + strings.ReplaceAll(dotted, ".", "_")
 }
 
-// Shim is one generated file under site-packages.
 type Shim struct {
 	Path    string // slash-separated, relative to site-packages
 	Content []byte

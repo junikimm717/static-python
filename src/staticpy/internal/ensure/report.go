@@ -1,5 +1,4 @@
-// Package ensure is staticpy's verification layer. It proves that a built
-// interpreter is what it claims to be — statically linked, built for the right
+// Package ensure proves that a built interpreter is what it claims to be — statically linked, built for the right
 // machine, able to import every module the recipe promised, and in agreement
 // with CPython's own test suite — rather than trusting that the build exited
 // zero.
@@ -93,7 +92,6 @@ func (r *Report) Fail(name string, err error, format string, a ...any) {
 	r.Add(Check{Name: name, Status: StatusFail, Err: err, Detail: sprintf(format, a...)})
 }
 
-// FailCmd records a failure whose evidence is a command's own output.
 func (r *Report) FailCmd(name string, res RunResult, err error, format string, a ...any) {
 	r.Add(Check{
 		Name:   name,
@@ -107,7 +105,6 @@ func (r *Report) FailCmd(name string, res RunResult, err error, format string, a
 	})
 }
 
-// Absorb folds a sub-report in, optionally namespacing its check names.
 func (r *Report) Absorb(prefix string, sub *Report) {
 	if sub == nil {
 		return
@@ -239,8 +236,6 @@ func (e *reportError) Error() string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
-// Err is nil when the report passed, else an error listing every failure with
-// the evidence that produced it.
 func (r *Report) Err() error {
 	if r.OK() {
 		return nil
@@ -284,7 +279,7 @@ func (r *Report) MarshalJSON() ([]byte, error) {
 
 func (r *Report) JSON() ([]byte, error) { return json.MarshalIndent(r, "", "  ") }
 
-// Tail bounds text kept with a failed check, keeping the end: a traceback's
+// Keeps the end: a traceback's
 // last lines say what went wrong, its first lines say where it started.
 func Tail(s string) string {
 	s = strings.TrimRight(s, "\n")
@@ -326,8 +321,7 @@ func pad(s string, w int) string {
 	return s
 }
 
-// ShJoin renders an argv the way a shell would accept it, so a failure can be
-// re-run by copy and paste.
+// Shell-quoted so a failure can be re-run by copy and paste.
 func ShJoin(argv []string) string {
 	out := make([]string, len(argv))
 	for i, a := range argv {

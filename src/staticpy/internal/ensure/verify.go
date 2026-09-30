@@ -19,35 +19,29 @@ import (
 // not a habit picked up from a shell history.
 const SkipEnv = "STATICPY_SKIP_VERIFY"
 
-// ReportName is the file the job publishes: the whole report, in JSON, so a CI
-// run keeps its evidence after the terminal output is gone.
+// The whole report, in JSON, so a CI run keeps its evidence after the terminal
+// output is gone.
 const ReportName = "report.json"
 
-// DefaultPythonRel is where the interpreter sits inside the interpreter job's
-// artifact.
 const DefaultPythonRel = "bin/python3"
 
-// SymbolsExpected are the symbols ctypes.pythonapi resolves through. They exist
-// only when the build was not stripped, so their absence is reported as a skip
-// rather than a failure.
+// ctypes.pythonapi resolves through these. They exist only when the build was
+// not stripped, so their absence is reported as a skip rather than a failure.
 var SymbolsExpected = []string{"Py_GetVersion", "Py_Initialize"}
 
-// Options tune one verification run.
 type Options struct {
-	// PythonRel is the interpreter's path inside the interpreter artifact.
 	PythonRel string
-	// Symbols are checked against .symtab when the binary is not stripped.
+	// Checked against .symtab when the binary is not stripped.
 	Symbols []string
-	// WantVersion, if set, is the version prefix sys.version must report.
+	// If set, the version prefix sys.version must report.
 	WantVersion string
-	// Modules overrides the smoke tier's import list.
+	// Overrides the smoke tier's import list.
 	Modules []string
 	// Jobs is regrtest's -j for the full level.
-	Jobs int
-	// TestTimeout and SuiteTimeout bound one test and the whole suite.
+	Jobs         int
 	TestTimeout  time.Duration
 	SuiteTimeout time.Duration
-	// WantDynamic is the host-built reference: shared libpython, a PT_INTERP,
+	// The host-built reference: shared libpython, a PT_INTERP,
 	// no staticapi symbol table in the executable.
 	WantDynamic bool
 }
@@ -75,7 +69,7 @@ func NewJob(interp core.Job, target config.Target, profile string, level Level, 
 	return &Job{interp: interp, target: target, profile: profile, level: level, expect: expect, opts: opts}
 }
 
-// checkerVersion invalidates stored reports when the checks themselves change.
+// Invalidates stored reports when the checks themselves change.
 // Without it a green report written by a laxer checker outlives the fix that
 // tightened it, which is how a verification system lies.
 const checkerVersion = "3"
@@ -251,7 +245,7 @@ func writeReport(stage string, rep *Report) error {
 	return nil
 }
 
-// pathSlug mirrors core's slug-to-path rule: ':' is readable in logs, '_' is
+// Mirrors core's slug-to-path rule: ':' is readable in logs, '_' is
 // safe on every filesystem.
 func pathSlug(slug string) string {
 	out := []rune(slug)

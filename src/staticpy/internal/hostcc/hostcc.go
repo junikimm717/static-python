@@ -37,7 +37,6 @@ func SupportedArch() (string, error) {
 	return "", fmt.Errorf("the reference build is only supported on x86_64 and aarch64; this machine is %s.\nThe static build is unaffected: `staticpy build` works on every configured target", runtime.GOARCH)
 }
 
-// Find resolves the host C compiler, honouring CC.
 func Find() (string, error) {
 	var tried []string
 	if cc := strings.TrimSpace(os.Getenv("CC")); cc != "" {
@@ -69,8 +68,6 @@ type Report struct {
 
 func (r Report) OK() bool { return r.Compile == nil && r.Shared == nil && r.Headers == nil }
 
-// Probe proves the compiler works rather than merely existing.
-//
 // The shared-library link is the check that matters and the one a --version
 // probe misses: every dependency of the reference interpreter is built shared,
 // so a toolchain that cannot produce a .so fails deep in a dependency build
@@ -127,8 +124,8 @@ func run(ctx context.Context, dir, cc string, args ...string) error {
 	return nil
 }
 
-// Gate is the fail-fast entry point: it runs before anything is fetched, so a
-// missing toolchain costs nothing but the check.
+// Runs before anything is fetched, so a missing toolchain costs nothing but the
+// check.
 func Gate(ctx context.Context) (Report, error) {
 	if _, err := SupportedArch(); err != nil {
 		return Report{}, err
@@ -149,8 +146,6 @@ func Gate(ctx context.Context) (Report, error) {
 	return r, nil
 }
 
-// Identity is what a job key records about the host toolchain.
-//
 // The static build takes its compiler's identity from a gccfactory manifest or,
 // failing that, a probe of the driver. Neither is available here, and the key
 // has to name the libc as well as the compiler: a distro glibc upgrade changes
@@ -168,7 +163,6 @@ type Identity struct {
 	Key    string
 }
 
-// Describe is the one-line human form, for doctor and for provenance.
 func (id Identity) Describe() string {
 	return fmt.Sprintf("gcc %s targeting %s against %s, driver+headers %s",
 		id.Version, id.Machine, id.Libc, id.Key[:12])

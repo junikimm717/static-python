@@ -21,8 +21,7 @@ const (
 	ActionDeleteLine   = "delete_line"
 )
 
-// MatchCountError is what makes edits safe to keep in a build that runs for
-// years. sed exits 0 when its anchor has moved: the edit silently does nothing
+// sed exits 0 when its anchor has moved: the edit silently does nothing
 // and the build ships a subtly broken interpreter. Here a moved anchor stops
 // the job.
 type MatchCountError struct {
@@ -150,9 +149,6 @@ func validateEdit(s config.Source, e config.Edit) error {
 	return nil
 }
 
-// A bare text_file resolves under the source's patch directory, the same way a
-// patch filename does. Naming the directory in the config instead would embed
-// the version in a second place and quietly stop resolving on the next bump.
 // An anchor is a line lifted out of somebody else's source, so it is compared
 // literally against a whole line. Treating it as a regex by default is what
 // turned `pythonapi = PyDLL(None)` into a pattern for `PyDLLNone`, which
@@ -169,6 +165,9 @@ func anchorMatcher(e config.Edit) (func(string) bool, error) {
 	return re.MatchString, nil
 }
 
+// A bare text_file resolves under the source's patch directory, the same way a
+// patch filename does. Naming the directory in the config instead would embed
+// the version in a second place and quietly stop resolving on the next bump.
 func editText(a Assets, s config.Source, e config.Edit) (string, error) {
 	if e.TextFile == "" {
 		return e.Text, nil

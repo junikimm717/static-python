@@ -20,33 +20,26 @@ import (
 )
 
 const (
-	patcherAsset = "patcher.c"
-	// ConfigSiteName is the cache CPython's configure reads through CONFIG_SITE.
+	patcherAsset   = "patcher.c"
 	ConfigSiteName = "config.site"
 )
 
-// PyconfigPatchAsset is the per-target header fragment holding the facts the
-// probe cannot produce: inline-asm availability, atomics quirks, anything that
-// is a decision rather than a measurement.
+// Holds the facts the probe cannot produce: inline-asm availability, atomics
+// quirks, anything that is a decision rather than a measurement.
 func PyconfigPatchAsset(t config.Target) string {
 	return path.Join("pyconfig", t.Triple+"-patches.h")
 }
 
-// ConfigSite and PyconfigPatches locate the probe's two outputs inside its
-// artifact directory.
 func ConfigSite(dir string) string { return filepath.Join(dir, ConfigSiteName) }
 
 func PyconfigPatches(dir string, t config.Target) string {
 	return filepath.Join(dir, t.Triple+"-patches.h")
 }
 
-// Probe measures the target's ABI by compiling patcher.c with the target
-// toolchain and running the result. Its output is a config.site, so CPython's
-// own configure computes a correct pyconfig.h rather than being bypassed and
-// the header patched afterwards.
-//
-// It is profile-free: sizes and alignments are properties of the ABI, not of
-// the flags a build happens to use.
+// The output is a config.site, so CPython's own configure computes a correct
+// pyconfig.h rather than being bypassed and the header patched afterwards.
+// Profile-free: sizes and alignments are properties of the ABI, not of the
+// flags a build happens to use.
 func Probe(cfg *config.Config, srcAssets fs.FS, t config.Target) (core.Job, error) {
 	id, err := Toolchain(nil, t.Triple)
 	if err != nil {
@@ -158,8 +151,7 @@ func (j *probeJob) Build(ctx context.Context, e *core.Env, r *core.Runner, work,
 		pyconfigFragment(j.target, res.Stdout, order, fromAsset, j.patches), 0o644)
 }
 
-// define is one line of the probe's output or of the per-target fragment.
-// Value is empty for an #undef.
+// One line of the probe's output or of the per-target fragment.
 type define struct {
 	Value string
 	Undef bool
@@ -191,8 +183,7 @@ func parseDefines(text string) (map[string]define, []string) {
 	return out, order
 }
 
-// probedMacros are the measurements CPython's configure cannot make for a
-// target it cannot run. Losing one silently is how pyconfig.h ends up with a
+// configure cannot measure these for a target it cannot run. Losing one silently is how pyconfig.h ends up with a
 // host-sized long.
 var probedMacros = []string{
 	"SIZEOF_INT", "SIZEOF_LONG", "SIZEOF_LONG_LONG", "SIZEOF_VOID_P", "SIZEOF_SHORT",
@@ -203,7 +194,7 @@ var probedMacros = []string{
 	"ALIGNOF_DOUBLE", "ALIGNOF_LONG_DOUBLE", "ALIGNOF_SIZE_T", "ALIGNOF_WCHAR_T", "ALIGNOF__BOOL",
 }
 
-// probedBooleans must appear in the probe output but may legitimately be an
+// These must appear in the probe output but may legitimately be an
 // #undef, which is a real answer rather than a missing one. These are the
 // questions configure settles by running a program, so on a cross build they
 // are otherwise guessed: ac_cv_aligned_required in particular defaults to
@@ -274,8 +265,8 @@ func autoconfCache(macro string) (string, bool) {
 	return "ac_cv_" + kind + "_" + strings.ToLower(name), true
 }
 
-// reportOverrides names every field where the hand-written fragment contradicts
-// what the hardware just reported. The fragment still wins -- forcing a value
+// Names every field where the hand-written fragment contradicts what the
+// hardware just reported. The fragment still wins -- forcing a value
 // the probe could measure is occasionally deliberate -- but silence here is
 // what lets a fragment rot into overriding a correct measurement with a stale
 // one, which is how the blanket x87 undef survived into targets that have x87.
@@ -314,13 +305,10 @@ func showDefine(d define) string {
 	return d.Value
 }
 
-// crossAnswers are the questions CPython's configure settles by running a test
-// program, which a cross build cannot do. They are assertions about Linux and
-// musl rather than measurements -- the probe can report a size, it cannot
-// report whether getaddrinfo is buggy -- so each one is stated with its reason.
-//
-// Without ac_cv_buggy_getaddrinfo configure finds getaddrinfo, fails to run its
-// correctness check, assumes the worst, and refuses to continue.
+// Questions configure settles by running a test program, which a cross build
+// cannot do. These are assertions about Linux and musl, not measurements, so
+// each is stated with its reason. Without ac_cv_buggy_getaddrinfo configure
+// assumes the worst and refuses to continue.
 var crossAnswers = map[string]string{
 	"ac_cv_buggy_getaddrinfo":   "no",  // musl's is fine; the check is for an old glibc bug
 	"ac_cv_file__dev_ptmx":      "yes", // Linux has it; configure stats the *build* machine
@@ -343,9 +331,6 @@ func crossAnswersHash() string {
 	return hex.EncodeToString(h.Sum(nil))[:16]
 }
 
-// configSite is what makes CPython's own configure produce a correct
-// pyconfig.h for a target it cannot execute: every test it would have run and
-// failed to run is pre-answered here.
 func configSite(t config.Target, probed, fromAsset map[string]define) ([]byte, error) {
 	merged := map[string]define{}
 	for k, v := range probed {
@@ -410,7 +395,7 @@ func boolYesNo(v bool) string {
 	return "no"
 }
 
-// pyconfigFragment is the legacy <triple>-patches.h: the probe's own output
+// The legacy <triple>-patches.h: the probe's own output
 // followed by the per-target asset. A macro the asset also states is dropped
 // from the probe half, so the two halves can never redefine each other.
 func pyconfigFragment(t config.Target, probeOut string, order []string, fromAsset map[string]define, asset []byte) []byte {

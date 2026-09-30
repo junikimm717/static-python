@@ -500,10 +500,6 @@ func isExecutable(p string) bool {
 	return err == nil && !fi.IsDir() && fi.Mode()&0o111 != 0
 }
 
-// findStaticInterp resolves (and, with build, produces) this machine's own
-// pynative artifact. Any failure here - not built, or no toolchain provisioned
-// at all - is meant to be a soft "skip static" for the caller, not fatal: bench
-// is still useful comparing just dynamic and system.
 // findBuiltInterp locates the interpreter one profile produces, building it
 // first when asked. An empty profile means whatever --profile selected.
 func findBuiltInterp(g *Global, profile, abi string, build bool) (string, error) {

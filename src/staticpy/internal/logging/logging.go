@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-// It gates both output streams.
+// Gates both output streams.
 type Level int8
 
 const (
@@ -56,7 +56,7 @@ func ParseLevel(s string) (Level, error) {
 	return LevelInfo, fmt.Errorf("unknown log level %q (want debug|info|warn|error)", s)
 }
 
-// It is exactly what a JSONL line holds.
+// One JSONL line.
 type Event struct {
 	Time   time.Time      `json:"time"`
 	Level  string         `json:"level"`
@@ -69,8 +69,7 @@ type Event struct {
 type Options struct {
 	// RunsRoot is dist/logs/runs. Empty disables the JSONL stream.
 	RunsRoot string
-	// Stderr receives the human stream; defaults to os.Stderr. Use io.Discard
-	// to silence it.
+	// Stderr receives the human stream; defaults to os.Stderr.
 	Stderr io.Writer
 	// Level is the minimum severity emitted to either stream.
 	Level Level
@@ -94,7 +93,7 @@ type Logger struct {
 	fields map[string]any
 }
 
-// Close it when the run ends.
+// Close the returned Logger when the run ends.
 func New(o Options) (*Logger, error) {
 	s := &sink{out: o.Stderr, level: o.Level}
 	if s.out == nil {
@@ -121,12 +120,13 @@ func New(o Options) (*Logger, error) {
 	return &Logger{s: s}, nil
 }
 
-// Useful in tests.
+// A Logger that drops everything; useful in tests.
 func Discard() *Logger {
 	return &Logger{s: &sink{out: io.Discard, level: LevelError + 1}}
 }
 
-// Two runs starting in the same second therefore never share a run.jsonl.
+// Mkdir fails on an existing dir, so two runs starting in the same second
+// never share a run.jsonl.
 func uniqueDir(root, name string) (string, error) {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return "", err
@@ -158,7 +158,6 @@ func autoColor(w io.Writer) bool {
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
 
-// RunDir is the directory holding run.jsonl, or "" if none.
 func (l *Logger) RunDir() string {
 	if l == nil || l.s == nil {
 		return ""

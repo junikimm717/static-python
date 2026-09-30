@@ -218,7 +218,7 @@ func (s *session) planRows(nodes []core.PlanNode) []planRow {
 	return out
 }
 
-// printPlan lists the DAG in dependency-first order, which is also build order.
+// Dependency-first order, which is also build order.
 func (s *session) printPlan(nodes []core.PlanNode, verb string) error {
 	rows := s.planRows(nodes)
 	if s.g.JSON {

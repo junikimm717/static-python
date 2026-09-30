@@ -6,9 +6,8 @@ import (
 	"strings"
 )
 
-// Machine is the hardware provenance written to every suite's env.json.
-// Summary fields stay at the top so reports and fixtures stay readable;
-// Fingerprint is the full host record, also copied onto manifest.json.
+// Written to every suite's env.json. Summary fields stay at the top so reports
+// and fixtures stay readable; Fingerprint is the full host record.
 type Machine struct {
 	Kernel               string       `json:"kernel"`
 	CPUModel             string       `json:"cpu_model"`

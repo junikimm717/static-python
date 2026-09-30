@@ -22,8 +22,7 @@ func alignMenu() Menu {
 
 // The header is drawn as the last description line; the options are drawn by
 // huh with a selector in front of each. Both come from row() with the same
-// widths, so alignment is exactly whether the two prefixes match -- which a
-// hardcoded indent did not, being guessed against a different renderer.
+// widths, so alignment is exactly whether the two prefixes match.
 func TestColumnHeaderAlignsWithOptionRows(t *testing.T) {
 	th := huh.ThemeCharm()
 	m := alignMenu()
