@@ -19,35 +19,21 @@ import (
 // not a habit picked up from a shell history.
 const SkipEnv = "STATICPY_SKIP_VERIFY"
 
-// ReportName is the file the job publishes: the whole report, in JSON, so a CI
-// run keeps its evidence after the terminal output is gone.
+// The whole report, in JSON, so a CI run keeps its evidence after the terminal
+// output is gone.
 const ReportName = "report.json"
 
-// DefaultPythonRel is where the interpreter sits inside the interpreter job's
-// artifact.
 const DefaultPythonRel = "bin/python3"
 
-// SymbolsExpected are the symbols ctypes.pythonapi resolves through. They exist
-// only when the build was not stripped, so their absence is reported as a skip
-// rather than a failure.
+// ctypes.pythonapi resolves through these. They exist only when the build was
+// not stripped, so their absence is reported as a skip rather than a failure.
 var SymbolsExpected = []string{"Py_GetVersion", "Py_Initialize"}
 
-// Options tune one verification run.
 type Options struct {
-	// PythonRel is the interpreter's path inside the interpreter artifact.
 	PythonRel string
-	// Symbols are checked against .symtab when the binary is not stripped.
-	Symbols []string
-	// WantVersion, if set, is the version prefix sys.version must report.
+	// If set, the version prefix sys.version must report.
 	WantVersion string
-	// Modules overrides the smoke tier's import list.
-	Modules []string
-	// Jobs is regrtest's -j for the full level.
-	Jobs int
-	// TestTimeout and SuiteTimeout bound one test and the whole suite.
-	TestTimeout  time.Duration
-	SuiteTimeout time.Duration
-	// WantDynamic is the host-built reference: shared libpython, a PT_INTERP,
+	// The host-built reference: shared libpython, a PT_INTERP,
 	// no staticapi symbol table in the executable.
 	WantDynamic bool
 }
@@ -69,13 +55,10 @@ func NewJob(interp core.Job, target config.Target, profile string, level Level, 
 	if opts.PythonRel == "" {
 		opts.PythonRel = DefaultPythonRel
 	}
-	if opts.Symbols == nil {
-		opts.Symbols = SymbolsExpected
-	}
 	return &Job{interp: interp, target: target, profile: profile, level: level, expect: expect, opts: opts}
 }
 
-// checkerVersion invalidates stored reports when the checks themselves change.
+// Invalidates stored reports when the checks themselves change.
 // Without it a green report written by a laxer checker outlives the fix that
 // tightened it, which is how a verification system lies.
 const checkerVersion = "3"
@@ -120,7 +103,7 @@ func testSetHash(level Level) string {
 }
 
 func (j *Job) ArtifactDir(e *core.Env) string {
-	return e.Path(core.DirArtifact, pathSlug(j.Slug())+hostPublishTail(j.interp.ArtifactDir(e)))
+	return e.Path(core.DirArtifact, core.PathSlug(j.Slug())+hostPublishTail(j.interp.ArtifactDir(e)))
 }
 
 func SkipRequested() bool { return os.Getenv(SkipEnv) == "1" }
@@ -144,10 +127,8 @@ func (j *Job) Build(ctx context.Context, e *core.Env, r *core.Runner, work, stag
 	if werr := writeReport(stage, rep); werr != nil && err == nil {
 		err = werr
 	}
-	if rep != nil {
-		e.Log.Info("verification finished", "target", j.target.Triple, "level", string(j.level),
-			"report", rep.String())
-	}
+	e.Log.Info("verification finished", "target", j.target.Triple, "level", string(j.level),
+		"report", rep.String())
 	return err
 }
 
@@ -158,20 +139,13 @@ func Verify(ctx context.Context, e *core.Env, r *core.Runner, t config.Target, l
 	rep := NewReport(fmt.Sprintf("verify %s %s", t.Triple, level))
 	defer func() { rep.Dur = time.Since(start) }()
 
-	if opts.PythonRel == "" {
-		opts.PythonRel = DefaultPythonRel
-	}
-	if opts.Symbols == nil {
-		opts.Symbols = SymbolsExpected
-	}
-
 	if st, err := os.Stat(python); err != nil || st.IsDir() {
 		rep.Failf("interpreter", "%s is not a file: the interpreter job did not produce %s",
 			python, opts.PythonRel)
 		return rep, rep.Err()
 	}
 
-	CheckELF(rep, python, t, opts.Symbols, opts.WantDynamic)
+	CheckELF(rep, python, t, SymbolsExpected, opts.WantDynamic)
 
 	l, err := NewLauncher(e, t)
 	if err != nil {
@@ -180,14 +154,9 @@ func Verify(ctx context.Context, e *core.Env, r *core.Runner, t config.Target, l
 	}
 	rep.Pass("runner", "%s%s", l.Runner, launcherDetail(l))
 
-	if r != nil {
-		r.Step("verify " + t.Triple + " " + string(level))
-	}
+	r.Step("verify " + t.Triple + " " + string(level))
 
-	rep.Absorb("", RunProbes(ctx, r, l, t, python, work, ProbeOptions{
-		Modules:     opts.Modules,
-		WantVersion: opts.WantVersion,
-	}))
+	rep.Absorb(RunProbes(ctx, r, l, t, python, work, opts.WantVersion))
 
 	// The suite is worth nothing if the interpreter cannot import its own
 	// modules, and running it anyway would bury the real failure under
@@ -201,12 +170,7 @@ func Verify(ctx context.Context, e *core.Env, r *core.Runner, t config.Target, l
 	for _, e := range expect.Ignore {
 		ignore = append(ignore, e.Test)
 	}
-	out, err := RunSuite(ctx, r, l, level, python, work, SuiteOptions{
-		Ignore:      ignore,
-		Jobs:        opts.Jobs,
-		TestTimeout: opts.TestTimeout,
-		Timeout:     opts.SuiteTimeout,
-	})
+	out, err := RunSuite(ctx, r, l, level, python, work, ignore)
 	if err != nil {
 		rep.Fail("suite", err, "CPython's test suite could not be run")
 		return rep, rep.Err()
@@ -221,7 +185,7 @@ func Verify(ctx context.Context, e *core.Env, r *core.Runner, t config.Target, l
 	}
 
 	class := Classify(out, expect, t.Triple)
-	rep.Absorb("", class.Report(time.Since(suiteStart)))
+	rep.Absorb(class.Report(time.Since(suiteStart)))
 	return rep, rep.Err()
 }
 
@@ -237,9 +201,6 @@ func launcherDetail(l *Launcher) string {
 }
 
 func writeReport(stage string, rep *Report) error {
-	if rep == nil {
-		return nil
-	}
 	b, err := rep.JSON()
 	if err != nil {
 		return fmt.Errorf("encode verification report: %w", err)
@@ -249,18 +210,6 @@ func writeReport(stage string, rep *Report) error {
 		return fmt.Errorf("write verification report to %s: %w", path, err)
 	}
 	return nil
-}
-
-// pathSlug mirrors core's slug-to-path rule: ':' is readable in logs, '_' is
-// safe on every filesystem.
-func pathSlug(slug string) string {
-	out := []rune(slug)
-	for i, c := range out {
-		if c == ':' || c == '/' {
-			out[i] = '_'
-		}
-	}
-	return string(out)
 }
 
 // Matches recipe.hostPublishSuffix: a host-built interpreter dir ends in

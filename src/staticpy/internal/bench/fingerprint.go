@@ -14,13 +14,9 @@ import (
 	"time"
 )
 
-// Fingerprint is every host property that can move a number. It is written
-// onto manifest.json (and nested in env.json) so a later comparison can tell
-// "same machine" from "same cpu_model string".
-//
-// SHA256 covers the identity fields only. Snapshots that change while the
-// machine sits idle (load, current frequency, free RAM, this run's pin)
-// live under Telemetry and are excluded from the digest.
+// Every host property that can move a number, written onto manifest.json (and
+// nested in env.json) so a later comparison can tell "same machine" from "same
+// cpu_model string". SHA256 excludes Telemetry.
 type Fingerprint struct {
 	SHA256          string            `json:"sha256,omitempty"`
 	CPU             CPUInfo           `json:"cpu"`
@@ -39,9 +35,9 @@ type Fingerprint struct {
 	Telemetry       *Telemetry        `json:"telemetry,omitempty"`
 }
 
-// Telemetry is a point-in-time snapshot of the host, recorded so a
-// suspicious number can be audited, but not hashed: two runs on the same
-// silicon must compare equal even if load and current MHz moved.
+// Recorded so a suspicious number can be audited, but not hashed: two runs on
+// the same silicon must compare equal even if load, current MHz, free RAM or
+// this run's pin moved.
 type Telemetry struct {
 	CapturedUTC          string `json:"captured_utc,omitempty"`
 	CPUMHz               string `json:"cpu_mhz,omitempty"`
@@ -279,19 +275,7 @@ func readFingerprint(fs procFS) *Fingerprint {
 	f.SMT.Active = readTrim(fs.sys + "/devices/system/cpu/smt/active")
 	f.SMT.Control = readTrim(fs.sys + "/devices/system/cpu/smt/control")
 	f.Caches = readCaches(cpu0 + "cache")
-	mem, memTel := readMemDetail(fs)
-	f.Memory = mem
-	if memTel != (Telemetry{}) {
-		tel.MemoryAvailable = memTel.MemoryAvailable
-		tel.MemoryAvailableBytes = memTel.MemoryAvailableBytes
-		tel.MemoryFreeBytes = memTel.MemoryFreeBytes
-		tel.BuffersBytes = memTel.BuffersBytes
-		tel.CachedBytes = memTel.CachedBytes
-		tel.SwapFreeBytes = memTel.SwapFreeBytes
-		tel.DirtyBytes = memTel.DirtyBytes
-		tel.AnonPagesBytes = memTel.AnonPagesBytes
-		tel.ShmemBytes = memTel.ShmemBytes
-	}
+	f.Memory = readMemDetail(fs, tel)
 	f.NUMA = readNUMA(fs.sys + "/devices/system/node")
 	f.Kernel = readKernel(fs)
 	f.OS = readOS()
@@ -301,12 +285,7 @@ func readFingerprint(fs procFS) *Fingerprint {
 	tel.CurKHz = curKHz
 	f.Platform = readPlatform(fs.sys + "/class/dmi/id")
 	f.Virtualization = readVirt(fs)
-	iso, isoTel := readIsolation(fs)
-	f.Isolation = iso
-	tel.Loadavg1 = isoTel.Loadavg1
-	tel.Loadavg5 = isoTel.Loadavg5
-	tel.Loadavg15 = isoTel.Loadavg15
-	tel.RunnableEntities = isoTel.RunnableEntities
+	f.Isolation = readIsolation(fs, tel)
 	f.Collector = CollectorInfo{
 		GOOS: runtime.GOOS, GOARCH: runtime.GOARCH,
 		NumCPU: runtime.NumCPU(),
@@ -404,9 +383,8 @@ func readCaches(dir string) []CacheInfo {
 	return out
 }
 
-func readMemDetail(fs procFS) (MemDetail, Telemetry) {
+func readMemDetail(fs procFS, tel *Telemetry) MemDetail {
 	m := MemDetail{PageSize: os.Getpagesize()}
-	tel := Telemetry{}
 	b, err := os.ReadFile(fs.proc + "/meminfo")
 	if err == nil {
 		vals := parseMeminfoMap(string(b))
@@ -441,7 +419,7 @@ func readMemDetail(fs procFS) (MemDetail, Telemetry) {
 	m.THPDefrag = readTrim(fs.sys + "/kernel/mm/transparent_hugepage/defrag")
 	m.Swappiness = readTrim(fs.proc + "/sys/vm/swappiness")
 	m.ASLR = readTrim(fs.proc + "/sys/kernel/randomize_va_space")
-	return m, tel
+	return m
 }
 
 func parseMeminfoMap(text string) map[string]int64 {
@@ -619,7 +597,7 @@ func readVirt(fs procFS) VirtInfo {
 	return v
 }
 
-func readIsolation(fs procFS) (IsolationInfo, Telemetry) {
+func readIsolation(fs procFS, tel *Telemetry) IsolationInfo {
 	cpu := fs.sys + "/devices/system/cpu/"
 	iso := IsolationInfo{
 		Online:   readTrim(cpu + "online"),
@@ -629,7 +607,6 @@ func readIsolation(fs procFS) (IsolationInfo, Telemetry) {
 		Isolated: readTrim(cpu + "isolated"),
 		NohzFull: readTrim(cpu + "nohz_full"),
 	}
-	tel := Telemetry{}
 	if b, err := os.ReadFile(fs.proc + "/self/status"); err == nil {
 		iso.CpusAllowed = cpuinfoField(string(b), "Cpus_allowed_list")
 	}
@@ -642,7 +619,7 @@ func readIsolation(fs procFS) (IsolationInfo, Telemetry) {
 			tel.RunnableEntities = f[3]
 		}
 	}
-	return iso, tel
+	return iso
 }
 
 func readDirMap(dir string) map[string]string {

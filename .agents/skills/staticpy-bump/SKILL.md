@@ -5,211 +5,145 @@ description: Upgrade a pinned dependency — openssl, sqlite, ncurses, readline,
 
 # Bumping a pinned dependency
 
-A version bump is the operation this whole build system exists to make safe, so
-most of it is mechanical. What follows is the order, and the places where it is
-not mechanical.
+## Procedure
 
-## The procedure
+1. **Get an authoritative checksum.** There is no `staticpy sources update`,
+   deliberately: **the sha256 you paste is the sha256 you trust from then
+   on.** Take it from upstream's release announcement, signature or checksum
+   file, then confirm your download matches. Hashing whatever the network
+   handed you pins a substituted tarball just as firmly.
+2. **Edit `config/sources.toml`**: `version`, `file`, `urls`, `sha256`, and
+   `topdir` if the wrapper directory renamed. Version and sha256 move **in the
+   same edit**. Every mirror must serve the *same* file; a differently packaged
+   tarball is a failed build, not a fallback.
+3. **Move and regenerate patches.** They live in
+   `config/patches/<name>-<version>/`, so a bump orphans the old directory and
+   `LoadPatches` fails loudly on a missing patch — that's the point; don't work
+   around it. Regenerate against a *pristine* extraction, never
+   `dist/srctrees/` (already patched, so the diff is empty or wrong):
 
-**1. Get the new version and an authoritative checksum.**
+   ```sh
+   tar -xzf dist/src/<hash>-<file> -C /tmp/pristine
+   cp -r /tmp/pristine/<pkg> /tmp/edit && (cd /tmp/edit && …apply the change…)
+   diff -u --label a/<f> --label b/<f> /tmp/pristine/<pkg>/<f> /tmp/edit/<f>
+   ```
 
-There is no `staticpy sources update` — nothing here downloads with verification
-disabled and records whatever arrived. The gap is deliberate enough to state
-plainly:
-**the sha256 you paste is the sha256 you trust from then on.** Hashing whatever
-your network handed you pins a corrupted or substituted tarball exactly as
-firmly as it pins the real one. Take the digest from upstream's release
-announcement, signature, or checksum file — then download and confirm your copy
-matches it.
+4. **Fetch, verify, see the cost.** The srctree key changes, so the dep,
+   sysroot and interpreter rebuild — for CPython, everything.
 
-**2. Edit `config/sources.toml`.** `version`, `file`, `urls`, `sha256`, and
-`topdir` if the archive's wrapper directory changed name. Mirrors must serve the
-*same* file: a mirror carrying a differently-packaged tarball of the same
-release is a failed build, not a fallback.
+   ```sh
+   ./staticpy sources fetch
+   ./staticpy sources verify      # re-hashes; ignores the .done marker
+   ./staticpy status              # what the bump will rebuild
+   ```
 
-**3. Move and regenerate the patches.** Patch files live under
-`patches/<name>-<version>/`, so bumping the version orphans the old directory.
-`LoadPatches` errors when a listed patch is missing, so this fails loudly rather
-than silently building unpatched — do not work around it. Regenerate against a
-*pristine* extraction:
-
-```sh
-tar -xzf dist/src/<hash>-<file> -C /tmp/pristine
-cp -r /tmp/pristine/<pkg> /tmp/edit && (cd /tmp/edit && …apply the change…)
-diff -u --label a/<f> --label b/<f> /tmp/pristine/<pkg>/<f> /tmp/edit/<f>
-```
-
-Never diff against a tree in `dist/srctrees/`: patches and content-anchored
-edits have already been applied there, so the diff you get will be empty or
-wrong.
-
-**4. The version and its sha256 move in the same edit.** A pin without its
-checksum is not a half-done commit, it is a build that fetches an unverified
-tarball.
-
-**5. Fetch and verify.**
-
-```sh
-./staticpy sources fetch
-./staticpy sources verify      # re-hashes; does not trust the .done marker
-./staticpy status              # what the bump will rebuild
-```
-
-**6. Rebuild.** The shim re-syncs `internal/config/defaults/` from `config/` and
-treats a change under either as a rebuild trigger. Building with bare
-`go build` skips that and will use a stale embedded copy — `config/sources.toml`
-is excluded from the runtime overlay by design, so the embedded copy is the only
-one a build reads.
-
-## What a bump costs
-
-The srctree key changes, so everything downstream of it rebuilds: the dep, the
-sysroot, the interpreter. For CPython that is the whole tree. Run
-`./staticpy status` first and know what you are triggering.
+5. **Rebuild through `./staticpy`.** `config/` is a symlink into the `go:embed`
+   tree and `sources.toml` is excluded from the runtime overlay, so builds read
+   only the embedded copy. The shim rebuilds the binary on a config change;
+   bare `go build` does not and leaves a stale embed.
 
 ## Sharp corners, per package
 
-**sqlite encodes its version twice, and one half is a date.** `3510200` is
-3.51.2 as a packed integer, and the download URL carries a *year* directory
-(`sqlite.org/2026/sqlite-src-3510200.zip`). Both move together, and the year is
-not derivable from the version.
-
-**libuuid's source list is hardcoded, and this is the one that fails quietly.**
-`build = "sources"` compiles a declared file list with no configure step — for
-libuuid, eleven files from `libuuid/src` plus `lib/randutils.c`, `lib/md5.c` and
-`lib/sha1.c`. A util-linux bump that *removes* a file breaks the compile, which
-is fine. One that *adds* a file leaves it silently uncompiled, and you find out
-at link time if you are lucky and at runtime if you are not. Diff the directory
-listings between the old and new tarballs before trusting the list, and check
-whether `gen_uuid.c` picked up a new dependency on something in `lib/`.
-
-**openssl changes shape between majors.** The `Configure` patch is a
-version-pinned diff and will need regenerating. The `no-*` option names in
-`packages.toml` are not stable across major versions. The platform names in
-`Target.Maps["openssl"]` come from `Configurations/*.conf` — `./Configure LIST`
-is authoritative, and `i386` → `linux-x86` and `riscv32` → `linux32-riscv32`
-are the two that are not guessable from the arch name.
-
-**readline and ncurses are coupled.** `readline` declares `needs = ["ncurses"]`,
-and sqlite needs readline. Bump them together or expect a mismatch that surfaces
-as a link error a layer away from the change.
-
-**bzip2 has not moved since 2019.** Its patch is stable and its Makefile is
-frozen. If a new release appears, treat the whole recipe as unverified rather
-than assuming the patch still applies.
-
-**zlib rejects `--host`** and reads `$CHOST` instead. If a bump changes its
-hand-rolled configure, that special case is the first thing to re-check.
+- **sqlite encodes its version twice, one half a date.** `3510200` is 3.51.2
+  packed; the URL has a *year* directory (`sqlite.org/2026/sqlite-src-3510200.zip`)
+  not derivable from the version. Move both.
+- **libuuid's source list is hardcoded and fails quietly.** `build = "sources"`
+  compiles eleven files from `libuuid/src` plus `lib/randutils.c`, `lib/md5.c`,
+  `lib/sha1.c`. A util-linux bump that *removes* a file breaks the compile
+  (fine); one that *adds* a file leaves it uncompiled, found at link time or at
+  runtime. Diff the old and new directory listings, and check whether
+  `gen_uuid.c` gained a dependency in `lib/`.
+- **openssl changes shape between majors.** The `Configure` patch needs
+  regenerating; `no-*` option names in `packages.toml` aren't stable. Platform
+  names in `Target.Maps["openssl"]` come from `Configurations/*.conf`
+  (`./Configure LIST`); `i386` → `linux-x86` and `riscv32` → `linux32-riscv32`
+  aren't guessable.
+- **readline and ncurses are coupled** (`readline` needs `ncurses`; sqlite
+  needs readline). Bump together, or get a link error one layer away.
+- **bzip2 hasn't moved since 2019.** If it does, treat the whole recipe
+  (patch, frozen Makefile) as unverified.
+- **zlib rejects `--host`** and reads `$CHOST`. Re-check that special case if
+  its hand-rolled configure changes.
 
 ## Bumping CPython
 
-A patch release (3.13.13 → 3.13.14) is usually mechanical. A minor bump
-(3.13 → 3.14) touches more than any other dependency here.
+A patch release is usually mechanical; a minor (3.13 → 3.14) touches the most.
 
-- **`python-abi` changes**, so the interpreter becomes `bin/python3.14` and
-  `lib/python3.14`. Anything matching those paths by string moves with it.
-- **`symbols.c` regenerates automatically** from the new `Misc/stable_abi.toml`,
-  which is the point of generating it. But the count of genuinely undeclared
-  `abi_only` entries changes with the release, and the header scan that finds
-  them must still work — if the generated file stops compiling, that scan is
-  where to look, not the entry list.
-- **The ctypes anchored edits are the most likely thing to break**, which is
-  exactly why they are anchored edits rather than diffs. `MustMatch` fails the
-  job naming the anchor and the count; re-anchor rather than loosening it.
-- **`--with-build-python` only checks major.minor.** A `pyhost` left over from
-  the old minor would be rejected, but one from a different *patch* release
-  would be silently accepted. The job key covers this — pyhost is keyed on the
-  srctree — so it only bites if you go around the build system.
-- **The musl skips may have been fixed upstream.** `test_re` and
-  `test_fma_zero_result` are declared in `tests.toml`; if musl or CPython fixed
-  either, verification reports an **unexpected pass** and fails, which is the
-  mechanism working. Delete the stale entry rather than silencing it.
-- **The per-target pyconfig fragments** are unaffected by a CPython bump — they
-  describe the target, not the interpreter. A fragment that suddenly matters
-  again after a bump means CPython started using a macro it did not before.
+- **`python-abi` changes**: `bin/python3.14`, `lib/python3.14`. Anything
+  matching those strings moves too.
+- **`symbols.c` regenerates** from `Misc/stable_abi.toml`. The set of truly
+  undeclared `abi_only` entries changes per release; if the generated file stops
+  compiling, look at the header scan, not the entry list.
+- **The ctypes anchored edits break first** — that's why they're anchored.
+  `MustMatch` names the anchor and count; re-anchor, don't loosen.
+- **`--with-build-python` checks only major.minor**, so a stale-patch `pyhost`
+  would be accepted. The job key (pyhost keyed on the srctree) covers it unless
+  you bypass the build system.
+- **musl skips may be fixed upstream.** `test_re` and `test_fma_zero_result`
+  are in `tests.toml`; a fix shows as an **unexpected pass** that fails verify.
+  Delete the stale entry, don't silence it.
+- **Pyconfig fragments** describe the target and are unaffected. One that
+  suddenly matters means CPython started using a new macro.
 
-## What is not a package bump
+## Not a package bump
 
-**The compiler is not pinned here.** gcc, binutils, musl and the kernel headers
-live in gccfactory, which publishes one tarball per (host, target) cell. A
-compiler bump is a gccfactory change plus a re-publish. On this side it appears
-as a new toolchain key, which invalidates every downstream artifact
-automatically — see `staticpy-traps` for why `pyhost` needed that wired in
-explicitly.
-
-**Adding a package is not bumping one.** A new native library is a `[source.X]`
-plus a `[package.X]`; a new architecture is `staticpy-add-target`.
-
-**The bench suite is not a `sources.toml` pin.** pyperformance and pyperf live
-in `config/bench.toml` (and the fallback constants in `internal/bench/pins.go`).
-A pin bump is a suite change, not a protocol bump. The ETA weight table
-(`internal/bench/eta_weights.json`) is the benches we actually time, not the
-full upstream suite — do not treat a pin edit as "the table is now wrong and
-the ETA will break." After a session has timed the new names, restamp the
-table so they join the shape. Procedure: `staticpy` skill, **Bench ETA weights**.
+- **The compiler** is pinned in gccfactory (gcc, binutils, musl, kernel
+  headers). A bump is a gccfactory change plus re-publish; here it shows up as
+  a new toolchain key that invalidates everything downstream (see
+  `staticpy-traps` for why `pyhost` needed that wired in explicitly).
+- **Adding a package**: `[source.X]` plus `[package.X]`. A new architecture:
+  `staticpy-add-target`.
+- **The bench suite**: pyperformance and pyperf are in `config/bench.toml`
+  (fallback constants in `internal/bench/pins.go`). A pin bump is a suite
+  change, not a protocol bump, and does not break the ETA — `eta_weights.json`
+  covers the benches we actually time. After a session has timed the new
+  names, restamp it: `staticpy` skill, **Bench ETA weights**.
 
 ## Verifying the bump
 
-Cheapest first, so a mistake costs seconds rather than an hour:
+Cheapest first:
 
 ```sh
-./staticpy sources verify          # the checksum is what you think it is
-./staticpy config show             # the pin resolved, and from which file
+./staticpy sources verify          # checksum is what you think
+./staticpy config show             # pin resolved, and from which file
 ./staticpy status                  # what will rebuild
 ./staticpy build --dry-run
 ./staticpy build --target <t> --verify core
 ```
 
-Then the sanity imports, which catch a dependency that built but linked wrong:
-`ssl`, `zlib`, `sqlite3`, `ctypes`, `_lzma`, `_hashlib`, `readline`, `curses`,
-`uuid`, `compression.zstd`. The `smoke` verification level runs exactly these,
-plus a `sysconfig`/`ctypes` cross-check that catches a corrupted `_sysconfigdata`.
+Sanity imports catch a dep that built but linked wrong: `ssl`, `zlib`,
+`sqlite3`, `ctypes`, `_lzma`, `_hashlib`, `readline`, `curses`, `uuid`,
+`compression.zstd`. The `smoke` level runs exactly these plus a
+`sysconfig`/`ctypes` cross-check for a corrupted `_sysconfigdata`.
 
 ## Running a matrix upgrade
 
-A CPython minor bump, or a pin sweep that invalidates every interpreter, is
-not "edit sources.toml and hope". The job is the current matrix: every
-triple `staticpy print targets-all` names, every static profile, and every
-host-built `reference*` profile. Do not hard-code a cell count — targets
-and profiles move. Do not stop until every cell is packed and its verify
-artifact has `failed=0`.
+A CPython minor or a sweep invalidating every interpreter covers the current
+matrix: every `staticpy print targets-all` triple × every static profile, plus
+every host-built `reference*` profile. Don't hard-code a cell count. Don't stop
+until every cell is packed with a `failed=0` verify.
 
-**Fuzz before you compile.** A class-wide ABI, Setup, thread, or
-configure-guess hole costs more than an hour at verify, per cell. Agent
-time is cheap next to that: send cheap parallel passes at the codebase
-first — stable-ABI / `staticapi` macros, `Setup` vs
-`Modules/Setup.stdlib.in`, fork/atomics, new `AC_RUN_IFELSE` tests the
-ABI probe does not cover. Always do this preemptively, even when the
-last bump was "just a patch release".
+- **Fuzz before compiling, always** (even after "just a patch release"). A
+  class-wide hole costs >1 h of verify per cell; cheap parallel agent passes
+  first: stable-ABI / `staticapi` macros, `Setup` vs
+  `Modules/Setup.stdlib.in`, fork/atomics, new `AC_RUN_IFELSE` tests the probe
+  doesn't cover.
+- **Hunt the class, don't green-wash.** For a failing cell, spin a separate
+  investigation demanding a repro on a second arm, the layer, and the complete
+  fix. Parking it under `[expect.<this-triple>]` or a one-package profile
+  stanza is forbidden (staticpy-traps **Do not overfit the last failure**).
+  Write the finding there.
+- **Use the machine.** Load is `--workers` × `-j`; maximise without exploding
+  RSS (LTO is the peak — measure before trusting the default). earlyoom is a
+  backstop, not a plan. Fail-fast: re-run instead of reading a partial sweep.
+- **Docker and tmux** exactly as in `AGENTS.md`: one `spython` container for
+  every cell (no second container for the libcs); host tmux with
+  `EXIT_CODE=${PIPESTATUS[0]}`; poll the log and `staticpy status`, don't
+  attach.
+- **Pack from a clean tree** (`staticpy-kit`): commit, then stamp, or
+  `kit.json` and `staticpy-bench` advertise `HEAD-dirty`.
 
-**Hunt the class, do not green-wash.** Getting the matrix to build is not
-the goal; the build has to stay reproducible. When a cell fails, spin a
-separate investigation and demand evidence (repro on a second arm, the
-layer, the complete fix). Parking the last failure under `[expect.<this-triple>]` or
-a one-package profile stanza is forbidden — that is the
-`staticpy-traps` rule **Do not overfit the last failure**. Write the
-finding there.
-
-**Use the machine.** `--workers` times `-j` is the load. Maximize workers
-without exploding RSS — LTO is the peak, so measure before trusting the
-worker default. earlyoom is a backstop, not a plan. Fail-fast: one flake
-abandons the queue, so re-run rather than reading a partial sweep.
-
-**Docker, not the host.** One container (`spython`) for every cell:
-static, cross, `reference*`, and `staticpy kit`. The image is Ubuntu, so
-`reference*` is glibc; static/cross still link gccfactory musl. Do not
-stand up a second container to "keep the libcs apart".
-
-**Tmux on the host.** The container has no tmux. Detach a session that
-`docker compose exec`s, tees the log, and writes `EXIT_CODE=` from
-`${PIPESTATUS[0]}` — not `tee`'s 0. Poll the log and `staticpy status`;
-do not attach.
-
-**Pack from a clean tree.** See `staticpy-kit`: whenever possible, commit
-the work and then stamp the kit at a non-dirty version. A kit packed from
-a dirty tree advertises `HEAD-dirty` in `kit.json` and `staticpy-bench`.
-
-Done when: `staticpy status --target all --verify core --pack` is 0 stale
-/ 0 missing on every static profile and each `reference*`; every verify
-report has `failed=0`; every tarball sha256 matches its sidecar; the
-kit, if you shipped one, has a clean `git_revision`.
+Done when: `staticpy status --target all --verify core --pack` is 0 stale /
+0 missing on every static profile and each `reference*`; every verify report
+has `failed=0`; every tarball sha256 matches its sidecar; any shipped kit has a
+clean `git_revision`.

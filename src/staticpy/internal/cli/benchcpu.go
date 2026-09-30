@@ -43,7 +43,6 @@ func cpuMenu(t *bench.Topology, recommended int) tui.Menu {
 		Flag:    "--cpu",
 		Default: strconv.Itoa(recommended),
 	}
-	g := tui.Group{}
 	for _, c := range cores {
 		sib := "none"
 		for _, s := range c.Siblings {
@@ -69,9 +68,8 @@ func cpuMenu(t *bench.Topology, recommended int) tui.Menu {
 		case c.ID == 0:
 			ch.Note = "handles the most interrupts"
 		}
-		g.Choices = append(g.Choices, ch)
+		m.Choices = append(m.Choices, ch)
 	}
-	m.Groups = []tui.Group{g}
 	return m
 }
 

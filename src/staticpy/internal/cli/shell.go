@@ -264,7 +264,7 @@ func resolveWorkDir(dist, slug, recorded string) (string, string) {
 	if recorded != "" && isDir(recorded) {
 		return recorded, ""
 	}
-	matches, _ := filepath.Glob(filepath.Join(dist, core.DirWork, pathSlug(slug)+".*"))
+	matches, _ := filepath.Glob(filepath.Join(dist, core.DirWork, core.PathSlug(slug)+".*"))
 	sort.Strings(matches)
 	for i := len(matches) - 1; i >= 0; i-- {
 		if isDir(matches[i]) {

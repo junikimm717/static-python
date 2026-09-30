@@ -18,12 +18,10 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/sources"
 )
 
-// bootstrapProfile is the only profile pyhost is ever built with. pyhost is a
-// means and not an output, so tying it to the requested profile would give
-// every profile its own copy of a binary nobody ships.
+// pyhost is a means and not an output, so tying it to the requested profile
+// would give every profile its own copy of a binary nobody ships.
 const bootstrapProfile = "bootstrap"
 
-// pythonSource is the pinned CPython release every job in this file works from.
 func pythonSource(cfg *config.Config) (config.Source, error) {
 	s, ok := cfg.Sources["python"]
 	if !ok {
@@ -32,19 +30,16 @@ func pythonSource(cfg *config.Config) (config.Source, error) {
 	return s, nil
 }
 
-// PyHost is the interpreter the build machine runs during a cross build, and
-// the one gen.StaticAPI uses to read Misc/stable_abi.toml.
-//
-// It is built with the *native* gccfactory toolchain and linked static: that
-// toolchain targets musl while the build machine is usually glibc, so a dynamic
-// binary would look for a loader that is not installed. Static is safe here
-// because pyhost never imports a .so — every module it uses is a builtin.
+// Also what gen.StaticAPI uses to read Misc/stable_abi.toml. Linked static
+// because the *native* gccfactory toolchain targets musl while the build
+// machine is usually glibc, so a dynamic binary would look for a loader that is
+// not installed. Safe because every module pyhost uses is a builtin.
 func PyHost(cfg *config.Config, srcAssets fs.FS, host config.Target) (core.Job, error) {
 	src, err := pythonSource(cfg)
 	if err != nil {
 		return nil, err
 	}
-	res, err := resolveScope(cfg, bootstrapProfile, config.ScopePyhost)
+	res, err := cfg.Resolve(bootstrapProfile, config.ScopePyhost)
 	if err != nil {
 		return nil, err
 	}
@@ -143,10 +138,8 @@ func (j *pyHost) Build(ctx context.Context, e *core.Env, r *core.Runner, work, s
 	}
 
 	prefix := j.ArtifactDir(e)
-	// No dependency view: pyhost links nothing but libc. deepfreeze imports only
-	// the standard library, and freeze_modules reaches for hashlib, which falls
-	// back to the builtin _sha2 and _md5 when _hashlib is absent — so there is
-	// no OpenSSL here, and not even zlib.
+	// No dependency view: pyhost links nothing but libc. freeze_modules' hashlib
+	// falls back to the builtin _sha2 and _md5, so no OpenSSL, not even zlib.
 	te, err := newToolenv(e, j.host, j.res, prefix, nil)
 	if err != nil {
 		return err
@@ -181,17 +174,6 @@ func (j *pyHost) Build(ctx context.Context, e *core.Env, r *core.Runner, work, s
 		return err
 	}
 	return installPrefix(ctx, r, te, src, work, stage, prefix, nil)
-}
-
-// PyNative builds the shipped interpreter for the machine it runs on.
-func PyNative(cfg *config.Config, srcAssets fs.FS, target config.Target, profile, bundle string) (core.Job, error) {
-	return newPyBuild(cfg, srcAssets, target, target, profile, bundle, false)
-}
-
-// PyCross builds the shipped interpreter for a target the build machine cannot
-// execute.
-func PyCross(cfg *config.Config, srcAssets fs.FS, host, target config.Target, profile, bundle string) (core.Job, error) {
-	return newPyBuild(cfg, srcAssets, host, target, profile, bundle, true)
 }
 
 // Native and cross differ by four configure arguments, so keeping them one
@@ -232,7 +214,7 @@ func newPyBuild(cfg *config.Config, srcAssets fs.FS, host, target config.Target,
 	if err != nil {
 		return nil, err
 	}
-	res, err := resolveScope(cfg, profile, config.ScopePython)
+	res, err := cfg.Resolve(profile, config.ScopePython)
 	if err != nil {
 		return nil, err
 	}
@@ -267,7 +249,7 @@ func newPyBuild(cfg *config.Config, srcAssets fs.FS, host, target config.Target,
 		return nil, err
 	}
 
-	j := &pyBuild{
+	return &pyBuild{
 		cross:        cross,
 		srctree:      srctree,
 		src:          src,
@@ -276,6 +258,7 @@ func newPyBuild(cfg *config.Config, srcAssets fs.FS, host, target config.Target,
 		sysroot:      sysroot,
 		staticapi:    gen.NewStaticAPI(srctree, pyhost, src.Version),
 		probe:        probe,
+		buildPython:  pyhost,
 		host:         host,
 		target:       target,
 		profile:      profile,
@@ -283,9 +266,7 @@ func newPyBuild(cfg *config.Config, srcAssets fs.FS, host, target config.Target,
 		bundle:       bundle,
 		res:          res,
 		setup:        setup,
-	}
-	j.buildPython = pyhost
-	return j, nil
+	}, nil
 }
 
 func (j *pyBuild) Name() string {
@@ -303,11 +284,7 @@ func (j *pyBuild) Slug() string {
 }
 
 func (j *pyBuild) Deps() []core.Job {
-	deps := []core.Job{j.srctree, j.sysroot, j.staticapi, j.probe}
-	if j.buildPython != nil {
-		deps = append(deps, j.buildPython)
-	}
-	return deps
+	return []core.Job{j.srctree, j.sysroot, j.staticapi, j.probe, j.buildPython}
 }
 
 func (j *pyBuild) KeyInputs() map[string]string {
@@ -500,8 +477,8 @@ func installPrefix(ctx context.Context, r *core.Runner, te *toolenv, src, work, 
 	return trimInterpreter(stage)
 }
 
-// trimInterpreter drops what only a build of a third-party extension could use. A
-// static interpreter cannot dlopen one, so libpython.a and the config-* makefile
+// Drops what only a build of a third-party extension could use. A static
+// interpreter cannot dlopen one, so libpython.a and the config-* makefile
 // are tens of megabytes nobody on the target can spend.
 func trimInterpreter(stage string) error {
 	patterns := []string{
@@ -522,8 +499,7 @@ func trimInterpreter(stage string) error {
 	return nil
 }
 
-// replaceFlag swaps a placeholder flag for its resolved form, keeping the
-// argument order the key was computed from.
+// Keeps the argument order the key was computed from.
 func replaceFlag(args []string, want, with string) []string {
 	for i, a := range args {
 		if a == want {
@@ -534,9 +510,8 @@ func replaceFlag(args []string, want, with string) []string {
 	return append(args, with)
 }
 
-// hostRunner is what configure puts in front of a target binary it needs to
-// execute. With --with-build-python nothing in `all` or `install` runs one, so
-// it stays out of the job key: it is a safety net, not an input.
+// With --with-build-python nothing in `all` or `install` runs a target binary,
+// so HOSTRUNNER stays out of the job key: it is a safety net, not an input.
 func hostRunner(e *core.Env, t config.Target) string {
 	qemu := e.Qemu[t.Triple]
 	if qemu == "" {
@@ -548,8 +523,7 @@ func hostRunner(e *core.Env, t config.Target) string {
 	return qemu
 }
 
-// compileLibatAtfork builds the lock-table replacement that registers
-// pthread_atfork. Compiled without -flto so WPA cannot drop the constructor.
+// A libatomic lock-table replacement that registers pthread_atfork. Compiled without -flto so WPA cannot drop the constructor.
 // The .c is spinlocks + child-only zero; see staticpy-traps LIBATOMIC_FORK.
 func (j *pyBuild) compileLibatAtfork(ctx context.Context, r *core.Runner, te *toolenv, work string) (string, error) {
 	if err := assets.WriteTo(work, "libat_atfork.c"); err != nil {
@@ -585,8 +559,7 @@ func installStaticAPI(artifact, src string) error {
 	return assets.WriteTo(filepath.Join(src, "Modules"), "staticapi/staticapi.c")
 }
 
-// findStaticAPIFile tolerates both layouts gen publishes: symbols.c sits at the
-// artifact root, symbols.h under staticapi/.
+// gen publishes symbols.c at the artifact root and symbols.h under staticapi/.
 func findStaticAPIFile(artifact, name string) (string, error) {
 	for _, p := range []string{
 		filepath.Join(artifact, name),
@@ -674,8 +647,7 @@ var (
 	_ core.Job = (*pyBuild)(nil)
 )
 
-// sysrootObjects lists the .o files a sysroot carries, sorted so the link line
-// cannot vary between two builds of the same inputs.
+// Sorted so the link line cannot vary between two builds of the same inputs.
 func sysrootObjects(sysroot string) ([]string, error) {
 	ents, err := os.ReadDir(filepath.Join(sysroot, "lib"))
 	if os.IsNotExist(err) {

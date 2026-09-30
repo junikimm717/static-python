@@ -14,9 +14,7 @@ import (
 // what makes the shared-read discipline work across goroutines too; the
 // per-slug mutex on top makes exclusive intent explicit and avoids spinning.
 type flockLease struct {
-	f    *os.File
-	path string
-	excl bool
+	f *os.File
 }
 
 var (
@@ -35,7 +33,7 @@ func slugMutex(slug string) *sync.Mutex {
 	return m
 }
 
-// It polls with LOCK_NB rather than blocking in the kernel so that ctx
+// Polls with LOCK_NB rather than blocking in the kernel so that ctx
 // cancellation works and so that we can report who we are waiting on.
 func acquire(ctx context.Context, e *Env, slug string, excl bool) (*flockLease, error) {
 	path := e.LockPath(slug)
@@ -51,7 +49,7 @@ func acquire(ctx context.Context, e *Env, slug string, excl bool) (*flockLease, 
 	for {
 		err := syscall.Flock(int(f.Fd()), how|syscall.LOCK_NB)
 		if err == nil {
-			return &flockLease{f: f, path: path, excl: excl}, nil
+			return &flockLease{f: f}, nil
 		}
 		if err != syscall.EWOULDBLOCK && err != syscall.EAGAIN && err != syscall.EINTR {
 			f.Close()
@@ -87,31 +85,10 @@ func (l *flockLease) release() {
 	l.f = nil
 }
 
-// leases is an ordered set of held locks, released as a group.
 type leases []*flockLease
 
 func (ls leases) release() {
 	for i := len(ls) - 1; i >= 0; i-- {
 		ls[i].release()
 	}
-}
-
-// It lets a reader of a published artifact tell "ready" apart from "being
-// republished right now" instead of racing the rename. ok=false means someone
-// holds it exclusively; the returned func must be called to release.
-func TryReadLease(e *Env, slug string) (release func(), ok bool, err error) {
-	path := e.LockPath(slug)
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
-	if err != nil {
-		return nil, false, fmt.Errorf("open lock %s: %w", path, err)
-	}
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_SH|syscall.LOCK_NB); err != nil {
-		f.Close()
-		if err == syscall.EWOULDBLOCK || err == syscall.EAGAIN {
-			return nil, false, nil
-		}
-		return nil, false, fmt.Errorf("flock %s: %w", path, err)
-	}
-	l := &flockLease{f: f, path: path}
-	return l.release, true, nil
 }

@@ -67,7 +67,7 @@ func runSources(g *Global, args []string) error {
 	}
 	switch action {
 	case "fetch":
-		return fetchSources(g, e, cfg, names)
+		return fetchSources(e, cfg, names)
 	case "verify":
 		return verifySources(g, e, cfg, names)
 	}
@@ -122,7 +122,7 @@ func listSources(g *Global, e *core.Env, cfg *config.Config, names []string) err
 	return nil
 }
 
-func fetchSources(g *Global, e *core.Env, cfg *config.Config, names []string) error {
+func fetchSources(e *core.Env, cfg *config.Config, names []string) error {
 	ctx, stop := signalContext()
 	defer stop()
 	fetched := 0

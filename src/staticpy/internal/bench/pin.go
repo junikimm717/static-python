@@ -20,18 +20,6 @@ type Pin struct {
 	Applied bool
 }
 
-// Affinity is set on ourselves rather than shelled out to taskset so that no
-// tool outside the provisioned environment is needed, and so a child cannot
-// escape by being launched through a wrapper.
-func (t *Topology) Apply() (Pin, error) {
-	cpu, sib, err := t.PickCore()
-	if err != nil {
-		return Pin{}, err
-	}
-	p := Pin{CPU: cpu, Siblings: sib}
-	return p, p.apply()
-}
-
 func (p *Pin) apply() error {
 	var set unix.CPUSet
 	set.Zero()

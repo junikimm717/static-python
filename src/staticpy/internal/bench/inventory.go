@@ -31,7 +31,6 @@ for d in distributions():
 print(json.dumps(pkgs, sort_keys=True))
 `
 
-// InventoryPackages asks python which distributions it can import.
 func InventoryPackages(ctx context.Context, x Exec, python string) (map[string]string, error) {
 	out, err := x.Output(ctx, core.Cmd{
 		Args: []string{python, "-c", strings.TrimSpace(inventoryScript)},

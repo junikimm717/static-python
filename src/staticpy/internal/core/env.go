@@ -40,8 +40,7 @@ var distSubdirs = []string{
 	filepath.Join(DirState, "heartbeats"),
 }
 
-// It opportunistically collects scratch directories left behind by processes
-// that died.
+// Also collects scratch directories left behind by processes that died.
 func (e *Env) EnsureDirs() error {
 	if e.Dist == "" {
 		return fmt.Errorf("core: Env.Dist is empty")
@@ -62,7 +61,7 @@ func (e *Env) EnsureDirs() error {
 	return nil
 }
 
-// It is best-effort: losing a race with another collector is harmless.
+// Best-effort: losing a race with another collector is harmless.
 // kill(pid, 0) is PID-namespace local, so two containers sharing dist/
 // would otherwise treat each other's live LTO trees as dead after StaleAge
 // (the scratch dir's mtime is the job start; WPA does not touch it).
@@ -104,7 +103,7 @@ func (e *Env) GCStale(age time.Duration) {
 	}
 }
 
-// This keeps `status` from reporting a build that a crash ended long ago.
+// Keeps `status` from reporting a build that a crash ended long ago.
 func (e *Env) gcHeartbeats() {
 	dir := e.Path(DirState, "heartbeats")
 	ents, err := os.ReadDir(dir)
@@ -124,8 +123,8 @@ func (e *Env) gcHeartbeats() {
 	}
 }
 
-// staticpy never builds or fetches one: the shim provisions it and we fail
-// loudly rather than falling back to whatever compiler the host happens to
+// staticpy never builds or fetches a toolchain: the shim provisions it and we
+// fail loudly rather than falling back to whatever compiler the host happens to
 // have.
 func (e *Env) ToolchainDir(triple, kind string) (string, error) {
 	if kind != KindCross && kind != KindNative {
@@ -155,15 +154,13 @@ func isDir(path string) bool {
 	return err == nil && fi.IsDir()
 }
 
-// PathFor is the selected toolchain's bin (when a target is named) followed
-// by the process PATH. The toolchain goes first so gcc/cc/ld resolve to
-// gccfactory. Recipes still set CC to an absolute path; this is the
-// backstop for configure scripts that look up `gcc` by name.
+// The toolchain's bin goes before the process PATH so gcc/cc/ld resolve to
+// gccfactory. Recipes still set CC to an absolute path; this is the backstop
+// for configure scripts that look up `gcc` by name.
 //
 // A named target that will not resolve is an error, never a silent omission:
 // dropping it would hand the build the host compiler under a target triple,
-// or no compiler at all, and the failure would surface hundreds of lines
-// later as something unrecognisable.
+// or no compiler at all, failing hundreds of lines later.
 func (e *Env) PathFor(target string) ([]string, error) {
 	var out []string
 	if target != "" {
@@ -197,7 +194,7 @@ func (e *Env) resolvePath(v string) (string, error) {
 // The naming convention makes abandoned directories attributable to a dead
 // process.
 func scratchName(slug string) string {
-	return fmt.Sprintf("%s.%d.%s", lockFileName(slug), os.Getpid(), randHex(4))
+	return fmt.Sprintf("%s.%d.%s", PathSlug(slug), os.Getpid(), randHex(4))
 }
 
 func pidFromScratchName(name string) (int, bool) {
@@ -213,13 +210,10 @@ func pidFromScratchName(name string) (int, bool) {
 }
 
 func slugFromScratchName(name string) (string, bool) {
-	parts := strings.Split(name, ".")
-	if len(parts) < 3 {
-		return "", false
-	}
 	if _, ok := pidFromScratchName(name); !ok {
 		return "", false
 	}
+	parts := strings.Split(name, ".")
 	return strings.Join(parts[:len(parts)-2], "."), true
 }
 

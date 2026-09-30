@@ -18,7 +18,6 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/logging"
 )
 
-// TailLines is how much of a failed command's output is quoted in the error.
 const TailLines = 60
 
 // Runner executes every command of one build attempt and leaves behind enough
@@ -85,7 +84,6 @@ func uniqueDir(base, name string) (string, error) {
 	}
 }
 
-// linkLatest atomically repoints <base>/latest at dir.
 func linkLatest(base, dir string) {
 	tmp := filepath.Join(base, fmt.Sprintf(".latest.%d.%s", os.Getpid(), randHex(3)))
 	if err := os.Symlink(filepath.Base(dir), tmp); err != nil {
@@ -128,8 +126,8 @@ func (r *Runner) CurrentStep() string {
 
 func (r *Runner) Log() *logging.Logger { return r.log }
 
-// Run executes c, streaming merged stdout+stderr into a per-step log file. On
-// failure it returns a *CmdError carrying the log path and the output tail.
+// Merged stdout+stderr goes to a per-step log file; failure returns a *CmdError
+// carrying the log path and the output tail.
 func (r *Runner) Run(ctx context.Context, c Cmd) error {
 	_, err := r.run(ctx, c, false)
 	return err
@@ -174,10 +172,9 @@ func (r *Runner) run(ctx context.Context, c Cmd, capture bool) (string, error) {
 
 	tail := newTailWriter(TailLines)
 	ws := []io.Writer{f, tail}
-	var buf *bytes.Buffer
+	var buf bytes.Buffer
 	if capture {
-		buf = &bytes.Buffer{}
-		ws = append(ws, buf)
+		ws = append(ws, &buf)
 	}
 	if r.log.Enabled(logging.LevelDebug) {
 		ws = append(ws, newLineWriter(func(line string) {
@@ -192,18 +189,15 @@ func (r *Runner) run(ctx context.Context, c Cmd, capture bool) (string, error) {
 	cmd.Stdout = out
 	cmd.Stderr = out
 	cmd.Stdin = nil
-	// Every command gets its own process group so cancelling reaches the whole
-	// tree. make's children are our grandchildren, and killing the supervisor
-	// alone leaves them running: nine orphaned lto1 processes holding 18GB
-	// survived a cancelled cross build and had to be reaped by hand.
+	// Own process group so cancelling reaches the whole tree: killing make alone
+	// once left nine orphaned lto1 processes holding 18GB.
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error {
 		if cmd.Process == nil {
 			return nil
 		}
-		// Negative pid signals the group. SIGKILL rather than SIGTERM: an lto1
-		// deep in a link ignores polite requests, and a cancelled job's output
-		// is discarded anyway.
+		// SIGKILL rather than SIGTERM: an lto1 deep in a link ignores polite
+		// requests, and a cancelled job's output is discarded anyway.
 		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 	}
 	// A grandchild that left the group -- the suite double-forks, and qemu's
@@ -239,17 +233,10 @@ func (r *Runner) run(ctx context.Context, c Cmd, capture bool) (string, error) {
 		} else {
 			r.log.Error("command failed", "step", step, "cmd", name, "exit", ce.ExitCode, "log", logPath)
 		}
-		outStr := ""
-		if buf != nil {
-			outStr = buf.String()
-		}
-		return outStr, ce
+		return buf.String(), ce
 	}
 	r.log.Debug("command ok", "step", step, "cmd", name, "duration", dur.Round(time.Millisecond))
-	if capture {
-		return buf.String(), nil
-	}
-	return "", nil
+	return buf.String(), nil
 }
 
 func exitCode(err error) int {

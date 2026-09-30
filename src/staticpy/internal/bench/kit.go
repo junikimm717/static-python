@@ -32,8 +32,7 @@ type KitArm struct {
 	Factors      *Factors `json:"factors,omitempty"`
 }
 
-// LoadKit reads kit.json from dir. dir is the unpacked top directory
-// (the one that contains run and python/).
+// dir is the unpacked top directory (the one that contains run and python/).
 func LoadKit(dir string) (*KitDoc, error) {
 	path := filepath.Join(dir, "kit.json")
 	b, err := os.ReadFile(path)
@@ -56,10 +55,9 @@ func LoadKit(dir string) (*KitDoc, error) {
 	return &doc, nil
 }
 
-// AdoptKitRevision copies kit.json's pack-time SHA into buildinfo when the
-// running binary has none. ./run on a quiet box has no git repo and does
-// not pass --git-revision; the only experiment identity that survives
-// unpack is kit.json. An explicit --git-revision already in buildinfo wins.
+// ./run on a quiet box has no git repo and does not pass --git-revision; the
+// only experiment identity that survives unpack is kit.json. An explicit
+// --git-revision already in buildinfo wins.
 func AdoptKitRevision(kit *KitDoc) {
 	if kit == nil || kit.GitRevision == "" || buildinfo.GitRevision != "" {
 		return
@@ -67,13 +65,12 @@ func AdoptKitRevision(kit *KitDoc) {
 	buildinfo.GitRevision = kit.GitRevision
 }
 
-// ApplyKitToManifest copies every kit.json field onto the session so a
-// later reader can recover the packed experiment without the tarball.
-// The full document lives under "kit"; python_version, kit_version,
-// triple, and git_revision are also promoted to the top level because
-// the site and index look for them there. Existing top-level values win.
+// So a later reader can recover the packed experiment without the tarball.
+// The full document lives under "kit"; a few fields are also promoted to the
+// top level because the site and index look for them there. Existing
+// top-level values win.
 func ApplyKitToManifest(man map[string]any, kit *KitDoc) {
-	if kit == nil || man == nil {
+	if kit == nil {
 		return
 	}
 	man["kit"] = kit
@@ -94,7 +91,6 @@ func ApplyKitToManifest(man map[string]any, kit *KitDoc) {
 	promote("git_revision", kit.GitRevision)
 }
 
-// ResolveArms turns kit-relative paths into absolute interpreter binaries.
 func (k *KitDoc) ResolveArms(root string) (order []string, paths map[string]string, err error) {
 	paths = map[string]string{}
 	seen := map[string]bool{}
@@ -120,9 +116,6 @@ func (k *KitDoc) ResolveArms(root string) (order []string, paths map[string]stri
 }
 
 func (k *KitDoc) MatchesThisMachine() error {
-	if k.Triple == "" {
-		return nil
-	}
 	arch := runtime.GOARCH
 	want, ok := goarchOfTriple(k.Triple)
 	if !ok {

@@ -115,7 +115,7 @@ func printHelp(w io.Writer, topic string) {
 		fmt.Fprintln(w, "  staticpy [global flags] <command> [flags]")
 		fmt.Fprintln(w)
 		fmt.Fprintln(w, bold("COMMANDS"))
-		for _, c := range commands() {
+		for _, c := range registry {
 			fmt.Fprintf(w, "  %-8s %s\n", c.Name, c.Short)
 		}
 		fmt.Fprintf(w, "  %-8s %s\n", "help", "this, or `help <command>` for the details")
@@ -144,10 +144,6 @@ func printHelp(w io.Writer, topic string) {
 		return
 	}
 	c := lookup(topic)
-	if c == nil {
-		fmt.Fprintf(w, "no such command %q\n", topic)
-		return
-	}
 	fmt.Fprintln(w, bold("staticpy "+c.Name)+" - "+c.Short)
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, bold("USAGE"))

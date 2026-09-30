@@ -15,8 +15,8 @@ var (
 	moduleSets   = map[string]bool{"minimal": true, "full": true}
 )
 
-// Validate reports the first inconsistency across the merged config. It runs at
-// the end of Load, so no caller ever sees a Config that names something absent.
+// Runs at the end of Load, so no caller ever sees a Config that names something
+// absent.
 func (c *Config) Validate() error {
 	for _, check := range []func() error{
 		c.validateSources,
@@ -148,7 +148,7 @@ func (c *Config) validatePackages() error {
 		}
 		// A variant keyed on a profile that does not exist is dead config: it
 		// looks like the package was overridden while the build silently uses the
-		// original. Same reasoning as a *_remove that matches nothing.
+		// original.
 		for prof, v := range p.Variants {
 			if _, ok := c.Profiles[prof]; !ok {
 				return fmt.Errorf("%s: [package.%s.profile.%s] names no profile (have %s)",
@@ -290,10 +290,7 @@ func (c *Config) validateBundles() error {
 			}
 		}
 	}
-	if err := c.validateExpect(); err != nil {
-		return err
-	}
-	return nil
+	return c.validateExpect()
 }
 
 func (c *Config) validateBench() error {

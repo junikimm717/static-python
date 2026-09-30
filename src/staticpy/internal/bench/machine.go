@@ -6,9 +6,8 @@ import (
 	"strings"
 )
 
-// Machine is the hardware provenance written to every suite's env.json.
-// Summary fields stay at the top so reports and fixtures stay readable;
-// Fingerprint is the full host record, also copied onto manifest.json.
+// Written to every suite's env.json. Summary fields stay at the top so reports
+// and fixtures stay readable; Fingerprint is the full host record.
 type Machine struct {
 	Kernel               string       `json:"kernel"`
 	CPUModel             string       `json:"cpu_model"`
@@ -55,40 +54,33 @@ func readMachine(fs procFS) Machine {
 		CacheL3:     "?",
 		Fingerprint: fp,
 	}
-	if fp != nil {
-		if fp.CPU.ModelName != "" {
-			m.CPUModel = fp.CPU.ModelName
-		}
-		if fp.Kernel.Sysname != "" && fp.Kernel.Release != "" {
-			m.Kernel = fp.Kernel.Sysname + " " + fp.Kernel.Release
-		} else if fp.Kernel.Uname != "" {
-			m.Kernel = fp.Kernel.Uname
-		}
-		m.MemoryBytes = fp.Memory.TotalBytes
-		m.Memory = fp.Memory.Total
-		if fp.Telemetry != nil {
-			m.MemoryAvailableBytes = fp.Telemetry.MemoryAvailableBytes
-			m.MemoryAvailable = fp.Telemetry.MemoryAvailable
-		}
-		if s := cacheByType(fp.Caches, "1", "Data"); s != "" {
-			m.CacheL1d = s
-		}
-		if s := cacheByType(fp.Caches, "1", "Instruction"); s != "" {
-			m.CacheL1i = s
-		}
-		if s := cacheByType(fp.Caches, "2", "Unified"); s != "" {
-			m.CacheL2 = s
-		} else if s := cacheByType(fp.Caches, "2", "Data"); s != "" {
-			m.CacheL2 = s
-		}
-		if s := cacheByType(fp.Caches, "3", "Unified"); s != "" {
-			m.CacheL3 = s
-		}
-		m.Container = fp.Virtualization.Container
-		if fp.CPU.LogicalCPUs > 0 {
-			m.Cores = fp.CPU.LogicalCPUs
-		}
+	if fp.CPU.ModelName != "" {
+		m.CPUModel = fp.CPU.ModelName
 	}
+	if fp.Kernel.Sysname != "" && fp.Kernel.Release != "" {
+		m.Kernel = fp.Kernel.Sysname + " " + fp.Kernel.Release
+	} else if fp.Kernel.Uname != "" {
+		m.Kernel = fp.Kernel.Uname
+	}
+	m.MemoryBytes = fp.Memory.TotalBytes
+	m.Memory = fp.Memory.Total
+	m.MemoryAvailableBytes = fp.Telemetry.MemoryAvailableBytes
+	m.MemoryAvailable = fp.Telemetry.MemoryAvailable
+	if s := cacheByType(fp.Caches, "1", "Data"); s != "" {
+		m.CacheL1d = s
+	}
+	if s := cacheByType(fp.Caches, "1", "Instruction"); s != "" {
+		m.CacheL1i = s
+	}
+	if s := cacheByType(fp.Caches, "2", "Unified"); s != "" {
+		m.CacheL2 = s
+	} else if s := cacheByType(fp.Caches, "2", "Data"); s != "" {
+		m.CacheL2 = s
+	}
+	if s := cacheByType(fp.Caches, "3", "Unified"); s != "" {
+		m.CacheL3 = s
+	}
+	m.Container = fp.Virtualization.Container
 	// cpu0 indexN layout is still the common case when type files are missing.
 	if m.CacheL1d == "?" {
 		cpu0 := fs.sys + "/devices/system/cpu/cpu0/cache/"

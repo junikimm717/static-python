@@ -9,10 +9,9 @@ import (
 	"time"
 )
 
-// HeartbeatInterval is how often a builder refreshes its heartbeat file.
 const HeartbeatInterval = 5 * time.Second
 
-// It is advisory: it drives `staticpy status` and lock-wait messages, never
+// Heartbeats are advisory: it drives `staticpy status` and lock-wait messages, never
 // correctness.
 type Heartbeat struct {
 	Slug      string    `json:"slug"`
@@ -27,7 +26,7 @@ type Heartbeat struct {
 }
 
 func (e *Env) HeartbeatPath(slug string) string {
-	return e.Path(DirState, "heartbeats", lockFileName(slug)+".json")
+	return e.Path(DirState, "heartbeats", PathSlug(slug)+".json")
 }
 
 func ReadHeartbeat(e *Env, slug string) (*Heartbeat, error) {
@@ -51,7 +50,6 @@ func (h *Heartbeat) Live() bool {
 	return pidAlive(h.PID) || time.Since(h.UpdatedAt) < 4*HeartbeatInterval
 }
 
-// beat owns the heartbeat file for one build lease.
 type beat struct {
 	stop chan struct{}
 	wg   sync.WaitGroup

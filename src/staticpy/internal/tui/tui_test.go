@@ -13,17 +13,16 @@ func alignMenu() Menu {
 		Title:   "pick",
 		Headers: []string{"cpu", "core", "max clock"},
 		Flag:    "--cpu",
-		Groups: []Group{{Choices: []Choice{
+		Choices: []Choice{
 			{Value: "0", Cells: []string{"cpu0", "core0", "5.16GHz"}, Note: "recommended"},
 			{Value: "10", Cells: []string{"cpu10", "core15", "3.29GHz"}},
-		}}},
+		},
 	}
 }
 
 // The header is drawn as the last description line; the options are drawn by
 // huh with a selector in front of each. Both come from row() with the same
-// widths, so alignment is exactly whether the two prefixes match -- which a
-// hardcoded indent did not, being guessed against a different renderer.
+// widths, so alignment is exactly whether the two prefixes match.
 func TestColumnHeaderAlignsWithOptionRows(t *testing.T) {
 	th := huh.ThemeCharm()
 	m := alignMenu()
@@ -38,8 +37,8 @@ func TestColumnHeaderAlignsWithOptionRows(t *testing.T) {
 	if gotIndent != len(optPrefix) {
 		t.Fatalf("header indented %d, options indented %d", gotIndent, len(optPrefix))
 	}
-	for _, c := range m.Groups[0].Choices {
-		opt := optPrefix + label(m, m.Groups[0], c)
+	for _, c := range m.Choices {
+		opt := optPrefix + label(m, c)
 		for i, h := range m.Headers {
 			if strings.Index(header, h) != strings.Index(opt, c.Cells[i]) {
 				t.Fatalf("column %q misaligned:\n%s\n%s", h, header, opt)
@@ -64,7 +63,7 @@ func TestMultiSelectFallsBackWithoutATerminal(t *testing.T) {
 	if _, err := MultiSelect(alignMenu()); err != ErrNotInteractive {
 		t.Fatalf("err = %v, want ErrNotInteractive", err)
 	}
-	all := Menu{Title: "t", Groups: []Group{{Choices: []Choice{{Value: "a", Disabled: true, Why: "x"}}}}}
+	all := Menu{Title: "t", Choices: []Choice{{Value: "a", Disabled: true, Why: "x"}}}
 	if _, err := MultiSelect(all); err == nil || err == ErrNotInteractive {
 		t.Fatalf("an all-disabled menu must fail loudly, got %v", err)
 	}

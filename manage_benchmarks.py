@@ -367,8 +367,7 @@ def delete_run(
 def verify_runs(root: Path) -> int:
     dirs = _iter_run_dirs(root)
     if not dirs:
-        # An empty archive is valid: Pages still has the fixture heading once
-        # a fixture exists; with neither, verify is still a successful no-op.
+        # An empty archive is valid; verify is a successful no-op.
         return 0
     for path, fixture in dirs:
         for req in REQUIRED_FILES:
@@ -501,9 +500,7 @@ def _geomean(rs: list[float]) -> float | None:
 def compare_against(
     rows, baseline: str, arms: list[str]
 ) -> tuple[list[dict], dict[str, float]]:
-    """Recompute per-arm ratios and geomean from min_s against one baseline.
-
-    Same contract as Go's bench.Compare: ratio is baseline_min / arm_min
+    """Same contract as Go's bench.Compare: ratio is baseline_min / arm_min
     (>1 is faster), and a row with no baseline time contributes nothing.
     """
     acc: dict[str, list[float]] = {a: [] for a in arms if a != baseline}

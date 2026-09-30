@@ -57,8 +57,8 @@ LINEUP
     --interp PROFILE            any other profile's built interpreter
                                 (nomimalloc, nolto, seplto, reference-nolto, ...)
     --interp LABEL=/path/to/py  any other binary
-  Name each arm. There is no bundled lineup: the comparison set is whatever
-  --interp flags you pass, in that order. --baseline LABEL fixes the
+  There is no bundled lineup: the arms are the --interp flags, in the order
+  given. --baseline LABEL fixes the
   denominator of every ratio. When the lineup contains reference and
   --baseline is omitted, reference is the baseline; otherwise the first
   --interp wins.
@@ -211,7 +211,7 @@ func runBench(g *Global, args []string) error {
 		return fmt.Errorf("bench compares interpreters natively and only makes sense for this machine's own triple (%s); got --target %s.\nUnder qemu you would be measuring qemu, not the interpreter",
 			host, strings.Join(targets, " "))
 	}
-	abi, err := pythonABI(cfg)
+	abi, err := recipe.PythonABI(cfg)
 	if err != nil {
 		return err
 	}
@@ -483,27 +483,11 @@ func pinsOf(cfg *config.Config) bench.Pins {
 	return p
 }
 
-func pythonABI(cfg *config.Config) (string, error) {
-	s, err := lookupSource(cfg, "python")
-	if err != nil {
-		return "", err
-	}
-	parts := strings.SplitN(s.Version, ".", 3)
-	if len(parts) < 2 {
-		return "", fmt.Errorf("the pinned python version %q has no major.minor to take an ABI from", s.Version)
-	}
-	return parts[0] + "." + parts[1], nil
-}
-
 func isExecutable(p string) bool {
 	fi, err := os.Stat(p)
 	return err == nil && !fi.IsDir() && fi.Mode()&0o111 != 0
 }
 
-// findStaticInterp resolves (and, with build, produces) this machine's own
-// pynative artifact. Any failure here - not built, or no toolchain provisioned
-// at all - is meant to be a soft "skip static" for the caller, not fatal: bench
-// is still useful comparing just dynamic and system.
 // findBuiltInterp locates the interpreter one profile produces, building it
 // first when asked. An empty profile means whatever --profile selected.
 func findBuiltInterp(g *Global, profile, abi string, build bool) (string, error) {
@@ -645,9 +629,6 @@ func samplesToResults(order []string, ms map[string]*interpMeasurement) bench.Re
 	for _, l := range order {
 		res[l] = map[string][]float64{}
 		m := ms[l]
-		if m == nil {
-			continue
-		}
 		for name, ns := range m.CPU {
 			secs := make([]float64, len(ns))
 			for i, v := range ns {
@@ -745,72 +726,30 @@ func runQuiet(path string, args []string) error {
 	return cmd.Run()
 }
 
-func applyPin(disabled bool) (bench.Pin, *bench.Topology) {
-	topo, err := bench.ReadTopology()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s cannot read cpu topology (%v); running unpinned\n", yellow("note:"), err)
-		return bench.Pin{}, nil
-	}
-	fmt.Fprintf(os.Stderr, "%s %s\n", bold("machine:"), topo.Describe())
-	if disabled {
-		if topo.Hybrid {
-			fmt.Fprintf(os.Stderr, "%s --no-pin on a hybrid cpu: runs that migrate between core classes are not comparable\n", yellow("warning:"))
-		}
-		return bench.Pin{}, topo
-	}
-	pin, err := topo.Apply()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s %v; running unpinned\n", yellow("note:"), err)
-		return pin, topo
-	}
-	fmt.Fprintf(os.Stderr, "%s %s\n", bold("affinity:"), pin.Describe())
-
-	busy, err := pin.CheckQuiet(300*time.Millisecond, 0.20)
-	if err == nil && len(busy) > 0 {
-		for _, b := range busy {
-			what := "the pinned cpu"
-			if b.CPU != pin.CPU {
-				what = "an SMT sibling of the pinned cpu"
-			}
-			fmt.Fprintf(os.Stderr, "%s cpu%d (%s) is %.0f%% busy; measurements taken now will be biased\n",
-				yellow("warning:"), b.CPU, what, b.Frac*100)
-		}
-	}
-	return pin, topo
-}
-
 func resolveKnownInterp(g *Global, cfg *config.Config, label, abi string, build bool) (string, error) {
+	profile := label
 	switch label {
-	case "static":
-		p, err := findBuiltInterp(g, "", abi, build)
-		if err != nil {
-			return "", fmt.Errorf("--interp static: %w\nBuild it with `staticpy build`, or pass --build", err)
-		}
-		return p, nil
-	case "reference":
-		p, err := findBuiltInterp(g, config.ProfileReference, abi, build)
-		if err != nil {
-			return "", fmt.Errorf("--interp reference: %w\n"+
-				"Build it with `staticpy build --profile %s`, or pass --build",
-				err, config.ProfileReference)
-		}
-		return p, nil
 	case "system":
 		p, err := exec.LookPath("python3")
 		if err != nil {
 			return "", fmt.Errorf("--interp system: no python3 on PATH")
 		}
 		return p, nil
-	}
-	if cfg != nil {
-		if _, ok := cfg.Profiles[label]; ok {
-			p, err := findBuiltInterp(g, label, abi, build)
-			if err != nil {
-				return "", fmt.Errorf("--interp %s: %w\nBuild it with `staticpy build --profile %s`, or pass --build", label, err, label)
-			}
-			return p, nil
+	case "static":
+		profile = ""
+	default:
+		if _, ok := cfg.Profiles[label]; !ok {
+			return "", fmt.Errorf("--interp %s: unknown name (want %s, or a profile name)",
+				label, strings.Join(wellKnownInterps, ", "))
 		}
 	}
-	return "", fmt.Errorf("--interp %s: unknown name (want %s, or a profile name)",
-		label, strings.Join(wellKnownInterps, ", "))
+	p, err := findBuiltInterp(g, profile, abi, build)
+	if err != nil {
+		hint := "staticpy build"
+		if profile != "" {
+			hint += " --profile " + profile
+		}
+		return "", fmt.Errorf("--interp %s: %w\nBuild it with `%s`, or pass --build", label, err, hint)
+	}
+	return p, nil
 }

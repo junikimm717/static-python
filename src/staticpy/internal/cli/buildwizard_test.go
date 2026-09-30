@@ -112,7 +112,7 @@ func TestTargetMenuDisablesTargetsWithoutAToolchain(t *testing.T) {
 		t.Fatal(err)
 	}
 	seen := 0
-	for _, c := range m.Groups[0].Choices {
+	for _, c := range m.Choices {
 		seen++
 		switch {
 		case c.Value == wizHost:

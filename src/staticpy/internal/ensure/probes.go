@@ -13,26 +13,15 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
-// ProbeModules are the extension modules a static interpreter is expected to
-// have compiled in. Each is imported and reported as its own check, so one
-// missing module reads as one line rather than a wall of tracebacks.
+// Each is imported and reported as its own check, so one missing module reads
+// as one line rather than a wall of tracebacks.
 var ProbeModules = []string{
 	"ssl", "zlib", "sqlite3", "ctypes", "_lzma", "_hashlib", "readline", "curses", "uuid", "compression.zstd",
 }
 
-type ProbeOptions struct {
-	// Modules overrides ProbeModules.
-	Modules []string
-	// WantVersion, if set, is the prefix sys.version must start with.
-	WantVersion string
-	// PythonArgs is inserted before the script path.
-	PythonArgs []string
-}
-
 const probeScriptName = "staticpy_probe.py"
 
-// probeScript emits one PROBE line per check so a single interpreter start
-// covers the whole smoke tier — under qemu, process startup dominates
+// One PROBE line per check, so a single interpreter start covers the whole smoke tier — under qemu, process startup dominates
 // everything else here.
 const probeScript = `
 import sys
@@ -135,17 +124,15 @@ def _pythonapi():
 guard("ctypes.pythonapi", _pythonapi)
 `
 
-// RunProbes is the smoke tier: start the built interpreter, import everything
-// the recipe promised, and confirm it agrees with the target it was built for.
-func RunProbes(ctx context.Context, r *core.Runner, l *Launcher, t config.Target, python, work string, opts ProbeOptions) *Report {
+// The smoke tier: import everything the recipe promised and confirm the
+// interpreter agrees with the target it was built for. wantVersion, if set, is
+// the prefix sys.version must start with.
+func RunProbes(ctx context.Context, r *core.Runner, l *Launcher, t config.Target, python, work, wantVersion string) *Report {
 	rep := NewReport(fmt.Sprintf("smoke %s (%s)", t.Triple, l.Runner))
 	start := time.Now()
 	defer func() { rep.Dur = time.Since(start) }()
 
-	modules := opts.Modules
-	if modules == nil {
-		modules = ProbeModules
-	}
+	modules := ProbeModules
 	bits := t.Bits
 	if bits == 0 {
 		bits = 64
@@ -162,8 +149,7 @@ func RunProbes(ctx context.Context, r *core.Runner, l *Launcher, t config.Target
 		return rep
 	}
 
-	args := append(append([]string(nil), opts.PythonArgs...), "-B", script,
-		strconv.Itoa(bits), opts.WantVersion, strings.Join(modules, ","))
+	args := []string{"-B", script, strconv.Itoa(bits), wantVersion, strings.Join(modules, ",")}
 	// The artifact directory is published read-only; a stray .pyc write would
 	// fail the run for a reason that has nothing to do with the interpreter.
 	l.Env["PYTHONDONTWRITEBYTECODE"] = "1"

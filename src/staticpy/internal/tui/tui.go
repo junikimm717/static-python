@@ -21,14 +21,12 @@ import (
 )
 
 var (
-	// ErrNotInteractive means there is no terminal to prompt on. Callers fall
-	// back to their default rather than failing.
+	// No terminal to prompt on; callers fall back to their default.
 	ErrNotInteractive = errors.New("tui: not interactive")
 	// ErrAborted means the user quit the menu.
 	ErrAborted = errors.New("tui: aborted")
 )
 
-// Choice is one selectable row.
 type Choice struct {
 	// Value is what the equivalent flag would take, e.g. "3" for --cpu 3.
 	Value string
@@ -42,17 +40,11 @@ type Choice struct {
 	Why      string
 }
 
-// Group is a labelled block of choices.
-type Group struct {
-	Title   string
-	Choices []Choice
-}
-
 type Menu struct {
 	Title   string
 	Help    string
 	Headers []string
-	Groups  []Group
+	Choices []Choice
 	// Flag is the command-line flag this menu stands in for, e.g. "--cpu".
 	Flag string
 	// Default is the Value pre-selected when the menu opens, and the one a
@@ -60,7 +52,7 @@ type Menu struct {
 	Default string
 }
 
-// Interactive reports whether a menu can be shown. Menus render on stderr so
+// Menus render on stderr so
 // a command's real output can still be piped, but input has to come from a
 // real terminal either way.
 func Interactive() bool {
@@ -75,7 +67,6 @@ func isTTY(f *os.File) bool {
 	return err == nil && fi.Mode()&os.ModeCharDevice != 0
 }
 
-// Select shows the menu and returns the chosen row.
 func Select(m Menu) (Choice, error) {
 	opts, byValue, err := options(m)
 	if err != nil {
@@ -106,8 +97,7 @@ func Select(m Menu) (Choice, error) {
 	return byValue[chosen], nil
 }
 
-// MultiSelect shows the menu and returns every checked row, in menu order.
-// Menu.Default may pre-check several values, comma-separated. At least one row
+// Checked rows come back in menu order. Menu.Default may pre-check several values, comma-separated. At least one row
 // must be checked to submit; a menu where none is a valid answer should carry
 // an explicit "none" row, so the answer still has a flag to teach.
 func MultiSelect(m Menu) ([]Choice, error) {
@@ -151,14 +141,12 @@ func MultiSelect(m Menu) ([]Choice, error) {
 func options(m Menu) ([]huh.Option[string], map[string]Choice, error) {
 	byValue := map[string]Choice{}
 	var opts []huh.Option[string]
-	for _, g := range m.Groups {
-		for _, c := range g.Choices {
-			byValue[c.Value] = c
-			if c.Disabled {
-				continue
-			}
-			opts = append(opts, huh.NewOption(label(m, g, c), c.Value))
+	for _, c := range m.Choices {
+		byValue[c.Value] = c
+		if c.Disabled {
+			continue
 		}
+		opts = append(opts, huh.NewOption(label(m, c), c.Value))
 	}
 	if len(opts) == 0 {
 		return nil, nil, fmt.Errorf("tui: menu %q has no selectable choices", m.Title)
@@ -196,29 +184,23 @@ func SelectOr(m Menu) (string, error) {
 	return "", err
 }
 
-// label is one option's row, column-aligned across the whole menu so the
-// options line up however huh lays them out.
-func label(m Menu, g Group, c Choice) string {
+// Column-aligned across the whole menu so the options line up however huh
+// lays them out.
+func label(m Menu, c Choice) string {
 	s := row(c.Cells, widths(m))
-	if g.Title != "" {
-		s = fmt.Sprintf("%-14s %s", g.Title, s)
-	}
 	if c.Note != "" {
 		s += "  (" + c.Note + ")"
 	}
 	return s
 }
 
-// describe renders the rows that cannot be chosen, so the shape of the machine
-// and the reason part of it is unavailable stay visible while choosing.
-// headerIndent is the gap between where huh draws a description line and where
-// it draws an option's text, so the two can be made to line up.
+// The gap between where huh draws a description line and where it draws an
+// option's text, so the two can be made to line up.
 //
 // Both sit inside Focused.Base, whose padding therefore cancels; the selector
 // prefix ("> ") is the entire difference, and an unselected row is padded by
 // exactly its width. Measuring the selector is what keeps the header aligned
-// through a theme change -- a hardcoded indent was wrong the moment it met the
-// real form, because it had been guessed against a different renderer.
+// through a theme change.
 //
 // A multi-select row additionally carries a checked/unchecked mark between the
 // selector and the text.
@@ -231,6 +213,8 @@ func headerIndent(t *huh.Theme, multi bool) string {
 	return strings.Repeat(" ", w)
 }
 
+// Renders the rows that cannot be chosen, so the shape of the machine and the
+// reason part of it is unavailable stay visible while choosing.
 func describe(m Menu, headerPad string) string {
 	var b strings.Builder
 	if m.Help != "" {
@@ -238,11 +222,9 @@ func describe(m Menu, headerPad string) string {
 	}
 	w := widths(m)
 	var unavailable []string
-	for _, g := range m.Groups {
-		for _, c := range g.Choices {
-			if c.Disabled {
-				unavailable = append(unavailable, "  "+row(c.Cells, w)+"  -- "+c.Why)
-			}
+	for _, c := range m.Choices {
+		if c.Disabled {
+			unavailable = append(unavailable, "  "+row(c.Cells, w)+"  -- "+c.Why)
 		}
 	}
 	if len(unavailable) > 0 {
@@ -250,10 +232,8 @@ func describe(m Menu, headerPad string) string {
 		b.WriteString(strings.Join(unavailable, "\n") + "\n")
 	}
 	b.WriteString("equivalent flag: " + m.Flag)
-	// Headers sized the columns and were then never shown, which left every
-	// menu presenting aligned data with nothing naming it. Last in the
-	// description puts it directly above the first option, indented to clear
-	// the cursor huh draws in front of the selected row.
+	// Last in the description puts the header directly above the first option,
+	// indented to clear the cursor huh draws in front of the selected row.
 	if len(m.Headers) > 0 {
 		b.WriteString("\n" + headerPad + row(m.Headers, w))
 	}
@@ -265,12 +245,10 @@ func widths(m Menu) []int {
 	for i, h := range m.Headers {
 		w[i] = len(h)
 	}
-	for _, g := range m.Groups {
-		for _, c := range g.Choices {
-			for i, cell := range c.Cells {
-				if i < len(w) && len(cell) > w[i] {
-					w[i] = len(cell)
-				}
+	for _, c := range m.Choices {
+		for i, cell := range c.Cells {
+			if i < len(w) && len(cell) > w[i] {
+				w[i] = len(cell)
 			}
 		}
 	}

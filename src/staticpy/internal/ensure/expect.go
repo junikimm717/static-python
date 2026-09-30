@@ -17,17 +17,16 @@ import (
 // running natively.
 func ExpectKey(triple, runner string) string { return triple + ":" + runner }
 
-// LookupExpect resolves the expectations for (triple, runner, linkage).
-// A bare triple key applies to both runners; "<triple>:qemu" applies only
-// under qemu. ExpectAll always applies. ExpectStatic is the no-dlopen
-// skip/ignore set and is merged only when static is true — a host-built
-// reference can dlopen, so those entries would become unexpected passes.
+// ExpectAll always applies. ExpectStatic is the no-dlopen skip/ignore set and
+// is merged only when static is true — a host-built reference can dlopen, so
+// those entries would become unexpected passes.
 const (
 	ExpectAll    = "all"
 	ExpectStatic = "static"
 )
 
-// Keys are resolved widest-first, so a musl divergence is written once rather
+// A bare triple key applies to both runners; "<triple>:qemu" applies only
+// under qemu. Keys are resolved widest-first, so a musl divergence is written once rather
 // than repeated for eleven targets.
 func LookupExpect(all map[string]config.TestExpect, triple, runner string, static bool) config.TestExpect {
 	var out config.TestExpect
@@ -51,17 +50,15 @@ func LookupExpect(all map[string]config.TestExpect, triple, runner string, stati
 	return out
 }
 
-// Verdict is one test judged against what was expected of it.
 type Verdict struct {
 	Test     string     `json:"test"`
 	Observed TestStatus `json:"observed"`
-	// Why is the operator's recorded reason, carried through so a stale entry
-	// can be found and deleted by the same string that justified it.
+	// Carried through so a stale entry can be found and deleted by the same
+	// string that justified it.
 	Why string `json:"why,omitempty"`
 }
 
-// Classified is the four buckets a run sorts into. Only the first two decide
-// the exit status.
+// Only the first two buckets decide the exit status.
 type Classified struct {
 	Target string `json:"target"`
 	Runner string `json:"runner"`
@@ -141,9 +138,9 @@ func Classify(o *Outcome, expect config.TestExpect, target string) *Classified {
 	return c
 }
 
-// The two buckets that decide the
-// exit status become failures; the two that do not become one summary line
-// each, so an operator can see the size of the skip list without reading it.
+// The two buckets that decide the exit status become failures; the two that do
+// not become one summary line each, so an operator can see the size of the skip
+// list without reading it.
 func (c *Classified) Report(dur time.Duration) *Report {
 	rep := NewReport(fmt.Sprintf("%s suite %s (%s)", c.Level, c.Target, c.Runner))
 	rep.Dur = dur
@@ -172,23 +169,6 @@ func (c *Classified) Report(dur time.Duration) *Report {
 			c.Passed, len(c.ExpectedFailures), len(c.ExpectedSkips))
 	}
 	return rep
-}
-
-func (c *Classified) Err() error {
-	if c.OK() {
-		return nil
-	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "%s suite on %s (%s): ", c.Level, c.Target, c.Runner)
-	var parts []string
-	if n := len(c.UnexpectedFailures); n > 0 {
-		parts = append(parts, fmt.Sprintf("%d unexpected failure(s): %s", n, joinTests(c.UnexpectedFailures)))
-	}
-	if n := len(c.UnexpectedPasses); n > 0 {
-		parts = append(parts, fmt.Sprintf("%d unexpected pass(es): %s", n, joinTests(c.UnexpectedPasses)))
-	}
-	b.WriteString(strings.Join(parts, "; "))
-	return fmt.Errorf("%s", b.String())
 }
 
 // Only test names are hashed: editing the reason attached to an entry changes

@@ -5,16 +5,14 @@ description: How to run a comment sweep over src/staticpy without losing knowled
 
 # Comment hygiene
 
-Two failure modes, opposite directions, both expensive. **Narration** — a
-comment per line restating the line — is noise that goes stale and buries the
-comments that matter. **Knowledge loss** — deleting `// musl has no
-byte-level case folding` — costs the next person a day of rediscovery.
+Two opposite failures: **narration** (comments restating the line, which go
+stale and bury the useful ones) and **knowledge loss** (deleting
+`// musl has no byte-level case folding` costs someone a day).
 
 ## Build the harness first
 
-Never sweep without a way to prove you only moved comments. Reviewing a
-200-line comment diff by eye does not catch a subagent that improved a variable
-name along the way.
+Never sweep without proof that only comments moved; eyeballing a 200-line
+diff misses a subagent "improving" a variable name.
 
 ```sh
 cp -r .agents/skills/comment-hygiene/stripcmt /tmp/sc
@@ -25,37 +23,28 @@ cp -r .agents/skills/comment-hygiene/stripcmt /tmp/sc
 diff /tmp/before.txt /tmp/after.txt
 ```
 
-It prints every Go file's AST with comments discarded, so a comment-only edit
-produces byte-identical output. The only acceptable difference is **blank
-lines**: `go/printer` preserves the vertical gap a comment occupied, so
-deleting one that sat alone between two statements shows as one removed blank
-line. Anything with a token in it means code moved — find it and revert it.
+- It prints every Go file's AST without comments. The only acceptable diff is
+  **blank lines** (`go/printer` keeps the gap a lone comment occupied). Any
+  token in the diff means code moved: revert it.
+- Run from the repo root. With a wrong cwd it silently emits nothing, which
+  looks like a total rewrite.
+- Then `go build ./...` and `go vet ./...` (catches a deleted `//go:`
+  directive).
 
-Run from the repo root; `stripcmt` takes a relative path and silently emits
-nothing if the working directory is wrong, which looks like a total rewrite in
-the diff.
+## Delete, keep, or trim
 
-Then `go build ./...` and `go vet ./...`. Cheap, and it catches a deleted
-`//go:` directive.
+**Delete:** narration of the next line, step numbering, banner dividers,
+tautological docs (`// Close closes.`), explanations of Go/stdlib idioms,
+commented-out code, changelog narration (`// previously we did Y`, `// NEW:`).
 
-## The three options
+**Keep verbatim:** anything stating *why* — a constraint, workaround,
+upstream bug, invariant. Especially `internal/core`'s concurrency and
+correctness notes (lease/flock semantics, atomic-rename publish, what feeds a
+cache key); deleting those reintroduces races.
 
-Most guidance treats this as keep-or-delete. It is not — there are three, and
-the third is the one sweeps here keep skipping.
-
-**Delete.** Narration restating the next line, step numbering, banner
-dividers, tautological doc comments (`// Close closes.`), explanations of Go or
-stdlib idioms, commented-out code, changelog narration (`// previously we did
-Y`, `// NEW:`).
-
-**Keep verbatim.** Anything stating *why*: a constraint, a workaround, an
-upstream bug, an invariant. Especially the concurrency and correctness notes in
-`internal/core` — lease and flock semantics, atomic-rename publish, what feeds a
-cache key. Deleting one of those is how a race gets reintroduced.
-
-**Trim the dead leading sentence.** The most common shape here is a doc comment
-that opens by restating the signature and only then says something real. Delete
-the opener, keep the rest, reword minimally:
+**Trim the dead leading sentence** — the option sweeps here keep skipping. A
+doc comment that restates the signature, then says something real, loses the
+opener:
 
     // LockPath is the flock file for a job slug. Lock files are never deleted:
     // removing one would break flock identity for anyone holding it open.
@@ -63,79 +52,63 @@ the opener, keep the rest, reword minimally:
     // Lock files are never deleted: removing one would break flock identity for
     // anyone holding it open.
 
-Where cutting the opener strands a pronoun or leaves a subjectless fragment,
-reword the survivor into a standalone sentence. `// Built into its own prefix.`
-is a trim that forgot this half.
+If cutting strands a pronoun or leaves a fragment, reword into a standalone
+sentence (`// Built into its own prefix.` is a trim that forgot this).
 
-Go's "every exported identifier gets a doc comment starting with its name"
-convention is **explicitly overridden** in this repo's `internal/` packages.
-"It's exported" is never a reason to keep, and never a tie. Do not cite golint
-or godoc.
+Go's "every exported identifier gets a doc comment" convention is
+**explicitly overridden** in `internal/`. "It's exported" is never a reason
+to keep, nor a tie-breaker. Don't cite golint or godoc.
 
-## The failure mode this repo has actually hit
+## The failure this repo keeps hitting
 
-Every sweep so far has come back near-zero on the first pass — two removals
-across 1,970 lines, three across 2,150, four across 2,466 — because the agents
-applied only the binary test and never the trim. The sibling repo has the same
-history: a sweep on "when unsure, keep" alone removed one comment from 13k lines
-and was rejected.
+Every first-pass sweep came back near zero — 2 removals in 1,970 lines, 3 in
+2,150, 4 in 2,466 — because agents applied keep/delete and never trim. The
+sibling repo's "when unsure, keep" sweep removed one comment from 13k lines and
+was rejected. "When unsure, keep" is for genuine ties, not a licence to keep
+everything.
 
-"When unsure, keep" is the tiebreaker for genuine ties. It is not a licence to
-keep everything, and it is not a substitute for asking whether the first
-sentence is doing any work.
+The opposite also happens: agents inventing work delete WHY-comments and
+rephrase. Judge the *category* of removals, not the count: accessor docs and
+dead openers are real work; rationale is not.
 
-The opposite failure is real too: agents inventing work delete WHY-comments and
-rephrase things. Read the *category* of what came back, not the count. Removals
-of accessor docs and dead openers are real work; removals of rationale are not.
+## Two hazards in this tree
 
-## Two hazards specific to this tree
-
-**`internal/cli` is ~3% comments because the help text is the documentation,
-and it lives in string literals.** Every command has a `Long:` field; `help.go`
-is almost entirely literals; error messages are written to be actionable. String
-literals are code. A large number of removals from `cli` is a red flag, not a
-win, and several of its files should come back at zero.
-
-**`internal/gen/staticapi.go` emits C through string literals**, including
-comments that end up in the generated `symbols.c`. Same rule — those are output,
-not commentary.
+- **`internal/cli` is ~3% comments** because its docs are string literals
+  (`Long:` fields, `help.go`, actionable error messages). String literals are
+  code. Many removals from `cli` is a red flag; several files should come back
+  at zero.
+- **`internal/gen/staticapi.go` emits C via string literals**, including
+  comments that land in generated `symbols.c`. Those are output.
 
 ## Running it with subagents
 
-Partition by package, one agent per group, all spawned in a single message.
-Roughly: `recipe`, `ensure`, `cli`, `core`+`logging`, `config`+`sources`,
-`gen`+`assets`.
+One agent per package group, all spawned in one message: `recipe`, `ensure`,
+`cli`, `core`+`logging`, `config`+`sources`, `gen`+`assets`. Each prompt
+carries:
 
-Each prompt must carry its exact file list and "edit only these"; the absolute
-rule that only comments and the blank lines they leave may change, with the AST
-check named so the agent knows it is verified; the delete/keep/trim taxonomy
-**with concrete examples from that agent's own files**; "when unsure, keep";
-"removing zero from a file is a perfectly good outcome — do not manufacture
-removals"; `Edit` only, never `sed` or a python replace (a blind replace
-silently no-ops on a bad anchor and reports success); and a report quoting every
-change, before and after, so a trim is visible as a trim.
-
-Naming the sacred comments per package is what stops the shredding. A `core`
-agent needs to be told the flock note is load-bearing; a `sources` agent needs
-to be told the sha256-before-`.done` note is.
+- its exact file list and "edit only these"
+- the absolute rule: only comments and the blank lines they leave change,
+  verified by the AST check (name it)
+- the delete/keep/trim taxonomy **with examples from that agent's own files**,
+  and the sacred comments for its package (the flock note for `core`, the
+  sha256-before-`.done` note for `sources`) — naming them stops the shredding
+- "when unsure, keep"; "zero removals from a file is fine — don't manufacture
+  them"
+- `Edit` only, never `sed` or a python replace (a blind replace no-ops on a bad
+  anchor and reports success)
+- a report quoting every change before and after, so trims are visible
 
 ## Traps
 
-**Account for every changed file afterwards, not just the expected ones.**
-`git status` — the harness only covers `.go` files, so a changed `go.mod` or a
-touched asset is invisible to it.
+- **Account for every changed file** via `git status`: the harness only sees
+  `.go`, not `go.mod` or assets.
+- **Actively-wrong comments are the real find.** A comment describing code
+  that no longer exists should be *fixed*, not deleted, and reported
+  separately (one sweep found a duplicated verb in `writeExterns`' doc). Flag
+  rather than drive-by rewrite — prose rewrites mid-sweep hide real changes.
 
-**Actively-wrong comments are the real find.** A comment describing code that no
-longer exists should be *fixed*, not deleted, and reported separately. Today's
-sweep turned up a duplicated verb in `writeExterns`' doc left over from an
-earlier edit. An agent that flags one rather than drive-by fixing it is doing
-the right thing — a sweep's remit is comments, and rewriting prose mid-sweep
-hides real changes in a large diff.
+## Writing comments on a fix
 
-## Writing comments in the first place
-
-Repo rule, from `AGENTS.md`: when you have found a fix, **one line of comment
-max**. The impulse after a hard debugging session is to write a paragraph
-explaining the journey. Don't. One line at the fix; the full story goes in
-`staticpy-traps`, where it is searchable by symptom -- as an entry in its
-`SKILL.md`, or as a write-up under its `references/` if it needs a reproducer.
+Repo rule (`AGENTS.md`): **one line of comment max** at a fix. The full story
+goes in `staticpy-traps`, searchable by symptom — a `SKILL.md` entry, or a
+`references/` write-up if it needs a reproducer.

@@ -1,14 +1,13 @@
 # benchmarks/
 
-Committed `./staticpy bench` sessions. CI never measures; GitHub Pages is
-built from this tree by `./manage_benchmarks.py site`. Do not commit `_site`.
-Only measured sessions belong here. The manager's tests keep a synthetic
-session under `tests/fixtures/`.
+Committed `./staticpy bench` sessions, measured only (the manager's tests keep
+a synthetic one under `tests/fixtures/`). CI never measures. GitHub Pages is
+built from this tree by `./manage_benchmarks.py site`; do not commit `_site`.
 
 ## What we accept
 
-One directory per run, named `<stamp>-<arch>/` (UTC `YYYYMMDDThhmmssZ`, then
-the machine arch). Protocol **2**. These seven files, nothing else:
+One directory per run, `<stamp>-<arch>/` (UTC `YYYYMMDDThhmmssZ`, then machine
+arch), protocol **2**, exactly these seven files:
 
 ```
 manifest.json   protocol, suite.name (pyperformance|micro), baseline, identities
@@ -20,54 +19,41 @@ skipped.json    list, possibly empty
 timeline.jsonl  one event per measurement
 ```
 
-`import` copies only that set and refuses a directory missing `manifest.json`
-or `report.json`. `.gitignore` is the same allowlist, so a whole-session dump
-(venv, raw, logs, quiet.jsonl, …) will not be committed.
+`import` copies only these and refuses a directory without `manifest.json` or
+`report.json`. `.gitignore` is the same allowlist, so venv/raw/logs/quiet.jsonl
+in a whole-session dump never get committed.
 
-Required to compare later: `manifest.protocol == 2`, a host `fingerprint` /
-`fingerprint_sha256`, `python_version`, `git_revision` of the packed
-experiment (from `kit.json` on a kit run), and each interpreter as
-`{label, binary_sha256, artifact_key, factors, packages}`. A kit session
-also stores the full `kit.json` under `manifest.kit` so pins, the triple,
-and pack-time arm hashes survive without the tarball. A profile name is
-not a stable description of the binary.
+A session must carry, to be comparable later: `manifest.protocol == 2`, host
+`fingerprint` / `fingerprint_sha256`, `python_version`, the experiment's
+`git_revision` (from `kit.json` on a kit run), and each interpreter as
+`{label, binary_sha256, artifact_key, factors, packages}` (a profile name does
+not identify a binary). Kit sessions also keep the full `kit.json` under
+`manifest.kit`, so pins, triple and pack-time arm hashes survive without the
+tarball.
 
-## Paths in
+## Adding a session
 
-Prefer `import`. It checks the protocol, copies the seven files, and refreshes
-`index.json`. `list` / `verify` / `site` rescan directories that have a
-manifest, so a dump still publishes if the seven files are present.
-
-**Local (this repo, native machine)**
+Prefer `import`: it checks the protocol, copies the seven files and refreshes
+`index.json`. `list` / `verify` / `site` rescan any directory with a manifest,
+so a raw copy also publishes if the seven files are present.
 
 ```sh
+# local, native machine
 ./staticpy bench --interp static --interp reference --baseline reference
 ./manage_benchmarks.py import dist/bench/<stamp>-<arch>
-```
 
-**Local dump** (same machine, skip the copy step)
-
-```sh
+# local dump instead of import
 cp -a dist/bench/<stamp>-<arch> benchmarks/
 ./manage_benchmarks.py verify
-```
 
-**Remote / quiet box (kit)** — unpack a `staticpy kit` tarball, run it, bring
-the session back, import on a clone of this repo:
-
-```sh
-# quiet box
+# kit on a quiet box: results land in DIR/results/, not dist/bench/
 ./run
-# any machine with this repo
-scp -r quiet:results/<stamp>-<arch> /tmp/
+scp -r quiet:results/<stamp>-<arch> /tmp/          # then, on a repo clone:
 ./manage_benchmarks.py import /tmp/<stamp>-<arch>
 ```
 
-`scp`/`rsync` of the whole session into `benchmarks/<stamp>-<arch>/` is the
-same as a local dump. Results on the kit live under `DIR/results/`, not
-`dist/bench/`.
-
-Then commit `benchmarks/` and push. Pages rebuilds from that tree on `master`.
+Copying a whole session into `benchmarks/<stamp>-<arch>/` is the same as a
+local dump. Then commit `benchmarks/` and push; Pages rebuilds on `master`.
 
 ```sh
 ./manage_benchmarks.py list
@@ -76,7 +62,7 @@ Then commit `benchmarks/` and push. Pages rebuilds from that tree on `master`.
 ./manage_benchmarks.py delete <stamp>-<arch> --yes
 ```
 
-`--force` overwrites an existing id. `--allow-stale-protocol` imports a
-session whose `protocol` is not 2; those stay in the tree and the site badges
-them. `delete` refuses anything still under `fixtures/` unless `--fixtures`
-is also passed.
+- `--force` overwrites an existing id.
+- `--allow-stale-protocol` imports a non-2 protocol; it stays and the site
+  badges it.
+- `delete` refuses anything under `fixtures/` without `--fixtures`.

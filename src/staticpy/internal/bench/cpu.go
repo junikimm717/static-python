@@ -59,14 +59,13 @@ func readTopology(root string) (*Topology, error) {
 			continue // "cpufreq", "cpuidle" and friends
 		}
 		dir := filepath.Join(root, name)
-		coreID, _ := strconv.Atoi(readFile(filepath.Join(dir, "topology", "core_id")))
 		t.CPUs = append(t.CPUs, CPU{
 			ID:       id,
 			capacity: readInt(filepath.Join(dir, "cpu_capacity")),
 			maxFreq:  readInt(filepath.Join(dir, "cpufreq", "cpuinfo_max_freq")),
-			Rank:     readRank(dir),
-			CoreID:   coreID,
-			Siblings: parseCPUList(readFile(filepath.Join(dir, "topology", "thread_siblings_list"))),
+			Rank:     readInt(filepath.Join(dir, "acpi_cppc", "highest_perf")),
+			CoreID:   readInt(filepath.Join(dir, "topology", "core_id")),
+			Siblings: parseCPUList(readTrim(filepath.Join(dir, "topology", "thread_siblings_list"))),
 		})
 	}
 	if len(t.CPUs) == 0 {
@@ -85,9 +84,9 @@ func readTopology(root string) (*Topology, error) {
 
 func ReadTopology() (*Topology, error) { return readTopology(cpuRoot) }
 
-// classSource settles which reading becomes Class, across the whole machine
-// rather than per CPU: whichever of the two actually separates the core types
-// wins, because neither is right everywhere. See the staticpy-traps skill.
+// Decided across the whole machine rather than per CPU: whichever reading
+// actually separates the core types wins, because neither is right everywhere.
+// See the staticpy-traps skill.
 func classSource(t *Topology) {
 	cap, freq := 0, 0
 	for _, c := range t.CPUs {
@@ -113,27 +112,11 @@ func classSource(t *Topology) {
 }
 
 func readInt(path string) int {
-	v, err := strconv.Atoi(readFile(path))
+	v, err := strconv.Atoi(readTrim(path))
 	if err != nil {
 		return 0
 	}
 	return v
-}
-
-func readRank(dir string) int {
-	v, err := strconv.Atoi(readFile(filepath.Join(dir, "acpi_cppc", "highest_perf")))
-	if err != nil {
-		return 0
-	}
-	return v
-}
-
-func readFile(p string) string {
-	b, err := os.ReadFile(p)
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(b))
 }
 
 // "0,3-5" is 0,3,4,5.
@@ -228,8 +211,8 @@ func (t *Topology) Describe() string {
 	return fmt.Sprintf("%d logical cpus, %s (%s)", len(t.CPUs), kind, strings.Join(parts, ", "))
 }
 
-// classLabel renders a class as a clock where the value looks like a kHz
-// ceiling, which is what cpuinfo_max_freq reports.
+// A value that looks like a kHz ceiling (what cpuinfo_max_freq reports) is
+// rendered as a clock.
 func ClassLabel(class int) string {
 	if class > 100000 {
 		return fmt.Sprintf("%.2fGHz", float64(class)/1e6)
@@ -237,7 +220,6 @@ func ClassLabel(class int) string {
 	return fmt.Sprintf("capacity=%d", class)
 }
 
-// ByID finds one logical CPU.
 func (t *Topology) ByID(id int) (CPU, bool) {
 	for _, c := range t.CPUs {
 		if c.ID == id {
@@ -247,7 +229,6 @@ func (t *Topology) ByID(id int) (CPU, bool) {
 	return CPU{}, false
 }
 
-// ApplyCPU pins to a caller-chosen logical CPU.
 func (t *Topology) ApplyCPU(id int) (Pin, error) {
 	c, ok := t.ByID(id)
 	if !ok {

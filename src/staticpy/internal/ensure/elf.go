@@ -10,9 +10,8 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/config"
 )
 
-// identity is the ELF header a correctly cross-built binary for a target must
-// have. Keyed by architecture; a target whose arch is missing cannot be
-// verified, which is a failure rather than a silent pass.
+// A target whose arch has no row in identities cannot be verified, which is a
+// failure rather than a silent pass.
 type identity struct {
 	Machine elf.Machine
 	Class   elf.Class
@@ -50,7 +49,6 @@ var archAliases = map[string]string{
 	"s390":     "s390x",
 }
 
-// ELFInfo is what verification cares about, not a full parse of the file.
 type ELFInfo struct {
 	Path    string `json:"path"`
 	Machine string `json:"machine"`
@@ -85,8 +83,8 @@ func (i *ELFInfo) String() string {
 	return s + " dynamic"
 }
 
-// Static is the property that matters: no program interpreter to find at exec
-// time and no dynamic segment to process.
+// No program interpreter to find at exec time and no dynamic segment to
+// process.
 func (i *ELFInfo) Static() bool { return !i.HasInterp && !i.HasDynSeg }
 
 func (i *ELFInfo) HasSymbol(name string) bool { return i.symbols[name] }
@@ -149,8 +147,7 @@ func InspectELF(path string) (*ELFInfo, error) {
 	return info, nil
 }
 
-// CheckELF asserts that path is the ELF the profile asked for. wantDynamic is
-// the host-built reference: shared libpython, a PT_INTERP, no staticapi table
+// wantDynamic is the host-built reference: shared libpython, a PT_INTERP, no staticapi table
 // in the executable. A static profile still requires no PT_INTERP / PT_DYNAMIC.
 // Symbols are checked only when the binary carries a .symtab; a stripped
 // binary (or a dynamic one) reports those checks as skipped.
@@ -227,8 +224,7 @@ func CheckELF(rep *Report, path string, t config.Target, wantSymbols []string, w
 	return info
 }
 
-// IdentityFor resolves a target's expected ELF header, accepting either the
-// arch column or the leading component of the triple.
+// Accepts either the arch column or the leading component of the triple.
 func IdentityFor(t config.Target) (identity, bool) {
 	for _, k := range []string{t.Arch, strings.SplitN(t.Triple, "-", 2)[0]} {
 		k = strings.ToLower(strings.TrimSpace(k))

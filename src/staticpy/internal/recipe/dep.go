@@ -17,23 +17,14 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/sources"
 )
 
-// The recipe shapes a package can declare. Anything else is a typo in
-// packages.toml, and is rejected rather than silently treated as autotools.
+// The recipe shapes a package can declare. config.Validate rejects anything
+// else rather than silently treating it as autotools.
 const (
 	buildAutotools = "autotools"
 	buildOpenSSL   = "openssl"
 	buildMake      = "make"
 	buildSources   = "sources"
 )
-
-// Each dependency is built into its own prefix, never a shared accumulator:
-// that is what let a stale libz.a from an older version survive a version
-// bump and link into everything afterwards.
-func Dep(cfg *config.Config, assets fs.FS, t config.Target, profile, name string) (core.Job, error) {
-	b := &depBuilder{cfg: cfg, assets: assets, target: t, profile: profile,
-		memo: map[string]*depJob{}, onStack: map[string]bool{}}
-	return b.job(name)
-}
 
 func Deps(cfg *config.Config, assets fs.FS, t config.Target, profile string) ([]core.Job, error) {
 	b := &depBuilder{cfg: cfg, assets: assets, target: t, profile: profile,
@@ -80,22 +71,17 @@ func (b *depBuilder) job(name string) (*depJob, error) {
 	if err != nil {
 		return nil, fmt.Errorf("recipe: %w", err)
 	}
+	// config.Validate guarantees the source exists and that Name is the key.
 	srcName := pkg.Source
 	if srcName == "" {
 		srcName = pkg.Name
 	}
-	if srcName == "" {
-		srcName = name
-	}
-	src, ok := b.cfg.Sources[srcName]
-	if !ok {
-		return nil, fmt.Errorf("recipe: package %s names source %q, which is not in sources.toml", name, srcName)
-	}
-	res, err := resolveScope(b.cfg, b.profile, depScope(name))
+	src := b.cfg.Sources[srcName]
+	res, err := b.cfg.Resolve(b.profile, depScope(name))
 	if err != nil {
 		return nil, err
 	}
-	id, err := toolchainFor(nil, res, b.target.Triple)
+	id, err := toolchainFor(res, b.target.Triple)
 	if err != nil {
 		return nil, err
 	}
@@ -110,13 +96,9 @@ func (b *depBuilder) job(name string) (*depJob, error) {
 	if j.tgtPatchHash, err = sources.TargetPatchSetHash(b.assets, src, b.target.Triple); err != nil {
 		return nil, err
 	}
+	// config.Validate guarantees every target sets the map a package names.
 	if pkg.PlatformMap != "" {
-		j.platform, ok = b.target.Maps[pkg.PlatformMap]
-		if !ok || j.platform == "" {
-			return nil, fmt.Errorf("recipe: %s needs maps.%s for target %s, which targets.toml does not set; "+
-				"these platform names do not follow from the triple and have to be written down",
-				name, pkg.PlatformMap, b.target.Triple)
-		}
+		j.platform = b.target.Maps[pkg.PlatformMap]
 	}
 
 	b.onStack[name] = true
@@ -135,13 +117,11 @@ func (b *depBuilder) job(name string) (*depJob, error) {
 	return j, nil
 }
 
-// A dep builds into a prefix it shares with every other dep, instead of its
-// own artifact. A shared library records where it was configured to live --
-// libtool writes an RPATH, OpenSSL writes OPENSSLDIR, ncurses writes its
-// terminfo directory -- and those strings are only correct when --prefix is the
-// path the files actually end up at. The per-dep prefixes the static build uses
-// cannot satisfy that, because nothing resolves a path at runtime there and a
-// stale one is inert.
+// A rootfs dep builds into a prefix shared with every other dep. A shared
+// library records where it was configured to live (libtool RPATH, OPENSSLDIR,
+// ncurses' terminfo dir), so --prefix must be where the files end up. The
+// static build's per-dep prefixes get away without this: nothing resolves a
+// path at runtime there.
 type rootfsMode struct {
 	// The final path, baked into everything installed.
 	prefix string
@@ -247,8 +227,7 @@ func (j *depJob) ArtifactDir(e *core.Env) string {
 
 func (j *depJob) Provenance() map[string]string { return j.tc.Provenance() }
 
-// view is every prefix this package compiles and links against: its direct
-// needs and theirs, deepest last so a direct need's headers win.
+// Deepest last, so a direct need's headers win.
 func (j *depJob) view(e *core.Env) []string {
 	if j.roots != nil {
 		// Everything already installed is in one place, so there is no chain of
@@ -309,9 +288,6 @@ func (j *depJob) Build(ctx context.Context, e *core.Env, r *core.Runner, work, s
 		err = j.plainMake(ctx, e, r, te, src, stage)
 	case buildSources:
 		err = j.fromSources(ctx, r, te, src, stage)
-	default:
-		err = fmt.Errorf("recipe: package %s declares build = %q; valid shapes are %q, %q, %q and %q",
-			j.name, j.pkg.Build, buildAutotools, buildOpenSSL, buildMake, buildSources)
 	}
 	if err != nil {
 		return err
@@ -450,9 +426,6 @@ func (j *depJob) fromSources(ctx context.Context, r *core.Runner, te *toolenv, s
 		return fmt.Errorf("recipe: package %s has build = %q but no libname, so there is no archive to write",
 			j.name, buildSources)
 	}
-	if len(j.pkg.Sources) == 0 {
-		return fmt.Errorf("recipe: package %s has build = %q but lists no sources", j.name, buildSources)
-	}
 
 	// One cc -c over the whole list drops the objects next to their sources,
 	// named after them, so two files with the same basename would silently
@@ -511,8 +484,8 @@ func (j *depJob) fromSources(ctx context.Context, r *core.Runner, te *toolenv, s
 // pkg-config still points at the artifact. See staticpy-traps (seplto prefix).
 const keepablePrefix = "/usr"
 
-// opensslCertDir is OPENSSLDIR on every non-host openssl. /usr/ssl is empty
-// on Alpine/Debian/Fedora; /etc/ssl is where the CA bundle lives.
+// /usr/ssl is empty on Alpine/Debian/Fedora; /etc/ssl is where the CA bundle
+// lives.
 const opensslCertDir = "/etc/ssl"
 
 func (j *depJob) configurePrefix(artifact string) string {
@@ -580,7 +553,7 @@ func rewriteKeepableMetadata(root, from, to string) error {
 	})
 }
 
-// hoistDestdir lifts <stage><prefix> to <stage>, so the artifact is the
+// Lifts <stage><prefix> to <stage>, so the artifact is the
 // installed tree itself rather than a deep path mirroring the store.
 func hoistDestdir(stage, prefix, pkg string) error {
 	staged := destDirTree(stage, prefix)
@@ -612,8 +585,8 @@ func hoistDestdir(stage, prefix, pkg string) error {
 	return nil
 }
 
-// assertProvides is the postcondition that catches the failure mode a green
-// configure and a green make cannot: an install that produced no library.
+// Catches what a green configure and a green make cannot: an install that
+// produced no library.
 func (j *depJob) assertProvides(stage string) error {
 	for _, p := range j.pkg.Provides {
 		clean := filepath.Clean(filepath.FromSlash(p))
@@ -628,8 +601,8 @@ func (j *depJob) assertProvides(stage string) error {
 	return nil
 }
 
-// installedSummary lists what the install actually produced, so a missing
-// library is diagnosable from the error alone (wrong libdir, wrong name).
+// Makes a missing library diagnosable from the error alone (wrong libdir,
+// wrong name).
 func installedSummary(stage string) []string {
 	var out []string
 	for _, dir := range []string{"lib", "lib64", "include"} {

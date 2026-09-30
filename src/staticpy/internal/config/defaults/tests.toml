@@ -17,7 +17,7 @@
 # (see staticpy-traps: "Do not overfit the last failure"). An ignore that
 # exists to avoid re-keying packed verifies is a lie to the next status.
 
-# ---------------------------------------------------------------- musl libc --
+# musl libc
 
 [[expect.all.skip]]
 test = "test_re"
@@ -57,11 +57,9 @@ every UDPLITE class fails in setUp with no 'cli' attribute rather than \
 skipping. This is the kernel/runtime, not the interpreter.\
 """
 
-# ------------------------------------------------------- no dlopen at all --
-#
-# Every extension module is a builtin, so there is no .so to open, no
-# __file__ to read, and no dlerror() to inspect. ctypes here can describe
-# foreign types and reach the interpreter's own symbols, nothing more.
+# No dlopen at all: every extension module is a builtin, so there is no .so to
+# open, no __file__ to read, and no dlerror() to inspect. ctypes here can
+# describe foreign types and reach the interpreter's own symbols, nothing more.
 
 [[expect.static.skip]]
 test = "test_bytes"
@@ -123,11 +121,9 @@ ExtensionFileLoader has no file to open and run_in_subinterp returns -1. \
 Also ignored in profile_task, or PGO training aborts the build.\
 """
 
-# ------------------------------------------------------------- qemu-user --
-#
-# [expect.qemu] applies to every emulated target and to none of the native
-# ones. All of these pass natively on x86_64, which is what identifies them as
-# emulator gaps rather than target or build problems.
+# qemu-user: [expect.qemu] applies to every emulated target and to none of the
+# native ones. All of these pass natively on x86_64, which is what identifies
+# them as emulator gaps rather than target or build problems.
 
 [[expect.qemu.ignore]]
 test = "*RecvmsgSCMRightsStreamTest*"
@@ -145,7 +141,7 @@ why = "IPv6 ancillary data (RFC 3542) is not reproduced by qemu-user's recvmsg."
 test = "*BasicCANTest*"
 why = "AF_CAN sockets are unavailable under qemu-user."
 
-# --------------------------------------------------------------- i386 x87 --
+# i386 x87
 
 [[expect.i386-linux-musl.ignore]]
 test = "*MathTests.testSinh*"

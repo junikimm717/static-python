@@ -22,7 +22,6 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/logging"
 )
 
-// Subdirectories of dist/.
 const (
 	DirSrc      = "src"
 	DirSrcTrees = "srctrees"
@@ -38,7 +37,6 @@ const (
 	DirBin      = ".bin"
 )
 
-// ManifestName is the stamp that makes an artifact directory valid.
 const ManifestName = ".staticpy.json"
 
 // StaleAge is how old a pid-tagged scratch dir must be, on top of having a dead
@@ -52,10 +50,8 @@ type Job interface {
 	// Slug is filesystem-safe, unique per job, and stable across recipe edits.
 	// It selects the artifact path, lock file and log directory.
 	Slug() string
-	// Deps are the jobs whose artifacts this job reads.
 	Deps() []Job
-	// It must be deterministic, and must not contain any path that varies per
-	// run.
+	// Must be deterministic, and must not contain any path that varies per run.
 	KeyInputs() map[string]string
 	// ArtifactDir is the absolute path where the published output lives.
 	ArtifactDir(e *Env) string
@@ -64,8 +60,7 @@ type Job interface {
 	Build(ctx context.Context, e *Env, r *Runner, work, stage string) error
 }
 
-// Manifest is the .staticpy.json stamp inside a published artifact. Its
-// presence with a matching key is the definition of "built".
+// A manifest's presence with a matching key is the definition of "built".
 type Manifest struct {
 	Key         string            `json:"key"`
 	Slug        string            `json:"slug"`
@@ -75,22 +70,18 @@ type Manifest struct {
 	CompletedAt time.Time         `json:"completed_at"`
 	BuiltBy     string            `json:"built_by"`
 	Duration    string            `json:"duration"`
-	// Provenance records inputs that were taken on trust rather than verified:
-	// a toolchain with no gccfactory manifest, an explicit --sources overlay.
-	// A build that took a weaker path must never look identical to one that did
-	// not.
+	// Inputs taken on trust rather than verified: a toolchain with no gccfactory
+	// manifest, an explicit --sources overlay. See Provenancer.
 	Provenance map[string]string `json:"provenance,omitempty"`
 }
 
 type Cmd struct {
-	// Dir is the working directory; required.
-	Dir string
+	Dir string // required
 	// Env, if non-nil, replaces the environment entirely.
 	Env []string
 	// EnvAdd overlays variables onto whatever Env resolves to.
 	EnvAdd map[string]string
-	// Args is the argv; Args[0] is the program.
-	Args []string
+	Args   []string
 	// Name labels the log file, e.g. "openssl-configure".
 	Name string
 	// SoftFail logs a non-zero exit as a warning, not an error. The caller
@@ -103,8 +94,7 @@ type Cmd struct {
 // Set Dist to an absolute path: EnsureDirs will otherwise rewrite it, which is
 // unsafe once other goroutines are reading the Env.
 type Env struct {
-	Dist     string
-	RepoRoot string
+	Dist string
 
 	// Toolchains is the directory holding one subdir per <triple>-<cross|native>.
 	// Provisioned by the shim; staticpy never fetches it. Overrides maps a
@@ -153,16 +143,16 @@ func (e *Env) MakeJobs() int {
 // Lock files are never deleted: removing one would break flock identity for
 // anyone holding it open.
 func (e *Env) LockPath(slug string) string {
-	return e.Path(DirLocks, lockFileName(slug)+".lock")
+	return e.Path(DirLocks, PathSlug(slug)+".lock")
 }
 
 func (e *Env) JobLogDir(slug string) string {
-	return e.Path(DirLogs, "jobs", lockFileName(slug))
+	return e.Path(DirLogs, "jobs", PathSlug(slug))
 }
 
 // Slugs carry ':' to stay readable in logs and on the CLI; paths get '_' so the
 // two never diverge by accident on a filesystem that dislikes colons.
-func lockFileName(slug string) string {
+func PathSlug(slug string) string {
 	out := []rune(slug)
 	for i, r := range out {
 		if r == ':' || r == '/' {
@@ -172,7 +162,6 @@ func lockFileName(slug string) string {
 	return string(out)
 }
 
-// PlanNode is one resolved job plus its current state, for status and dry-run.
 type PlanNode struct {
 	Job      Job
 	Key      string

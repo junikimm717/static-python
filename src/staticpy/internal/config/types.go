@@ -5,8 +5,6 @@
 // works alone and a checkout wins over it. Resolution order is
 // embedded -> --config <dir>, with sources.toml and patches/
 // deliberately excluded from the automatic layer; see Load.
-//
-// This file is the contract the rest of the tree compiles against.
 package config
 
 // Mirrors are tried in order.
@@ -16,48 +14,39 @@ type Source struct {
 	File    string   `toml:"file"`
 	URLs    []string `toml:"urls"`
 	SHA256  string   `toml:"sha256"`
-	// TopDir is the directory the archive unpacks into, stripped to produce a
-	// flat srctree. Empty means the archive has no wrapper directory.
+	// Stripped to produce a flat srctree. Empty means the archive has no
+	// wrapper directory.
 	TopDir string `toml:"topdir"`
-	// Patches are filenames under patches/<name>-<version>/, applied in order.
+	// Filenames under patches/<name>-<version>/, applied in order.
 	Patches []string `toml:"patches"`
 	// TargetPatches are keyed by triple and applied on top of Patches, to the
 	// private copy a build stages rather than to the shared srctree. A diff
 	// listed in Patches moves the tree's key and with it every target; one
 	// keyed here reaches that target's key and nothing else.
 	TargetPatches map[string][]string `toml:"target_patches"`
-	// Edits are content-anchored fixups for things a version-pinned diff cannot
-	// survive; see Edit.
-	Edits []Edit `toml:"edits"`
+	Edits         []Edit              `toml:"edits"`
 }
 
-// Edit is a content-anchored source fixup, and is the exception rather than the
-// tool of choice: patches/ holds real diffs, and `patch` already fails loudly
-// when its context moves.
-//
-// Reach for an Edit only when the edit must survive an upstream version bump
-// unreviewed. Every source here is sha256-pinned, so for a given pin a diff can
-// never spuriously fail — which means a diff that breaks on a bump is a signal
-// worth having, not a cost. The one place that trade goes the other way is the
-// ctypes injection: CPython patch releases are frequent and the injection is
-// mechanical, so an anchor (one line) beats diff context (three) there.
+// A content-anchored fixup is the exception, not the tool of choice: patches/
+// holds real diffs, and `patch` already fails loudly when its context moves.
+// Every source is sha256-pinned, so a diff that breaks on a bump is a signal
+// worth having. Reach for an Edit only when it must survive an upstream bump
+// unreviewed — the ctypes injection, where CPython patch releases are frequent
+// and the injection mechanical, so one anchor line beats three of context.
 type Edit struct {
 	File   string `toml:"file"`
 	Anchor string `toml:"anchor"`
-	// Action is one of "insert_after", "insert_before", "replace_line",
-	// "delete_line".
+	// One of "insert_after", "insert_before", "replace_line", "delete_line".
 	Action string `toml:"action"`
-	// Text is the replacement or inserted content. TextFile reads it from an
-	// asset instead, for multi-line insertions.
+	// TextFile reads Text from an asset instead, for multi-line insertions.
 	Text     string `toml:"text"`
 	TextFile string `toml:"text_file"`
-	// MustMatch is how many times Anchor is required to match. Zero means
-	// exactly once. Any other count fails the job.
+	// Required match count for Anchor; zero means exactly once. Any other
+	// count fails the job.
 	MustMatch int `toml:"must_match"`
-	// Regex matches Anchor as a regular expression instead of comparing whole
-	// lines literally. Off by default: an anchor is a line of somebody else's
-	// source, and characters like ( and ) are ordinary there while a regex
-	// would read them as syntax and match nothing at all.
+	// Without Regex, anchors compare as whole lines literally. Off by default:
+	// an anchor is a line of somebody else's source, where ( and ) are ordinary
+	// characters a regex would read as syntax and match nothing at all.
 	Regex bool   `toml:"regex"`
 	Why   string `toml:"why"`
 }
@@ -114,7 +103,7 @@ type Target struct {
 	Qemu      string `toml:"qemu"`
 	// Status is "proven" or "experimental"; experimental targets do not gate CI.
 	Status string `toml:"status"`
-	// Maps holds per-package platform names, e.g. maps.openssl = "linux-ppc64le".
+	// Per-package platform names, e.g. maps.openssl = "linux-ppc64le".
 	Maps map[string]string `toml:"maps"`
 	// MakeVars are passed on CPython's make command line, where they beat the
 	// makefile's own assignment. They reach the key only when set, so giving one
@@ -205,28 +194,24 @@ type Resolved struct {
 
 func (r Resolved) HostBuilt() bool { return r.Toolchain == ToolchainHost }
 
-// EffectiveLTO is what the recipe will pass: unset is on, because that is
-// CPython's --with-lto default for a host-built profile.
+// Unset is on, because that is CPython's --with-lto default for a host-built
+// profile.
 func (r Resolved) EffectiveLTO() bool { return !r.LTOSet || r.LTO }
 
-// LTOModeWholeGraph is slim IR in every archive and one WHOPR at the python
-// link. Empty in the file means this.
+// Slim IR in every archive and one WHOPR at the python link. Empty in the file
+// means this.
 const LTOModeWholeGraph = "whole-graph"
 
 // LTO each static archive to native code after install, rather than leaving
 // slim IR for the python link to WHOPR over.
 const LTOModePerDep = "per-dep"
 
-// It must contain no absolute path and no value that varies between runs.
-func (r Resolved) KeyInputs() map[string]string { return r.keyInputs() }
-
 type Bundle struct {
 	Packages []string `toml:"packages"`
 }
 
-// PyPackage is a third-party Python package linked in as builtins. A static
-// interpreter cannot dlopen an extension, so every C module has to arrive this
-// way or not at all.
+// Linked in as builtins: a static interpreter cannot dlopen an extension, so
+// every C module has to arrive this way or not at all.
 type PyPackage struct {
 	Name        string     `toml:"name"`
 	Version     string     `toml:"version"`
@@ -247,17 +232,15 @@ type PyModule struct {
 	Libs    []string `toml:"libs"`
 }
 
-// TestExpect declares what CPython's suite is expected to do on a given target
-// and runner. An unexpected pass fails too: a skip list that only grows is how
-// a suite quietly stops meaning anything.
+// An unexpected pass fails too: a skip list that only grows is how a suite
+// quietly stops meaning anything.
 type TestExpect struct {
 	Skip []TestEntry `toml:"skip"`
 	Fail []TestEntry `toml:"fail"`
-	// Ignore is handed to regrtest as -i, which matches test cases and methods
-	// rather than files. Skip and Fail are judged against what regrtest reports,
-	// and it reports whole files, so a single impossible method can only be
-	// expressed here -- the alternative is declaring its entire file expected to
-	// fail, which hides every future regression in it.
+	// Handed to regrtest as -i, which matches test cases and methods rather
+	// than files. Skip and Fail are judged per whole file, so a single
+	// impossible method can only be expressed here without hiding every future
+	// regression in its file.
 	Ignore []TestEntry `toml:"ignore"`
 }
 
@@ -292,8 +275,8 @@ type BenchConfig struct {
 	Vendor        map[string]VendorPin `toml:"vendor"`
 }
 
-// VendorPin is a sha256-pinned archive shipped inside a kit so the quiet
-// box can pip-install the suite without PyPI. setuptools is a wheel
+// Shipped inside a kit so the quiet box can pip-install the suite without
+// PyPI. setuptools is a wheel
 // because the sdists declare it as a PEP 517 build-system requirement
 // and --no-deps does not skip that.
 type VendorPin struct {
@@ -303,8 +286,8 @@ type VendorPin struct {
 	URLs    []string `toml:"urls"`
 }
 
-// Kit is a named comparison set: several profiles packed together with a
-// runner so a quiet machine can unzip and measure without a checkout.
+// Several profiles packed together with a runner so a quiet machine can unzip
+// and measure without a checkout.
 type Kit struct {
 	Baseline string   `toml:"baseline"`
 	Arms     []string `toml:"arms"`

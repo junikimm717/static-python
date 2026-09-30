@@ -108,14 +108,21 @@ func runBuild(g *Global, args []string) error {
 		return s.printPlan(nodes, "would build")
 	}
 
+	return s.run(nodes, fmt.Sprintf("%s %s -> %s   profile %s",
+		bold("build:"), s.host, strings.Join(s.targets, " "), s.g.Profile),
+		"built", strings.Join(s.targets, " "))
+}
+
+// run builds the plan, then reports verification results and the root
+// artifacts. header opens the progress line; "<verb> <what> in <time>" closes it.
+func (s *session) run(nodes []core.PlanNode, header, verb, what string) error {
 	todo := 0
 	for _, n := range nodes {
 		if nodeState(s.e, n) != stateOK {
 			todo++
 		}
 	}
-	fmt.Fprintf(os.Stderr, "%s %s -> %s   profile %s   %d of %d job%s to build\n",
-		bold("build:"), s.host, strings.Join(s.targets, " "), s.g.Profile, todo, len(nodes), plural(len(nodes)))
+	fmt.Fprintf(os.Stderr, "%s   %d of %d job%s to build\n", header, todo, len(nodes), plural(len(nodes)))
 	fmt.Fprintf(os.Stderr, "%s\n", dim(fmt.Sprintf("dist %s   %d worker%s x make -j%d   logs %s",
 		s.e.Dist, s.e.Workers(), plural(s.e.Workers()), s.e.MakeJobs(), s.e.Path(core.DirLogs))))
 
@@ -132,7 +139,7 @@ func runBuild(g *Global, args []string) error {
 	if runErr != nil {
 		return runErr
 	}
-	fmt.Fprintf(os.Stderr, "\n%s %s in %s\n", green("built"), strings.Join(s.targets, " "), humanDur(time.Since(started)))
+	fmt.Fprintf(os.Stderr, "\n%s %s in %s\n", green(verb), what, humanDur(time.Since(started)))
 	if planErr == nil {
 		printArtifacts(s.e, s.jobs, after)
 	}
@@ -218,7 +225,7 @@ func (s *session) planRows(nodes []core.PlanNode) []planRow {
 	return out
 }
 
-// printPlan lists the DAG in dependency-first order, which is also build order.
+// Dependency-first order, which is also build order.
 func (s *session) printPlan(nodes []core.PlanNode, verb string) error {
 	rows := s.planRows(nodes)
 	if s.g.JSON {

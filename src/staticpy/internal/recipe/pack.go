@@ -21,18 +21,15 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
-// packVersion is the archive layout generation: bump it when the entry order,
-// the top-level directory or the header normalisation changes, since none of
-// that shows up in the interpreter's key.
+// Bump when the entry order, the top-level directory or the header
+// normalisation changes, since none of that shows up in the interpreter's key.
 const packVersion = "2"
 
-// tarEpoch is the timestamp every entry carries. Unix zero rather than the Go
-// zero time: a pre-1970 mtime cannot be written as a plain ustar field, so it
+// Unix zero rather than the Go zero time: a pre-1970 mtime cannot be written as a plain ustar field, so it
 // would force a pax record onto every single entry.
 var tarEpoch = time.Unix(0, 0).UTC()
 
-// Pack turns the interpreter prefix into the distributable tarball. after is
-// the last job that must succeed first — the verification, when there is one —
+// after is the last job that must succeed first — the verification, when there is one —
 // so an unverified interpreter is never packed.
 func Pack(cfg *config.Config, target config.Target, profile string, interp, after core.Job) (core.Job, error) {
 	src, err := pythonSource(cfg)
@@ -40,7 +37,7 @@ func Pack(cfg *config.Config, target config.Target, profile string, interp, afte
 		return nil, err
 	}
 	j := &pack{interp: interp, after: after, target: target, profile: profile, version: src.Version}
-	if after != nil && after.Slug() == interp.Slug() {
+	if after.Slug() == interp.Slug() {
 		j.after = nil
 	}
 	return j, nil
@@ -122,13 +119,10 @@ func isDir(path string) bool {
 	return err == nil && st.IsDir()
 }
 
-// writeTarGz produces a byte-reproducible archive: entries in sorted path
-// order, zeroed timestamps, and uid/gid 0 with no owner names, so the same
-// prefix packed on two machines is the same file.
-//
-// Lib/test is deliberately not excluded. It is 6.4 MB gzipped against a 23 MB
-// prefix, and it is what lets whoever has real riscv32 or s390x hardware run
-// the suite there — the one question qemu cannot answer.
+// Sorted entries, zeroed timestamps and uid/gid 0 with no owner names, so the
+// same prefix packed on two machines is the same file. Lib/test is kept (6.4
+// MB gzipped of 23 MB): it lets whoever has real riscv32 or s390x hardware run
+// the suite, the one question qemu cannot answer.
 func writeTarGz(ctx context.Context, root, topDir, dst string) (string, error) {
 	entries, err := tarEntries(root)
 	if err != nil {

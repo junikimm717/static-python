@@ -19,7 +19,6 @@ import (
 // defaults with any on-disk overlay already resolved. Tests pass an fstest.MapFS.
 type Assets = fs.FS
 
-// PatchDir is where a source's diffs live inside Assets.
 func PatchDir(s config.Source) string { return path.Join("patches", Slug(s)) }
 
 // Applied with `patch -p1` from the source root.
@@ -28,14 +27,13 @@ type Patch struct {
 	Data []byte
 }
 
-// LoadPatches reads s.Patches in listed order. Order is part of the contract:
+// Order is part of the contract:
 // a diff series is not commutative, and the listed order is also what
 // PatchSetHash hashes.
 func LoadPatches(a Assets, s config.Source) ([]Patch, error) {
 	return loadNamed(a, s, s.Patches)
 }
 
-// LoadTargetPatches reads the diffs s declares for one triple, if any.
 func LoadTargetPatches(a Assets, s config.Source, triple string) ([]Patch, error) {
 	return loadNamed(a, s, s.TargetPatches[triple])
 }
@@ -72,8 +70,7 @@ func PatchSetHash(a Assets, s config.Source) (string, error) {
 	return hashPatches(patches), nil
 }
 
-// TargetPatchSetHash reports "none" for a target with no entry, which is what
-// keeps a fix for one architecture out of every other architecture's key.
+// A target with no entry hashes to "none", which is what keeps a fix for one architecture out of every other architecture's key.
 func TargetPatchSetHash(a Assets, s config.Source, triple string) (string, error) {
 	patches, err := LoadTargetPatches(a, s, triple)
 	if err != nil {
@@ -105,8 +102,7 @@ func ApplyPatches(ctx context.Context, r *core.Runner, a Assets, s config.Source
 	return apply(ctx, r, s, patches, tree, work, "")
 }
 
-// ApplyTargetPatches runs the triple's diffs over a staged copy of the tree,
-// never over the published srctree.
+// Runs over a staged copy of the tree, never over the published srctree.
 func ApplyTargetPatches(ctx context.Context, r *core.Runner, a Assets, s config.Source, triple, tree, work string) error {
 	patches, err := LoadTargetPatches(a, s, triple)
 	if err != nil {

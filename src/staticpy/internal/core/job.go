@@ -31,17 +31,12 @@ var keyCache sync.Map // slug -> key
 // dependencies. A slug must uniquely determine a job's content within one
 // process.
 func Key(j Job) (string, error) {
-	if v, ok := keyCache.Load(j.Slug()); ok {
-		return v.(string), nil
-	}
-	return computeKey(j, &keyWalk{memo: map[string]string{}, onStack: map[string]bool{}, cache: true})
+	return computeKey(j, &keyWalk{onStack: map[string]bool{}})
 }
 
 type keyWalk struct {
-	memo    map[string]string
 	onStack map[string]bool
 	path    []string
-	cache   bool
 }
 
 func computeKey(j Job, w *keyWalk) (string, error) {
@@ -49,14 +44,8 @@ func computeKey(j Job, w *keyWalk) (string, error) {
 	if slug == "" || strings.ContainsAny(slug, "/\\\x00") {
 		return "", fmt.Errorf("core: invalid job slug %q", slug)
 	}
-	if k, ok := w.memo[slug]; ok {
-		return k, nil
-	}
-	if w.cache {
-		if v, ok := keyCache.Load(slug); ok {
-			w.memo[slug] = v.(string)
-			return v.(string), nil
-		}
+	if v, ok := keyCache.Load(slug); ok {
+		return v.(string), nil
 	}
 	if w.onStack[slug] {
 		return "", fmt.Errorf("core: dependency cycle: %s", strings.Join(append(w.path, slug), " -> "))
@@ -89,10 +78,7 @@ func computeKey(j Job, w *keyWalk) (string, error) {
 	}
 	sum := sha256.Sum256(buf)
 	k := hex.EncodeToString(sum[:])
-	w.memo[slug] = k
-	if w.cache {
-		keyCache.Store(slug, k)
-	}
+	keyCache.Store(slug, k)
 	return k, nil
 }
 
@@ -116,16 +102,6 @@ func ReadManifest(dir string) (*Manifest, error) {
 		return nil, fmt.Errorf("parse %s: %w", filepath.Join(dir, ManifestName), err)
 	}
 	return &m, nil
-}
-
-// IsValid reports whether the job's artifact exists and was built from exactly
-// this key.
-func IsValid(e *Env, j Job) (bool, error) {
-	k, err := Key(j)
-	if err != nil {
-		return false, err
-	}
-	return validAt(e, j.ArtifactDir(e), k), nil
 }
 
 func validAt(e *Env, dir, key string) bool {
@@ -178,7 +154,6 @@ func randHex(n int) string {
 	return hex.EncodeToString(b)
 }
 
-// node is a resolved DAG vertex: one job, deduped by slug, with its key.
 type node struct {
 	job  Job
 	slug string
@@ -189,9 +164,7 @@ type node struct {
 	err  error
 }
 
-// resolve flattens the DAG rooted at jobs: dedupes by slug, detects cycles and
-// slug collisions, computes every key, and returns nodes in dependency-first
-// topological order.
+// Returns nodes in dependency-first topological order.
 func resolve(jobs []Job) ([]*node, error) {
 	byslug := map[string]*node{}
 	var order []*node
@@ -252,8 +225,8 @@ func resolve(jobs []Job) ([]*node, error) {
 	return order, nil
 }
 
-// sameJob guards against two different recipes claiming one slug, which would
-// silently make them share an artifact directory.
+// Two different recipes claiming one slug would silently share an artifact
+// directory.
 func sameJob(a, b Job) error {
 	if a == b {
 		return nil

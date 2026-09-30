@@ -14,8 +14,7 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
-// runPyperfSuite drives the pyperformance suite across the selected arms and
-// writes a session directory that can be re-read long after the run.
+// Writes a session directory that can be re-read long after the run.
 func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, paths map[string]string,
 	baseline, suiteRoot, pyperfHint string, useVenv bool, noPin bool, cpu int, timeout time.Duration, offline bool, pins bench.Pins, sessionParent, findLinks, outPath string, kit *bench.KitDoc) error {
 
@@ -28,7 +27,7 @@ func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, 
 	machine := bench.ReadMachine()
 	topoDesc := ""
 	if topo != nil {
-		topoDesc = describeTopo(topo)
+		topoDesc = topo.Describe()
 	}
 	machine.SetRunPlacement(pin.Describe(), topoDesc)
 
@@ -59,7 +58,7 @@ func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, 
 		a := bench.Arm{Label: label, Python: paths[label]}
 		if useVenv {
 			runner.Step("venv-" + label)
-			// A copied pyperf tree is now the override, not the requirement:
+			// A copied pyperf tree is the override, not the requirement:
 			// installing pyperformance brings its own, pinned to the version
 			// its benchmarks were written against.
 			var pyperfSrc string
@@ -96,11 +95,10 @@ func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, 
 			return err
 		}
 	}
-	suite, discovered, err := bench.DiscoverSuite(suiteRoot)
+	suite, err := bench.DiscoverSuite(suiteRoot)
 	if err != nil {
 		return err
 	}
-	skipped = append(skipped, discovered...)
 
 	// Each benchmark's dependencies go into every arm, before anything is
 	// measured. A benchmark whose requirement will not install is dropped here
@@ -150,8 +148,8 @@ func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, 
 	// Written before the measurements and again after them. The early copy is
 	// what a run killed halfway still leaves behind; the late one is the only
 	// place a runtime failure can appear, since it is not known until then.
-	writeAccounting := func() error {
-		return sess.WriteAccounting(bench.Accounting{
+	accounting := func() bench.Accounting {
+		return bench.Accounting{
 			Baseline:      baseline,
 			SuiteName:     bench.SuitePyperformance,
 			Pins:          pins,
@@ -165,9 +163,9 @@ func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, 
 				"venv":             useVenv,
 				"benchmarks_found": len(suite.Cases),
 			},
-		})
+		}
 	}
-	if err := writeAccounting(); err != nil {
+	if err := sess.WriteAccounting(accounting()); err != nil {
 		return err
 	}
 
@@ -179,7 +177,7 @@ func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, 
 		return err
 	}
 	skipped = append(skipped, summarizeFailures(failures)...)
-	if err := writeAccounting(); err != nil {
+	if err := sess.WriteAccounting(accounting()); err != nil {
 		return err
 	}
 	if len(skipped) > 0 {
@@ -189,24 +187,10 @@ func runPyperfSuite(g *Global, cfg *config.Config, e *core.Env, order []string, 
 
 	rows, geo := bench.Compare(res, baseline, order)
 	md, report, err := sess.WriteReports(bench.Reports{
-		Accounting: bench.Accounting{
-			Baseline:      baseline,
-			SuiteName:     bench.SuitePyperformance,
-			Pins:          pins,
-			Identities:    ids,
-			Skipped:       skipped,
-			Machine:       machine,
-			Kit:           kit,
-			PythonVersion: pinnedPythonVersion(cfg),
-			Extra: map[string]any{
-				"suite_root":       suiteRoot,
-				"venv":             useVenv,
-				"benchmarks_found": len(suite.Cases),
-			},
-		},
-		Order:   order,
-		Rows:    rows,
-		Geomean: geo,
+		Accounting: accounting(),
+		Order:      order,
+		Rows:       rows,
+		Geomean:    geo,
 	})
 	if err != nil {
 		return err
@@ -236,11 +220,4 @@ func summarizeFailures(fs []bench.Failure) []string {
 			b, strings.Join(arms[b], ", "), reason[b]))
 	}
 	return out
-}
-
-func describeTopo(t *bench.Topology) string {
-	if t == nil {
-		return "unknown"
-	}
-	return t.Describe()
 }

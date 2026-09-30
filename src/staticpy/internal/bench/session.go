@@ -14,8 +14,6 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
-// Session is one bench run's output directory.
-//
 // Results are timestamped and never deduplicated. A measurement is not a pure
 // function of its inputs, so content-addressing it the way builds are cached
 // would serve an old machine state as if it were current.
@@ -23,7 +21,6 @@ type Session struct {
 	Dir      string
 	Stamp    string
 	timeline *os.File
-	quiet    *os.File
 }
 
 func NewSession(distDir, arch string, now time.Time) (*Session, error) {
@@ -43,9 +40,6 @@ func NewSessionIn(parent, arch string, now time.Time) (*Session, error) {
 	if s.timeline, err = os.Create(filepath.Join(dir, "timeline.jsonl")); err != nil {
 		return nil, err
 	}
-	if s.quiet, err = os.Create(filepath.Join(dir, "quiet.jsonl")); err != nil {
-		return nil, err
-	}
 	updateLatest(parent, stamp+"-"+arch)
 	return s, nil
 }
@@ -57,21 +51,14 @@ func updateLatest(base, name string) {
 }
 
 func (s *Session) Close() error {
-	if s.timeline != nil {
-		s.timeline.Close()
-	}
-	if s.quiet != nil {
-		s.quiet.Close()
-	}
+	s.timeline.Close()
 	return nil
 }
 
-// Event is one measurement, recorded as it happens.
-//
-// This is what makes a suspicious number auditable months later: it fixes the
-// interleaving order and records what the machine was doing at the time, so
-// "was something running on the sibling core when that outlier was taken" has
-// an answer.
+// Recorded as each measurement happens, so a suspicious number is auditable
+// months later: it fixes the interleaving order and records what the machine
+// was doing, so "was something running on the sibling core when that outlier
+// was taken" has an answer.
 type Event struct {
 	UTC       string  `json:"utc"`
 	Arm       string  `json:"arm"`
@@ -85,24 +72,12 @@ type Event struct {
 }
 
 func (s *Session) Record(e Event) {
-	if s.timeline == nil {
-		return
-	}
 	b, err := json.Marshal(e)
 	if err != nil {
 		return
 	}
 	s.timeline.Write(append(b, '\n'))
 	s.timeline.Sync()
-}
-
-func (s *Session) RecordQuiet(v any) {
-	if s.quiet == nil {
-		return
-	}
-	if b, err := json.Marshal(v); err == nil {
-		s.quiet.Write(append(b, '\n'))
-	}
 }
 
 func (s *Session) WriteJSON(name string, v any) error {
@@ -113,8 +88,7 @@ func (s *Session) WriteJSON(name string, v any) error {
 	return os.WriteFile(filepath.Join(s.Dir, name), append(b, '\n'), 0o644)
 }
 
-// SessionFiles is the set every suite writes. venv/, raw/, and logs/ stay
-// on the machine that measured.
+// venv/, raw/, and logs/ stay on the machine that measured.
 var SessionFiles = []string{
 	"manifest.json",
 	"env.json",
@@ -140,7 +114,6 @@ func SuiteMap(name string, pins Pins) map[string]string {
 	return m
 }
 
-// SuiteLabel is the one-line suite description in markdown/HTML.
 func SuiteLabel(name string, pins Pins) string {
 	if name == "" {
 		name = SuitePyperformance
@@ -152,10 +125,8 @@ func SuiteLabel(name string, pins Pins) string {
 	return name
 }
 
-// Manifest is the session accounting file. Protocol and the suite object live
-// here so a later reader can refuse stale numbers without re-reading the report.
-// A kit run also stores kit.json under "kit" and promotes python_version,
-// kit_version, triple, and git_revision to the top level.
+// Protocol and the suite object live on the manifest so a later reader can
+// refuse stale numbers without re-reading the report.
 func Manifest(stamp, baseline string, pins Pins, ids []Identity, skipped []string) map[string]any {
 	return ManifestSuite(stamp, baseline, SuitePyperformance, pins, ids, skipped)
 }
@@ -182,7 +153,6 @@ func ManifestSuite(stamp, baseline, suiteName string, pins Pins, ids []Identity,
 	return m
 }
 
-// Identity is everything needed to know which binary produced a column.
 // Factors exist because a profile name is not a stable description of
 // linkage, LTO, allocator or toolchain; those can change under "default".
 type Identity struct {

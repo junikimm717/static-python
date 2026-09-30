@@ -12,13 +12,9 @@
 //	pack:<prof>:<T>            the distributable tarball
 //	kit:<name>:<T>             several packed prefixes plus a bench runner
 //
-// pycross depends on pyhost, never on pynative: a cross build needs a runnable
-// same-version interpreter to freeze bytecode, and that is all it needs. Making
-// it wait on a full PGO release build of the host is why cross-compiling one
-// target used to be gated on an hour of unrelated work.
-//
-// This file is the seam the CLI plans against; the constructors it calls live
-// in the sibling files.
+// pycross depends on pyhost, never on pynative: a cross build only needs a
+// runnable same-version interpreter to freeze bytecode, not a full PGO release
+// build of the host.
 package recipe
 
 import (
@@ -29,16 +25,9 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 )
 
-// Version is the recipe generation. Bump it by hand when the *procedure*
-// changes in a way the configure flags do not capture — a new step, a different
-// ordering, a changed install layout. Every job key includes it, so bumping it
-// rebuilds the world.
-// 2: dependencies may publish a merged relocatable object, and the interpreter
-// links every object a sysroot carries.
-// 3: that object is localised before it is merged, not after.
-// 4: host-built trees rewrite RUNPATH to $ORIGIN after install, so the
-//
-//	rootfs can be copied; pack includes those trees.
+// Bump by hand when the *procedure* changes in a way the configure flags do
+// not capture — a new step, a different ordering, a changed install layout.
+// Every job key includes it, so bumping it rebuilds the world.
 const Version = 4
 
 type PlanOptions struct {
@@ -88,7 +77,7 @@ func Plan(cfg *config.Config, assets fs.FS, o PlanOptions) ([]core.Job, error) {
 		}
 		final := interp
 		if o.Verify != "" {
-			if final, err = Verify(cfg, assets, t, o.Profile, o.Verify, interp); err != nil {
+			if final, err = Verify(cfg, t, o.Profile, o.Verify, interp); err != nil {
 				return nil, err
 			}
 		}
@@ -104,7 +93,7 @@ func Plan(cfg *config.Config, assets fs.FS, o PlanOptions) ([]core.Job, error) {
 
 // No caller has to know which shape it is asking for.
 func Interpreter(cfg *config.Config, assets fs.FS, host, target config.Target, profile, bundle string) (core.Job, error) {
-	res, err := resolveScope(cfg, profile, config.ScopePython)
+	res, err := cfg.Resolve(profile, config.ScopePython)
 	if err != nil {
 		return nil, err
 	}
@@ -117,8 +106,5 @@ func Interpreter(cfg *config.Config, assets fs.FS, host, target config.Target, p
 		}
 		return PyRef(cfg, assets, target, profile)
 	}
-	if host.Triple == target.Triple {
-		return PyNative(cfg, assets, target, profile, bundle)
-	}
-	return PyCross(cfg, assets, host, target, profile, bundle)
+	return newPyBuild(cfg, assets, host, target, profile, bundle, host.Triple != target.Triple)
 }

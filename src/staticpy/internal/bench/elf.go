@@ -8,9 +8,8 @@ import (
 	"strings"
 )
 
-// linkage reports how a binary reaches its libc, plus its build id if it has
-// one. PT_INTERP is the distinction that survives stripping, which the flags
-// that produced the binary do not: nothing in a stripped ELF records -static.
+// PT_INTERP is the distinction that survives stripping, which the flags that
+// produced the binary do not: nothing in a stripped ELF records -static.
 func linkage(path string) (kind, buildID string) {
 	f, err := elf.Open(path)
 	if err != nil {
@@ -57,12 +56,10 @@ func buildIDOf(f *elf.File) string {
 	return hex.EncodeToString(b[off : off+int(descSz)])
 }
 
-// sharedCore locates the libpython an --enable-shared executable delegates to.
-//
-// That executable is a few kilobytes of main(); the interpreter under
-// measurement is the library. Recording only the stub's hash and size says
-// nothing about what actually ran, and makes a shared build look absurdly
-// smaller than a static one in the same table.
+// An --enable-shared executable is a few kilobytes of main(); the interpreter
+// under measurement is the libpython it delegates to. Recording only the stub's
+// hash and size says nothing about what actually ran, and makes a shared build
+// look absurdly smaller than a static one in the same table.
 func sharedCore(path string) string {
 	f, err := elf.Open(path)
 	if err != nil {

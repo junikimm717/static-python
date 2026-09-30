@@ -149,8 +149,8 @@ func humanAgo(t time.Time) string {
 	return humanDur(time.Since(t)) + " ago"
 }
 
-// shortKey is the display form of a content key: enough to tell two keys apart
-// by eye, short enough to sit in a table column.
+// Enough of a content key to tell two apart by eye, short enough to sit in a
+// table column.
 func shortKey(k string) string {
 	if len(k) > 12 {
 		return k[:12]

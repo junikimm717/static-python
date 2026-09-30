@@ -1,10 +1,9 @@
 #!/bin/sh
-# Build qemu-user 11.1.1 from the official tarball.
-#
 # Ubuntu 24.04's qemu-user is 8.2.2: too old for /proc/self/stat
 # num_threads (>= 9.1) and still on the wrong side of the i386 SAHF/cc_op
 # TCG bug (fixed in 11.0.4 / 11.1). download.qemu.org keeps release
-# tarballs; Alpine edge does not. See I386_QEMU_SAHF.md
+# tarballs; Alpine edge does not.
+# See .agents/skills/staticpy-traps/references/I386_QEMU_SAHF.md
 set -eu
 
 QEMU_VER=11.1.1

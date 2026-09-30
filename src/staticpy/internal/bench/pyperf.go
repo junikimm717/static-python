@@ -35,7 +35,6 @@ type Case struct {
 // required choice, e.g. {shortest_path,connected_components}.
 var positionalChoices = regexp.MustCompile(`\{([A-Za-z0-9_,]+)\}`)
 
-// Label is what the report calls this case.
 func (c Case) Label() string {
 	if c.Sub == "" {
 		return c.Name
@@ -47,16 +46,12 @@ func (c Case) Label() string {
 // and pip-installs its requirements, neither of which a --with-ensurepip=no
 // static interpreter can do. The benchmark scripts are ordinary pyperf
 // programs, so running them directly needs none of that.
-//
-// Skipped names are returned so the report can say what was left out instead
-// of quietly narrowing its own scope.
-func DiscoverSuite(root string) (*Suite, []string, error) {
+func DiscoverSuite(root string) (*Suite, error) {
 	ents, err := os.ReadDir(root)
 	if err != nil {
-		return nil, nil, fmt.Errorf("pyperformance benchmarks not found at %s: %w", root, err)
+		return nil, fmt.Errorf("pyperformance benchmarks not found at %s: %w", root, err)
 	}
 	s := &Suite{Root: root}
-	var skipped []string
 	for _, e := range ents {
 		if !e.IsDir() || !strings.HasPrefix(e.Name(), "bm_") {
 			continue
@@ -69,11 +64,10 @@ func DiscoverSuite(root string) (*Suite, []string, error) {
 		s.Cases = append(s.Cases, Case{Name: e.Name(), Script: script, Dir: dir})
 	}
 	sort.Slice(s.Cases, func(i, j int) bool { return s.Cases[i].Name < s.Cases[j].Name })
-	sort.Strings(skipped)
 	if len(s.Cases) == 0 {
-		return nil, skipped, fmt.Errorf("no runnable benchmarks under %s", root)
+		return nil, fmt.Errorf("no runnable benchmarks under %s", root)
 	}
-	return s, skipped, nil
+	return s, nil
 }
 
 // --affinity is passed on top of the inherited CPU mask: pyperf re-pins its
@@ -165,11 +159,8 @@ func installPyperformance(ctx context.Context, x Exec, v *Venv, pins Pins, findL
 		return fmt.Errorf("%s: this interpreter's venv has no pip, so pyperformance cannot be installed.\n"+
 			"It needs the ensurepip module and its bundled wheel; a build configured with --without-ensurepip still has both", v.Label)
 	}
-	// --no-deps, and pyperf named explicitly: pyperformance depends on psutil,
-	// which is a C extension. It fails to build here and would be unloadable
-	// anyway, and nothing in this path needs it -- pyperformance is wanted for
-	// its data-files/benchmarks, and pyperf runs fine without psutil. Each
-	// benchmark's own requirements are installed separately, where a C
+	// --no-deps, and pyperf named explicitly, to skip psutil: a C extension
+	// that fails to build here, and pyperf runs fine without it. Each benchmark's own requirements are installed separately, so a C
 	// extension that genuinely matters fails against the benchmark that needs
 	// it rather than against the whole suite.
 	if err := v.Pip(ctx, x, "install-pyperformance", PipInstallArgsFrom(pins, findLinks)...); err != nil {
@@ -232,12 +223,9 @@ func InstallRequirements(ctx context.Context, x Exec, v *Venv, c Case) error {
 	return nil
 }
 
-// A hardcoded list of the scripts taking a required positional argument was
-// tried first and was wrong within the hour: it named bm_argparse,
-// bm_async_tree and bm_pickle, and bm_networkx failed the same way on the next
-// run. argparse already prints the answer under "positional arguments:", so
-// reading it costs one --help per benchmark and cannot go stale when
-// pyperformance adds another.
+// argparse prints a required positional choice under "positional arguments:",
+// so reading it costs one --help per benchmark and cannot go stale when
+// pyperformance adds another -- a hardcoded list did, within the hour.
 //
 // Choosing the first variant is a choice, so Label reports it: bm_pickle[pickle],
 // never a bare bm_pickle standing in for five different measurements.

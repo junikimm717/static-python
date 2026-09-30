@@ -138,15 +138,12 @@ func doctorReport(g *Global) error {
 		row := targetCheck{
 			Triple: t.Triple, Status: t.Status,
 			Cross: st.Cross, Native: st.Native,
-			Missing:   g.toolchainMissing(host, t.Triple),
-			IsHost:    t.Triple == host,
-			Buildable: st.any() != "",
+			Missing: g.toolchainMissing(host, t.Triple),
+			IsHost:  t.Triple == host,
 		}
+		row.Buildable = row.Missing == ""
 		if st.Override != "" {
 			row.Cross, row.Native = st.Override, st.Override
-		}
-		if row.Missing != "" {
-			row.Buildable = false
 		}
 		if ensure.IsNativeTarget(t) {
 			row.Runner, row.Runnable = ensure.RunnerNative, true
@@ -347,7 +344,7 @@ func printProvisionPlan(g *Global, invocation []string) {
 	if err := g.resolve(); err != nil {
 		return
 	}
-	cfg, err := config.Load(config.Options{RepoRoot: g.repoRoot, Dir: inv.configDir, SourcesDir: inv.sourcesDir})
+	cfg, err := config.Load(config.Options{Dir: inv.configDir, SourcesDir: inv.sourcesDir})
 	if err != nil {
 		return
 	}
