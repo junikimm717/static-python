@@ -5,25 +5,19 @@ description: Work on this repo's Go build system (src/staticpy) — the job DAG,
 
 # staticpy
 
-## Orientation
-
-`src/staticpy` is the build system. It owns the job in **data** rather than
-recipes — `config/*.toml` holds versions, checksums, per-package configure args,
-per-target quirks and flag profiles — and every job's key is hashed over its
-inputs and its dependencies' keys, so an edit rebuilds exactly what depends on
-it. `config/sources.toml` is the single place a version and its sha256 live.
+The build system owns the job in **data**: `config/*.toml` holds versions,
+checksums, configure args, per-target quirks and flag profiles. Each job's key
+hashes its inputs plus its dependencies' keys, so an edit rebuilds exactly
+what depends on it.
 
 `./staticpy help` and each command's `Long:` in `internal/cli/*.go` are the
-user-facing documentation and are kept authoritative. Read them before writing
-new docs, and update them when behaviour changes.
+authoritative user docs. Read them before writing docs; update them when
+behaviour changes.
 
 ```
-staticpy                 sh shim; provisions the execution environment and
-                         nothing else. Rebuilds the binary from an mtime check
-                         over *.go only (see the trap below).
-config/*.toml            the data: sources, packages, targets, profiles,
-                         bundles, test expectations. Overlaid onto an embedded
-                         copy of the same files.
+staticpy                 sh shim: provisions the environment, nothing else;
+                         rebuilds the binary when src/staticpy changes
+config/*.toml            sources, packages, targets, profiles, bundles, tests
 src/staticpy/internal/
   config/                loader, layering, scope resolution, validation
   sources/               fetch + sha256 + extract + patch + content-anchored edits
@@ -36,36 +30,36 @@ src/staticpy/internal/
 dist/                    everything generated; gitignored, safe to delete
 ```
 
-## Answer questions from here, not from a scan
+## Lookup table
 
 | question | answer |
 |---|---|
-| what commands and flags exist | `./staticpy help`, `./staticpy help <cmd>`, `help layout`, `help targets` — authoritative |
-| bump a pinned version | `config/sources.toml` (version + file + urls + topdir + **sha256 in the same edit**). A CPython minor or a pin sweep that rebuilds the matrix: `staticpy-bump` **Running a matrix upgrade** — fuzz first, hunt the class, full matrix `failed=0`, pack from a clean tree |
-| change a package's configure flags | `config/packages.toml`. Only *decisions* live there: `--prefix`, `--exec-prefix`, `--host` are injected by the recipe because they are absolute or triple-derived |
-| change a compiler/linker flag | `config/profiles.toml`. Profile-wide, then scoped: `deps`, `deps.<pkg>`, `python`, `pyhost`. A scoped change rebuilds only what that scope reaches |
-| add a native library | a `[source.X]` in `config/sources.toml` + a `[package.X]` in `config/packages.toml` (`build` = autotools\|openssl\|make\|sources, `needs`, `provides`). `Deps` picks up every package automatically; `sysroot` composes them |
-| add a Python package / bundle | `config/bundles.toml`: a `[pkg.X]` with sdist + sha256 + `[[pkg.X.modules]]`, then a `[bundle.Y]` naming it. Nothing is defined yet. A static interpreter cannot dlopen, so a C module arrives at link time or not at all |
-| add an architecture | a row in `config/targets.toml` **plus** `internal/assets/files/pyconfig/<triple>-patches.h` — see the `staticpy-add-target` skill |
-| where do artifacts land | `dist/artifacts/<slug>/` (published job outputs, incl. each interpreter prefix); `dist/out/<profile>/<triple>/` (tarballs); `dist/src/` (verified tarballs); `dist/srctrees/` |
-| logs for a failed job | `dist/logs/jobs/<slug>/latest/` — `NNN-<step>.log` per command plus `commands.sh`; read them with `staticpy logs <slug> --failed` |
-| a shell in a job's exact environment | `staticpy shell <slug>` (add `--step NAME`, or `--print` to just see the env). Recovered from the recorded attempt, so it works long after the process is gone |
-| what invalidates a rebuild | a job's Merkle key: its `KeyInputs` (recipe version, source sha256s, decision flags, triples, resolved profile) plus every dependency's key. Not timestamps. `staticpy status` calls the difference `stale` |
-| what would a build do right now | `staticpy status [--todo]` — pass the same `--verify`/`--pack` you would pass to `build`, or you are not looking at the same plan |
-| what this machine is missing | `staticpy doctor`. `perl` is the one irreducible host dependency (OpenSSL's Configure); `patch` applies the pinned diffs |
-| a resolved value, for a script | `staticpy print <key>` — `python-version`, `python-abi`, `host`, `targets{,-all,-proven}`, `dist`, `recipe-version`, `version:<src>`, `sha256:<src>` |
-| pack a benchmark kit | the `staticpy-kit` skill — commit first, then stamp from a clean tree so `kit.json` is not `*-dirty` |
-| ship packed tarballs to GitHub | the `staticpy-release` skill — `scripts/gh-release.sh check\|stage\|publish\|verify`; do not invent the asset list |
-| what the flags actually resolve to | `staticpy config show [--profile N] [--scope S]`, which also names the file each layer came from |
-| why a built interpreter misbehaves | the `staticpy-traps` skill — symptom first. Read **Do not overfit the last failure** before adding an `[expect]` or a one-package stanza |
-| pyref advertised LTO/PGO but the DSO has none | CPython 3.13 matches `*gcc*` against `$CC`. `hostcc.Find` prefers `gcc` over `cc`; after configure, the Makefile must contain `-flto` / `PGO_PROF_USE_FLAG`. See staticpy-traps |
-| a verify method failed on one triple | reproduce on native x86_64 static and on a second qemu before writing `[expect.<triple>]`. Agent time is cheap; the sweep is not |
-| what a bench session writes | always the same seven files, regardless of `--suite`: `manifest.json`, `env.json`, `report.json`, `report.md`, `report.html`, `skipped.json`, `timeline.jsonl`. `suite.name` is `pyperformance` or `micro`. A kit session copies `kit.json` onto `manifest.kit` and promotes `python_version` / `git_revision` / `triple`. `venv/`, `raw/`, `logs/` stay on the machine |
-| bench ETA weights | `src/staticpy/internal/bench/eta_weights.json` — typical seconds per **benchmark name we actually time**, not all of pyperformance and not last night's kit. Restamp after a newly-run name has been timed (see **Bench ETA weights** below). A missing name must not break the ETA; it is a local guess and stays out of the pace |
+| commands and flags | `./staticpy help`, `help <cmd>`, `help layout`, `help targets` — authoritative |
+| bump a pinned version | `config/sources.toml` (version + file + urls + topdir + **sha256 in the same edit**). CPython minor or matrix-wide sweep: `staticpy-bump` **Running a matrix upgrade** (fuzz first, hunt the class, full matrix `failed=0`, pack from a clean tree) |
+| a package's configure flags | `config/packages.toml`. Only *decisions*; `--prefix`, `--exec-prefix`, `--host` are injected by the recipe (absolute or triple-derived) |
+| a compiler/linker flag | `config/profiles.toml`. Profile-wide, then scoped: `deps`, `deps.<pkg>`, `python`, `pyhost`. A scoped change rebuilds only what it reaches |
+| add a native library | `[source.X]` in `sources.toml` + `[package.X]` in `packages.toml` (`build` = autotools\|openssl\|make\|sources, `needs`, `provides`). `Deps` picks it up; `sysroot` composes it |
+| add a Python package / bundle | `config/bundles.toml`: `[pkg.X]` with sdist + sha256 + `[[pkg.X.modules]]`, then a `[bundle.Y]` naming it. None defined yet. No dlopen, so a C module arrives at link time or not at all |
+| add an architecture | a `config/targets.toml` row **plus** `internal/assets/files/pyconfig/<triple>-patches.h` — `staticpy-add-target` |
+| where artifacts land | `dist/artifacts/<slug>/` (job outputs incl. interpreter prefixes); `dist/out/<profile>/<triple>/` (tarballs); `dist/src/` (verified tarballs); `dist/srctrees/` |
+| logs for a failed job | `dist/logs/jobs/<slug>/latest/`: `NNN-<step>.log` per command plus `commands.sh`; `staticpy logs <slug> --failed` |
+| shell in a job's exact env | `staticpy shell <slug>` (`--step NAME`, or `--print` for the env). Recovered from the recorded attempt, works long after the process is gone |
+| what invalidates a rebuild | the Merkle key: `KeyInputs` (recipe version, source sha256s, decision flags, triples, resolved profile) plus every dep's key. Not timestamps. `staticpy status` calls the difference `stale` |
+| what a build would do now | `staticpy status [--todo]` with the same `--verify`/`--pack` you'd pass to `build`, or it's a different plan |
+| what this machine lacks | `staticpy doctor`. `perl` is the one irreducible host dep (OpenSSL's Configure); `patch` applies the pinned diffs |
+| a resolved value for a script | `staticpy print <key>`: `python-version`, `python-abi`, `host`, `targets{,-all,-proven}`, `dist`, `recipe-version`, `version:<src>`, `sha256:<src>` |
+| what flags resolve to | `staticpy config show [--profile N] [--scope S]` (names each layer's file) |
+| pack a benchmark kit | `staticpy-kit` — commit first, stamp from a clean tree so `kit.json` isn't `*-dirty` |
+| ship tarballs to GitHub | `staticpy-release` — `scripts/gh-release.sh check\|stage\|publish\|verify`; don't invent the asset list |
+| a built interpreter misbehaves | `staticpy-traps`, symptom first. Read **Do not overfit the last failure** before adding an `[expect]` or one-package stanza |
+| pyref advertised LTO/PGO, DSO has none | CPython 3.13 matches `*gcc*` against `$CC`. `hostcc.Find` prefers `gcc` over `cc`; after configure the Makefile must contain `-flto` / `PGO_PROF_USE_FLAG`. See staticpy-traps |
+| a verify method failed on one triple | reproduce on native x86_64 static and a second qemu before writing `[expect.<triple>]` |
+| what a bench session writes | always seven files, any `--suite`: `manifest.json`, `env.json`, `report.json`, `report.md`, `report.html`, `skipped.json`, `timeline.jsonl`. `suite.name` is `pyperformance` or `micro`. A kit session copies `kit.json` onto `manifest.kit` and promotes `python_version` / `git_revision` / `triple`. `venv/`, `raw/`, `logs/` stay local |
+| bench ETA weights | `src/staticpy/internal/bench/eta_weights.json`: typical seconds per **benchmark name we actually time** (not all of pyperformance, not last night's kit). Restamp once a new name has been timed (**Bench ETA weights** below). A missing name must not break the ETA; it's a local guess kept out of the pace |
 
 ## The DAG
 
-From `internal/recipe/recipe.go`'s package comment, which is the spine:
+From `internal/recipe/recipe.go`'s package comment:
 
 ```
 srctree:<pkg>-<ver>        extracted + patched source          (internal/sources)
@@ -79,226 +73,152 @@ pack:<prof>:<T>            the distributable tarball
 kit:<name>:<T>             several packed prefixes plus a bench runner
 ```
 
-Two edges carry the design:
+- **`pycross` depends on `pyhost`, never `pynative`.** A cross build only needs
+  a same-version interpreter to freeze bytecode; gating on a full PGO host
+  build once cost an hour per cross target. `pyhost` uses the fixed
+  `bootstrap` profile and a minimal module set.
+- **Every dep installs into its own prefix; `sysroot` is only the view.** A
+  shared accumulator once let a stale `libz.a` survive a bump. Bumping one
+  library rebuilds one library.
+- `probe` is profile-free (ABI, not flags). It emits a `config.site`, so
+  CPython's configure computes `pyconfig.h` instead of it being patched after.
+- `Plan` in `recipe.go` alone decides the graph's shape; the CLI never
+  constructs a job.
 
-**`pycross` depends on `pyhost`, never on `pynative`.** A cross build needs a
-runnable same-version interpreter to freeze bytecode, and that is all it needs;
-gating it on a full PGO release build of the host is what used to make one cross
-target cost an hour of unrelated work. `pyhost` is built with the fixed
-`bootstrap` profile and a minimal module set, because it is a means and not an
-output.
+## Config layering
 
-**Every dep installs into its own prefix, and `sysroot` composes them.** Nothing
-installs into a shared accumulator — that is how a stale `libz.a` from an older
-version survived a bump and linked into everything after it. `sysroot` is only
-the *view*, so bumping one library rebuilds one library.
-
-`probe` is profile-free: sizes and alignments are ABI properties, not flag
-properties. Its output is a `config.site`, so CPython's own configure computes
-`pyconfig.h` rather than being bypassed and the header patched afterwards.
-
-`Plan` in `recipe.go` is the only place the graph's shape is decided; the CLI
-never constructs a job.
-
-## Data, code, generated
-
-`config/` at the repo root is a symlink to
-`src/staticpy/internal/config/defaults/`, the tree `go:embed` compiles into the
-binary. `go:embed` cannot reach outside its own package, which is why the real
-directory lives there and the repo root gets the symlink rather than the other
-way round. There is one copy, so there is nothing to keep in sync.
-
-Resolution is **embedded defaults → `--config <dir>`**, the later layer winning
-per top-level entry, so a profile redefined on disk replaces the embedded one of
-the same name and profiles only the embedded set knows about survive untouched.
-
-`sources.toml` and `patches/` are deliberately **outside** that stack. They come
-from the copy embedded in the binary unless `--sources <dir>` is passed
-explicitly: if any `config/` next to the binary could redefine a sha256, pinning
-would document what was downloaded rather than constrain it. `--sources` warns,
-and is recorded in `Manifest.Provenance` of every artifact built with it — a
-build that took a weaker path must never look identical to one that did not.
-
-**Rebuilds.** The shim rebuilds when any file under `src/staticpy` is newer than
-the binary, not only `*.go`, because `go:embed` pulls in the config tree and
-`internal/assets/files/` (pyconfig fragments, `Setup`, `patcher.c`, staticapi)
-and none of those would move a `.go` mtime. Editing `config/` therefore takes
-effect on the next command with nothing else to do — the symlink points into
-that tree, so `find` sees it.
+- `config/` is a symlink to `src/staticpy/internal/config/defaults/`, the
+  `go:embed` tree (embed can't reach outside its package). One copy, nothing
+  to sync.
+- Resolution: **embedded defaults → `--config <dir>`**, later wins per
+  top-level entry (a redefined profile replaces the embedded one; others
+  survive).
+- `sources.toml` and `patches/` are **outside** that stack: always the
+  embedded copy unless `--sources <dir>` is passed. Otherwise any stray
+  `config/` could redefine a sha256. `--sources` warns and is recorded in every
+  artifact's `Manifest.Provenance`.
+- The shim rebuilds when any file under `src/staticpy` is newer than the
+  binary, not just `*.go`, because embeds (config, pyconfig fragments, `Setup`,
+  `patcher.c`, staticapi) don't move a `.go` mtime. So a `config/` edit takes
+  effect on the next `./staticpy`. Plain `go build` skips this.
 
 ## Invariants — do not break these
 
-1. **An artifact directory is either absent or complete.** It is published by a
-   single rename with the manifest (`.staticpy.json`) written last, so a crash,
-   a `SIGKILL` or a full disk can never leave a half-built directory that the
-   next run mistakes for a finished one. Jobs write only into `work` and
-   `stage`; core stamps the manifest itself and a recipe must never write it.
-2. **A job rebuilds only when its Merkle key changes, so `KeyInputs` must
-   contain no absolute path and nothing that varies per run.** An absolute
-   prefix makes the cache machine-specific; a timestamp or a pid makes it
-   useless. Everything behind a dependency is already covered by that
-   dependency's key, so do not re-hash it.
-3. **Two staticpy processes may share one `dist/` safely.** Content keys +
-   `flock` leases + atomic rename. Do not add process-global state that assumes
-   otherwise, and never delete a file in `dist/locks/` — removing one breaks
-   flock identity for anyone holding it open.
-4. **`recipe.Bind(env)` must be called before `recipe.Plan`.** `KeyInputs` gets
-   no `Env`, so without the bind the toolchain's identity never reaches the key,
-   and artifacts built by a compiler nobody can name any more keep being served
-   across a gccfactory re-publish.
+1. **An artifact directory is absent or complete.** Published by one rename,
+   manifest (`.staticpy.json`) written last. Jobs write only into `work` and
+   `stage`; core stamps the manifest, never a recipe.
+2. **`KeyInputs` contain no absolute path and nothing per-run.** An absolute
+   prefix makes the cache machine-specific; a timestamp or pid makes it
+   useless. Don't re-hash what a dependency's key already covers.
+3. **Two staticpy processes may share one `dist/`.** Content keys + `flock`
+   leases + atomic rename. No process-global state assuming otherwise; never
+   delete a file in `dist/locks/` (breaks flock identity for holders).
+4. **Call `recipe.Bind(env)` before `recipe.Plan`.** `KeyInputs` gets no `Env`;
+   without the bind the toolchain identity never reaches the key and stale
+   artifacts survive a gccfactory re-publish.
 5. **The shim provisions, the binary consumes.** staticpy never fetches a
-   toolchain or a qemu; it is handed paths and fails loudly when one is
-   missing. That is what lets the same binary run against a volume mount, a
-   gccfactory checkout or a musl.cc unpack.
-6. **Content-anchored edits assert their match count.** `Edit.MustMatch` (zero
-   meaning exactly once) makes a moved anchor a loud failure instead of a silent
-   no-op or a double application. Edits are the exception; `patches/` holds real
-   diffs and `patch` already fails when its context moves. Reach for an Edit only
-   where the fixup must survive an unreviewed version bump — the ctypes
-   injection is the case that earns it.
-7. **Every command goes through the Runner** (`core.Cmd`). Anything exec'd
-   around it is invisible in `dist/logs` and absent from `commands.sh`.
-8. **Bump `recipe.Version` by hand** when the *procedure* changes in a way the
-   flags do not capture — a new step, a different ordering, a changed install
-   layout. It is in every key, so it rebuilds the world.
+   toolchain or qemu; it's handed paths and fails loudly if one is missing
+   (so one binary works against a volume mount, a gccfactory checkout or a
+   musl.cc unpack).
+6. **Content-anchored edits assert their match count** (`Edit.MustMatch`, zero
+   meaning exactly once). Prefer real diffs in `patches/`; use an Edit only
+   where the fixup must survive an unreviewed version bump (the ctypes
+   injection).
+7. **Every command goes through the Runner** (`core.Cmd`), or it's missing from
+   `dist/logs` and `commands.sh`.
+8. **Bump `recipe.Version` by hand** when the *procedure* changes in a way flags
+   don't capture (new step, reordering, install layout). It's in every key, so
+   it rebuilds the world.
 
 ## Watching a long build or benchmark
 
-A build or a bench run is not going well merely because it is still running.
-Both here fail *silently and partially*: the process stays alive, the progress
-counter climbs, and the thing being produced is wrong. Poll for the failure
-mode, not for liveness.
+Both fail *silently and partially*: the process lives, the counter climbs, the
+output is wrong. Poll for failure, not liveness.
 
-**Check the failure count, not the progress count.** A pyperformance run sat at
-"87 of 134, eta 14m" while 43 of the reference arm's 45 measurements had already
-failed on `ModuleNotFoundError: pyperf` -- pyperformance had been installed into
-one arm's venv and not the others. Every one of those was logged, and nothing
-about the progress line said so. `grep -l '^# exit: [^0]' <logdir>/*.log | wc -l`
-is the check that would have caught it in the first thirty seconds.
-
-**A monitor that greps only for success is indistinguishable from a hung job.**
-Whatever filter you arm, ask: *if this crashed right now, would it emit
-anything?* Match the terminal states too -- `ERROR`, `error:`, `Traceback`,
-`FAILED` -- and have the loop exit when the process dies, so "no output" cannot
-mean both "still working" and "died ten minutes ago".
-
-**Check that the arms stayed comparable.** In anything measuring two builds
-against each other, a failure that hits one arm and not the other is worse than
-a failure that hits both: the run completes, the report renders, and the ratios
-are computed over whichever benchmarks happened to survive on both sides. Count
-per arm, not in total.
-
-**Verify the artefact, not the exit code.** `pyref` published an interpreter
-missing `_sqlite3` and `readline` with exit 0, twice, because CPython reports
-"necessary bits not found" and carries on. Whatever the job was for, assert the
-thing it was supposed to produce actually exists -- and prefer a postcondition
-inside the job over a check you have to remember to run.
-
-**A silent monitor is not evidence of health.** A watch that only speaks on
-failure leaves you unable to tell "fine" from "died an hour ago", and the
-temptation is then to poll by hand every thirty seconds, which is worse. Run a
-low-rate heartbeat alongside the failure watch -- one line every few minutes
-carrying the numbers that matter (`87/134 measured, failures static=0
-reference=43`) is roughly a dozen messages across an hour-long run, and it is
-the difference between watching the thing and hoping.
-
-**`pgrep -f` matches your own shell.** Every `pgrep -f "staticpy build"` in this
-session matched the command running it, so "still running" was reported for a
-process that had died and, later, missed a real one whose argv had flags before
-the subcommand. Match on something unique to the job (a session stamp, an
-artifact path) and treat a count of 1 with suspicion.
+- **Count failures, not progress.** A run sat at "87 of 134" while 43 of the
+  reference arm's 45 measurements had failed (`ModuleNotFoundError: pyperf`,
+  installed into one arm's venv only).
+  `grep -l '^# exit: [^0]' <logdir>/*.log | wc -l` catches it in 30 seconds.
+- **Match terminal states** (`ERROR`, `error:`, `Traceback`, `FAILED`) and exit
+  the watch loop when the process dies. A success-only grep looks like a hang.
+- **Count per arm.** A failure on one arm only still renders a report, with
+  ratios over whatever survived on both sides.
+- **Verify the artifact, not the exit code.** `pyref` twice published without
+  `_sqlite3` and `readline` at exit 0 ("necessary bits not found"). Prefer a
+  postcondition inside the job.
+- **Run a low-rate heartbeat** alongside the failure watch (e.g. every few
+  minutes: `87/134 measured, failures static=0 reference=43`), so silence
+  can't mean both "fine" and "dead an hour ago".
+- **`pgrep -f` matches your own shell**, and misses argv with flags before the
+  subcommand. Match something unique (session stamp, artifact path); distrust
+  a count of 1.
 
 ## The debug loop
 
-You should never be grepping a multi-megabyte undifferentiated log. Every
-command a job runs is its own file, headed with cwd, the overlaid environment
-and the exact argv.
+Each command a job runs has its own log, headed with cwd, overlaid env and
+argv.
 
 ```sh
 ./staticpy doctor                  # host requirements, per target: buildable vs runnable
-./staticpy status --todo           # what a build would actually do, before it does it
-./staticpy logs <slug> --failed    # the tail of the step the job died on
+./staticpy status --todo           # what a build would do, before it does it
+./staticpy logs <slug> --failed    # tail of the step the job died on
 ./staticpy logs <slug> --step configure
-./staticpy logs <slug> --follow    # works while another process is building it
+./staticpy logs <slug> --follow    # works while another process builds it
 ./staticpy shell <slug>            # that job's exact env and cwd
 ```
 
-`dist/logs/jobs/<slug>/latest/commands.sh` is the whole run as a replayable
-script: copy the one failing command out of it and iterate inside
-`staticpy shell <slug>`. Attempt directories are never reused, so a passing
-rebuild does not erase the evidence from the failure before it. The work tree
-is deleted when a job succeeds — rebuild with `--keep-work` if `shell` needs
-somewhere to land. Slugs are exactly the names `staticpy status` prints, e.g.
-`dep:default:x86_64-linux-musl:openssl`.
-
-Do not close a red suite with `[expect.<the-triple-that-failed>]` or a
-`[package.X.profile.<the-profile-that-failed>]` so the current sweep can
-finish. That is overfitting: the next target or the next library hits the
-same hole and you wait out another compile. Hunt the class (recipe, qemu
-version, ABI, getpath) to a complete fix. The traps skill's **Do not
-overfit the last failure** is the rule; this paragraph is the reminder
-at the point you would otherwise edit `tests.toml`.
-
-`staticpy verify` refuses to build by default: it is for asking whether what is
-on disk is good, not for starting an hour of work. Levels are `smoke` (import
-probes, seconds, the gate every target must pass), `core` (language core plus
-every hand-linked extension module) and `full` (CPython's suite, hours under
-qemu). Results are content-addressed and kept as `report.json` in the verify
-job's artifact.
+- `dist/logs/jobs/<slug>/latest/commands.sh` replays the run: copy out the
+  failing command and iterate in `staticpy shell <slug>`.
+- Attempt dirs are never reused, so a passing rebuild keeps the failure's
+  evidence. The work tree is deleted on success; rebuild with `--keep-work` if
+  `shell` needs it.
+- Slugs are the names `staticpy status` prints, e.g.
+  `dep:default:x86_64-linux-musl:openssl`.
+- Don't close a red suite with `[expect.<failing-triple>]` or
+  `[package.X.profile.<failing-profile>]`; hunt the class (recipe, qemu
+  version, ABI, getpath). Rule: staticpy-traps **Do not overfit the last
+  failure**.
+- `staticpy verify` refuses to build by default. Levels: `smoke` (import
+  probes, seconds, the gate every target must pass), `core` (language core plus
+  every hand-linked extension module), `full` (CPython's suite, hours under
+  qemu). Results are content-addressed, `report.json` in the verify artifact.
 
 ## State of play
 
-Honest inventory, because the code reads more finished than it is:
-
-- **Native builds are proven; nothing else is.** `pynative` on
-  x86_64-linux-musl and `pyref` on the host both build, verify and benchmark
-  end to end. Every other target is still only "compiles and validates".
-- **The cross path is unproven.** `pycross` configures with `--build`/`--host`/
-  `--with-build-python` pointed at `pyhost`; nothing has run it end to end.
-  `--with-build-python`'s version check is where a mismatched `pyhost` would
-  first surface.
+- `x86_64-linux-musl` and `aarch64-linux-musl` are `proven` in
+  `config/targets.toml`; the rest are `experimental`.
 - **PGO is native-only in practice.** CPython runs `PROFILE_TASK` as
   `./python …` with no HOSTRUNNER, so `pgo = "on"` means `native-only` for a
   cross build.
-- **The per-target pyconfig fragments are still the cross-check for the ABI
-  probe.** `probe` measures what is measurable; the fragments carry what is a
-  decision (inline asm availability, atomics quirks). Adding a target without
-  one is a hard error by design.
-- **Bundles are declared but empty.** `config/bundles.toml` defines no `[pkg.*]`,
-  so `--bundle` has nothing to select yet. It was believed that pyperformance
-  benchmarking waited on it "because there is no pip in a
-  `--with-ensurepip=no` interpreter". That is false, and the belief cost this
-  command its whole reason for existing: `--with-ensurepip=no` only skips
-  installing pip into the interpreter's prefix, leaving `ensurepip` and its
-  bundled wheel in the stdlib, so `-m venv` seeds a working pip even on the
-  fully static no-dlopen build. `./staticpy bench` now defaults to
-  pyperformance, installs it into each arm's venv, and installs each
-  benchmark's requirements; `--suite micro` selects the old stdlib-only suite,
-  which is the offline path. What a static interpreter genuinely cannot do is
-  load a C extension, which is a per-benchmark limit, not a suite-wide one.
+- **Pyconfig fragments still cross-check the ABI probe.** The probe measures;
+  fragments carry decisions (inline asm, atomics quirks). A target without a
+  fragment file is a hard error.
+- **Bundles are declared but empty** (`config/bundles.toml` has no `[pkg.*]`),
+  so `--bundle` selects nothing. This never blocked pyperformance:
+  `--with-ensurepip=no` leaves `ensurepip` and its wheel in the stdlib, so
+  `-m venv` seeds pip even on the static build. `bench` defaults to
+  pyperformance (installed per arm, plus each benchmark's requirements);
+  `--suite micro` is the offline stdlib-only path. The real limit is per
+  benchmark: no C extensions.
 
 ## Bench ETA weights
 
-The progress-line ETA is `this-run scale × leftover weight`. The weights are
-embedded in `src/staticpy/internal/bench/eta_weights.json`: mean `wall_s` of
-ok cells (`wall_s >= 1`) from committed `benchmarks/*/timeline.jsonl`. Scale
-uses **only names already in that file**. We do not run every pyperformance
-benchmark (several never install; some die at import). A new or newly-runnable
-name is guessed at the median until this run has measured it; it must not
-enter `elapsed/weight`, or one surprise ten-minute script rewrites every
-remaining estimate.
+ETA = `this-run scale × leftover weight`. Weights live in
+`src/staticpy/internal/bench/eta_weights.json`: mean `wall_s` of ok cells
+(`wall_s >= 1`) from committed `benchmarks/*/timeline.jsonl`.
 
-A kit is measured once, on a quiet box, with no previous session and a
-different lineup. Do not look up last night's `(arm, benchmark)` cells.
+- Scale uses **only names already in the file**. A new name is guessed at the
+  median until measured and must not enter `elapsed/weight`, or one surprise
+  ten-minute benchmark rewrites every estimate.
+- A kit runs once on a quiet box with no prior session and a different lineup;
+  never look up last night's `(arm, benchmark)` cells.
 
-**Maintain the table.** The ETA stays honest without a restamp. Restamping is
-how a newly-timed name joins the *shape*, so the next run does not spend the
-first arm of that bench on a median guess. Do it when:
+Restamp (so new names join the shape) when:
 
-- `config/bench.toml` / `DefaultPyperformance` moves, and a session has timed
+- `config/bench.toml` / `DefaultPyperformance` moves and a session has timed
   the new suite
 - a bench that used to skip or fail starts running (`skipped.json` shrinks)
-- a committed `benchmarks/` timeline contains names the JSON does not
+- a committed `benchmarks/` timeline has names the JSON lacks
 
 ```sh
 # from the repo root, after the new session is under benchmarks/
@@ -321,20 +241,15 @@ print(len(out), "weights")
 '
 ```
 
-Then `go test ./internal/bench/` in the spython container (the package is
-Linux-only). The replay test fails if the table regresses toward
-count-average.
+Then `go test ./internal/bench/` in the spython container (Linux-only); the
+replay test fails if the table regresses toward count-average.
 
-## Related
+## Related skills
 
-- `staticpy-traps` — symptom-to-cause catalogue, with the long bug write-ups in
-  its `references/`. **Read it before debugging anything that builds but
-  misbehaves, and write what you find there.**
-- `staticpy-bump` — pin edits, and the overnight matrix-upgrade rules
-  (preemptive fuzz, class-wide hunt, full-matrix done-when, clean-tree kit).
-- `staticpy-kit` — pack `staticpy kit`. Commit first, then stamp at a
-  non-dirty revision.
-- `staticpy-add-target` — adding and proving a new triple.
-- `comment-hygiene` — this repo's comment rule: say *why*, not *what*; no stale
-  framing; no baked-in numbers unless the number is the point. Anything longer
-  than a few lines goes in `staticpy-traps`, linked from the code by one line.
+- `staticpy-traps` — symptom-to-cause catalogue. Read before debugging
+  anything that builds but misbehaves; write findings there.
+- `staticpy-bump` — pin edits and matrix-upgrade rules.
+- `staticpy-kit` — `staticpy kit`; commit first, stamp at a clean revision.
+- `staticpy-add-target` — adding and proving a triple.
+- `staticpy-release` — GitHub releases of packed tarballs.
+- `comment-hygiene` — comment rules and sweeps.
