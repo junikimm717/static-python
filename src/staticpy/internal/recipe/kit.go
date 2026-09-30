@@ -48,7 +48,7 @@ func planKit(cfg *config.Config, assets fs.FS, o PlanOptions) ([]core.Job, error
 		if !ok {
 			return nil, fmt.Errorf("recipe: kit %q arm %q: root is %s, want pack", o.Kit, name, jobs[0].Slug())
 		}
-		arms = append(arms, kitArm{label: name, pack: p, interp: p.interp})
+		arms = append(arms, kitArm{label: name, pack: p})
 	}
 	host, ok := cfg.Targets[o.Host]
 	if !ok {
@@ -62,9 +62,8 @@ func planKit(cfg *config.Config, assets fs.FS, o PlanOptions) ([]core.Job, error
 }
 
 type kitArm struct {
-	label  string
-	pack   core.Job
-	interp core.Job
+	label string
+	pack  *pack
 }
 
 type kitJob struct {
@@ -126,10 +125,8 @@ func (j *kitJob) KeyInputs() map[string]string {
 func (j *kitJob) ArtifactDir(e *core.Env) string {
 	dir := e.Path(core.DirOut, "kit", j.name, j.target.Triple)
 	for _, a := range j.arms {
-		if p, ok := a.pack.(*pack); ok {
-			if ref, ok := p.interp.(*pyRef); ok {
-				return dir + hostPublishSuffix(ref.tc)
-			}
+		if ref, ok := a.pack.interp.(*pyRef); ok {
+			return dir + hostPublishSuffix(ref.tc)
 		}
 	}
 	return dir
@@ -176,7 +173,7 @@ func (j *kitJob) Build(ctx context.Context, e *core.Env, r *core.Runner, work, s
 
 	for _, a := range j.arms {
 		r.Step("stage " + a.label)
-		prefix := packContentRoot(a.interp, e)
+		prefix := packContentRoot(a.pack.interp, e)
 		dst := filepath.Join(root, "python", a.label)
 		if err := copyTree(prefix, dst); err != nil {
 			return fmt.Errorf("kit: copy %s: %w", a.label, err)

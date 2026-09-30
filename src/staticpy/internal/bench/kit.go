@@ -70,7 +70,7 @@ func AdoptKitRevision(kit *KitDoc) {
 // top level because the site and index look for them there. Existing
 // top-level values win.
 func ApplyKitToManifest(man map[string]any, kit *KitDoc) {
-	if kit == nil || man == nil {
+	if kit == nil {
 		return
 	}
 	man["kit"] = kit
@@ -116,9 +116,6 @@ func (k *KitDoc) ResolveArms(root string) (order []string, paths map[string]stri
 }
 
 func (k *KitDoc) MatchesThisMachine() error {
-	if k.Triple == "" {
-		return nil
-	}
 	arch := runtime.GOARCH
 	want, ok := goarchOfTriple(k.Triple)
 	if !ok {

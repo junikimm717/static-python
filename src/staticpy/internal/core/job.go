@@ -31,17 +31,12 @@ var keyCache sync.Map // slug -> key
 // dependencies. A slug must uniquely determine a job's content within one
 // process.
 func Key(j Job) (string, error) {
-	if v, ok := keyCache.Load(j.Slug()); ok {
-		return v.(string), nil
-	}
-	return computeKey(j, &keyWalk{memo: map[string]string{}, onStack: map[string]bool{}, cache: true})
+	return computeKey(j, &keyWalk{onStack: map[string]bool{}})
 }
 
 type keyWalk struct {
-	memo    map[string]string
 	onStack map[string]bool
 	path    []string
-	cache   bool
 }
 
 func computeKey(j Job, w *keyWalk) (string, error) {
@@ -49,14 +44,8 @@ func computeKey(j Job, w *keyWalk) (string, error) {
 	if slug == "" || strings.ContainsAny(slug, "/\\\x00") {
 		return "", fmt.Errorf("core: invalid job slug %q", slug)
 	}
-	if k, ok := w.memo[slug]; ok {
-		return k, nil
-	}
-	if w.cache {
-		if v, ok := keyCache.Load(slug); ok {
-			w.memo[slug] = v.(string)
-			return v.(string), nil
-		}
+	if v, ok := keyCache.Load(slug); ok {
+		return v.(string), nil
 	}
 	if w.onStack[slug] {
 		return "", fmt.Errorf("core: dependency cycle: %s", strings.Join(append(w.path, slug), " -> "))
@@ -89,10 +78,7 @@ func computeKey(j Job, w *keyWalk) (string, error) {
 	}
 	sum := sha256.Sum256(buf)
 	k := hex.EncodeToString(sum[:])
-	w.memo[slug] = k
-	if w.cache {
-		keyCache.Store(slug, k)
-	}
+	keyCache.Store(slug, k)
 	return k, nil
 }
 

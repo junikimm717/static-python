@@ -26,7 +26,7 @@ import (
 // be copied; shrinking the .dynstr string is safe because $ORIGIN/../lib is
 // shorter than dist/artifacts/pyref_.../rootfs/lib.
 func PyRef(cfg *config.Config, assets fs.FS, target config.Target, profile string) (core.Job, error) {
-	res, err := resolveScope(cfg, profile, config.ScopePython)
+	res, err := cfg.Resolve(profile, config.ScopePython)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +34,7 @@ func PyRef(cfg *config.Config, assets fs.FS, target config.Target, profile strin
 		return nil, fmt.Errorf("recipe: profile %q has toolchain %q; pyref exists to build with the machine's own compiler and libc, so it needs a host-built profile",
 			profile, res.Toolchain)
 	}
-	tc, err := toolchainFor(nil, res, target.Triple)
+	tc, err := toolchainFor(res, target.Triple)
 	if err != nil {
 		return nil, err
 	}
@@ -81,14 +81,12 @@ func PyRef(cfg *config.Config, assets fs.FS, target config.Target, profile strin
 		}
 	}
 
-	j := &pyRef{
-		cfg: cfg, assets: assets, target: target, profile: profile,
+	return &pyRef{
+		assets: assets, target: target, profile: profile,
 		res: res, tc: tc, src: src, deps: order,
-		version: src.Version,
-		tree:    sources.SrcTree(src, sources.Options{Assets: assets}),
-	}
-	j.abi = pyABI(src.Version)
-	return j, nil
+		abi:  pyABI(src.Version),
+		tree: sources.SrcTree(src, sources.Options{Assets: assets}),
+	}, nil
 }
 
 // Unset means the recipe default (pass --with-lto). Static builds ignore
@@ -107,7 +105,6 @@ func pyABI(version string) string {
 }
 
 type pyRef struct {
-	cfg     *config.Config
 	assets  fs.FS
 	target  config.Target
 	profile string
@@ -116,7 +113,6 @@ type pyRef struct {
 	src     config.Source
 	tree    core.Job
 	deps    []*depJob
-	version string
 	abi     string
 }
 
@@ -468,7 +464,7 @@ func rejectForeignHostPrefix(dir, wantKey string) error {
 	m, err := core.ReadManifest(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			if hasRootfsLib(dir) {
+			if isDir(filepath.Join(dir, "rootfs", "lib")) {
 				return fmt.Errorf("recipe: %s has a rootfs and no manifest; refusing to reuse a prefix that may belong to another host compiler", dir)
 			}
 			return nil
@@ -484,22 +480,10 @@ func rejectForeignHostPrefix(dir, wantKey string) error {
 }
 
 func manifestToolchain(m *core.Manifest) string {
-	if m.Inputs != nil {
-		if v := m.Inputs["toolchain"]; v != "" {
-			return v
-		}
+	if v := m.Inputs["toolchain"]; v != "" {
+		return v
 	}
-	if m.Provenance != nil {
-		if v := m.Provenance["toolchain"]; v != "" {
-			return v
-		}
-	}
-	return ""
-}
-
-func hasRootfsLib(dir string) bool {
-	st, err := os.Stat(filepath.Join(dir, "rootfs", "lib"))
-	return err == nil && st.IsDir()
+	return m.Provenance["toolchain"]
 }
 
 func shortKey(k string) string {

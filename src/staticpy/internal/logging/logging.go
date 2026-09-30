@@ -145,14 +145,14 @@ func autoColor(w io.Writer) bool {
 }
 
 func (l *Logger) RunDir() string {
-	if l == nil || l.s == nil {
+	if l == nil {
 		return ""
 	}
 	return l.s.runDir
 }
 
 func (l *Logger) Close() error {
-	if l == nil || l.s == nil || l.s.file == nil {
+	if l == nil || l.s.file == nil {
 		return nil
 	}
 	l.s.mu.Lock()
@@ -163,7 +163,7 @@ func (l *Logger) Close() error {
 }
 
 func (l *Logger) Enabled(lv Level) bool {
-	if l == nil || l.s == nil {
+	if l == nil {
 		return false
 	}
 	return lv >= l.s.level
@@ -171,7 +171,7 @@ func (l *Logger) Enabled(lv Level) bool {
 
 // The keys "job" and "step" are promoted to dedicated event fields.
 func (l *Logger) With(kv ...any) *Logger {
-	if l == nil || l.s == nil {
+	if l == nil {
 		return l
 	}
 	f := make(map[string]any, len(l.fields)+len(kv)/2)

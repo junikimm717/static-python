@@ -290,10 +290,7 @@ func (c *Config) validateBundles() error {
 			}
 		}
 	}
-	if err := c.validateExpect(); err != nil {
-		return err
-	}
-	return nil
+	return c.validateExpect()
 }
 
 func (c *Config) validateBench() error {

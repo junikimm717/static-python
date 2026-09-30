@@ -105,16 +105,8 @@ func (r *Report) FailCmd(name string, res RunResult, err error, format string, a
 	})
 }
 
-func (r *Report) Absorb(prefix string, sub *Report) {
-	if sub == nil {
-		return
-	}
-	for _, c := range sub.Checks {
-		if prefix != "" {
-			c.Name = prefix + c.Name
-		}
-		r.Checks = append(r.Checks, c)
-	}
+func (r *Report) Absorb(sub *Report) {
+	r.Checks = append(r.Checks, sub.Checks...)
 }
 
 func (r *Report) OK() bool {

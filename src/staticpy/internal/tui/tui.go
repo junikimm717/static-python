@@ -40,16 +40,11 @@ type Choice struct {
 	Why      string
 }
 
-type Group struct {
-	Title   string
-	Choices []Choice
-}
-
 type Menu struct {
 	Title   string
 	Help    string
 	Headers []string
-	Groups  []Group
+	Choices []Choice
 	// Flag is the command-line flag this menu stands in for, e.g. "--cpu".
 	Flag string
 	// Default is the Value pre-selected when the menu opens, and the one a
@@ -146,14 +141,12 @@ func MultiSelect(m Menu) ([]Choice, error) {
 func options(m Menu) ([]huh.Option[string], map[string]Choice, error) {
 	byValue := map[string]Choice{}
 	var opts []huh.Option[string]
-	for _, g := range m.Groups {
-		for _, c := range g.Choices {
-			byValue[c.Value] = c
-			if c.Disabled {
-				continue
-			}
-			opts = append(opts, huh.NewOption(label(m, g, c), c.Value))
+	for _, c := range m.Choices {
+		byValue[c.Value] = c
+		if c.Disabled {
+			continue
 		}
+		opts = append(opts, huh.NewOption(label(m, c), c.Value))
 	}
 	if len(opts) == 0 {
 		return nil, nil, fmt.Errorf("tui: menu %q has no selectable choices", m.Title)
@@ -193,11 +186,8 @@ func SelectOr(m Menu) (string, error) {
 
 // Column-aligned across the whole menu so the options line up however huh
 // lays them out.
-func label(m Menu, g Group, c Choice) string {
+func label(m Menu, c Choice) string {
 	s := row(c.Cells, widths(m))
-	if g.Title != "" {
-		s = fmt.Sprintf("%-14s %s", g.Title, s)
-	}
 	if c.Note != "" {
 		s += "  (" + c.Note + ")"
 	}
@@ -232,11 +222,9 @@ func describe(m Menu, headerPad string) string {
 	}
 	w := widths(m)
 	var unavailable []string
-	for _, g := range m.Groups {
-		for _, c := range g.Choices {
-			if c.Disabled {
-				unavailable = append(unavailable, "  "+row(c.Cells, w)+"  -- "+c.Why)
-			}
+	for _, c := range m.Choices {
+		if c.Disabled {
+			unavailable = append(unavailable, "  "+row(c.Cells, w)+"  -- "+c.Why)
 		}
 	}
 	if len(unavailable) > 0 {
@@ -257,12 +245,10 @@ func widths(m Menu) []int {
 	for i, h := range m.Headers {
 		w[i] = len(h)
 	}
-	for _, g := range m.Groups {
-		for _, c := range g.Choices {
-			for i, cell := range c.Cells {
-				if i < len(w) && len(cell) > w[i] {
-					w[i] = len(cell)
-				}
+	for _, c := range m.Choices {
+		for i, cell := range c.Cells {
+			if i < len(w) && len(cell) > w[i] {
+				w[i] = len(cell)
 			}
 		}
 	}

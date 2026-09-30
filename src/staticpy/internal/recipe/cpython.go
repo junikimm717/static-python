@@ -39,7 +39,7 @@ func PyHost(cfg *config.Config, srcAssets fs.FS, host config.Target) (core.Job, 
 	if err != nil {
 		return nil, err
 	}
-	res, err := resolveScope(cfg, bootstrapProfile, config.ScopePyhost)
+	res, err := cfg.Resolve(bootstrapProfile, config.ScopePyhost)
 	if err != nil {
 		return nil, err
 	}
@@ -176,14 +176,6 @@ func (j *pyHost) Build(ctx context.Context, e *core.Env, r *core.Runner, work, s
 	return installPrefix(ctx, r, te, src, work, stage, prefix, nil)
 }
 
-func PyNative(cfg *config.Config, srcAssets fs.FS, target config.Target, profile, bundle string) (core.Job, error) {
-	return newPyBuild(cfg, srcAssets, target, target, profile, bundle, false)
-}
-
-func PyCross(cfg *config.Config, srcAssets fs.FS, host, target config.Target, profile, bundle string) (core.Job, error) {
-	return newPyBuild(cfg, srcAssets, host, target, profile, bundle, true)
-}
-
 // Native and cross differ by four configure arguments, so keeping them one
 // job is what stops the cross path from drifting away from the native one
 // that gets all the testing.
@@ -222,7 +214,7 @@ func newPyBuild(cfg *config.Config, srcAssets fs.FS, host, target config.Target,
 	if err != nil {
 		return nil, err
 	}
-	res, err := resolveScope(cfg, profile, config.ScopePython)
+	res, err := cfg.Resolve(profile, config.ScopePython)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +249,7 @@ func newPyBuild(cfg *config.Config, srcAssets fs.FS, host, target config.Target,
 		return nil, err
 	}
 
-	j := &pyBuild{
+	return &pyBuild{
 		cross:        cross,
 		srctree:      srctree,
 		src:          src,
@@ -266,6 +258,7 @@ func newPyBuild(cfg *config.Config, srcAssets fs.FS, host, target config.Target,
 		sysroot:      sysroot,
 		staticapi:    gen.NewStaticAPI(srctree, pyhost, src.Version),
 		probe:        probe,
+		buildPython:  pyhost,
 		host:         host,
 		target:       target,
 		profile:      profile,
@@ -273,9 +266,7 @@ func newPyBuild(cfg *config.Config, srcAssets fs.FS, host, target config.Target,
 		bundle:       bundle,
 		res:          res,
 		setup:        setup,
-	}
-	j.buildPython = pyhost
-	return j, nil
+	}, nil
 }
 
 func (j *pyBuild) Name() string {
@@ -293,11 +284,7 @@ func (j *pyBuild) Slug() string {
 }
 
 func (j *pyBuild) Deps() []core.Job {
-	deps := []core.Job{j.srctree, j.sysroot, j.staticapi, j.probe}
-	if j.buildPython != nil {
-		deps = append(deps, j.buildPython)
-	}
-	return deps
+	return []core.Job{j.srctree, j.sysroot, j.staticapi, j.probe, j.buildPython}
 }
 
 func (j *pyBuild) KeyInputs() map[string]string {

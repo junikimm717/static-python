@@ -57,8 +57,8 @@ LINEUP
     --interp PROFILE            any other profile's built interpreter
                                 (nomimalloc, nolto, seplto, reference-nolto, ...)
     --interp LABEL=/path/to/py  any other binary
-  Name each arm. There is no bundled lineup: the comparison set is whatever
-  --interp flags you pass, in that order. --baseline LABEL fixes the
+  There is no bundled lineup: the arms are the --interp flags, in the order
+  given. --baseline LABEL fixes the
   denominator of every ratio. When the lineup contains reference and
   --baseline is omitted, reference is the baseline; otherwise the first
   --interp wins.
@@ -629,9 +629,6 @@ func samplesToResults(order []string, ms map[string]*interpMeasurement) bench.Re
 	for _, l := range order {
 		res[l] = map[string][]float64{}
 		m := ms[l]
-		if m == nil {
-			continue
-		}
 		for name, ns := range m.CPU {
 			secs := make([]float64, len(ns))
 			for i, v := range ns {
@@ -730,37 +727,29 @@ func runQuiet(path string, args []string) error {
 }
 
 func resolveKnownInterp(g *Global, cfg *config.Config, label, abi string, build bool) (string, error) {
+	profile := label
 	switch label {
-	case "static":
-		p, err := findBuiltInterp(g, "", abi, build)
-		if err != nil {
-			return "", fmt.Errorf("--interp static: %w\nBuild it with `staticpy build`, or pass --build", err)
-		}
-		return p, nil
-	case "reference":
-		p, err := findBuiltInterp(g, config.ProfileReference, abi, build)
-		if err != nil {
-			return "", fmt.Errorf("--interp reference: %w\n"+
-				"Build it with `staticpy build --profile %s`, or pass --build",
-				err, config.ProfileReference)
-		}
-		return p, nil
 	case "system":
 		p, err := exec.LookPath("python3")
 		if err != nil {
 			return "", fmt.Errorf("--interp system: no python3 on PATH")
 		}
 		return p, nil
-	}
-	if cfg != nil {
-		if _, ok := cfg.Profiles[label]; ok {
-			p, err := findBuiltInterp(g, label, abi, build)
-			if err != nil {
-				return "", fmt.Errorf("--interp %s: %w\nBuild it with `staticpy build --profile %s`, or pass --build", label, err, label)
-			}
-			return p, nil
+	case "static":
+		profile = ""
+	default:
+		if _, ok := cfg.Profiles[label]; !ok {
+			return "", fmt.Errorf("--interp %s: unknown name (want %s, or a profile name)",
+				label, strings.Join(wellKnownInterps, ", "))
 		}
 	}
-	return "", fmt.Errorf("--interp %s: unknown name (want %s, or a profile name)",
-		label, strings.Join(wellKnownInterps, ", "))
+	p, err := findBuiltInterp(g, profile, abi, build)
+	if err != nil {
+		hint := "staticpy build"
+		if profile != "" {
+			hint += " --profile " + profile
+		}
+		return "", fmt.Errorf("--interp %s: %w\nBuild it with `%s`, or pass --build", label, err, hint)
+	}
+	return p, nil
 }

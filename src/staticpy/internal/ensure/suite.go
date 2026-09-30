@@ -59,24 +59,6 @@ func DefaultSuiteTimeout(level Level) time.Duration {
 	return time.Hour
 }
 
-type SuiteOptions struct {
-	// Tests overrides the level's default set.
-	Tests []string
-	// regrtest's -j. Zero or one runs serially.
-	Jobs int
-	// regrtest's per-test --timeout.
-	TestTimeout time.Duration
-	// Bounds the whole suite run.
-	Timeout time.Duration
-	// Ignore becomes one -i per entry, so an impossible method drops out of the
-	// run instead of failing the file it lives in.
-	Ignore []string
-	// Extra flags appended after the generated ones.
-	Extra []string
-	// PythonArgs is inserted between the interpreter and -m test.
-	PythonArgs []string
-}
-
 type Outcome struct {
 	Level  Level  `json:"level"`
 	Runner string `json:"runner"`
@@ -128,33 +110,23 @@ func (o *Outcome) StatusOf(test string) TestStatus {
 // A non-zero exit is an expected outcome, so it lands in the Outcome rather
 // than the error; the error is reserved for not being able to run the suite at
 // all.
-func RunSuite(ctx context.Context, r *core.Runner, l *Launcher, level Level, python, work string, opts SuiteOptions) (*Outcome, error) {
-	tests := opts.Tests
-	if tests == nil {
-		switch level {
-		case LevelCore:
-			tests = CoreTests
-		case LevelFull:
-			tests = nil
-		default:
-			return nil, fmt.Errorf("level %q does not run CPython's test suite", level)
-		}
+//
+// Each ignore pattern becomes one -i, so an impossible method drops out of the
+// run instead of failing the file it lives in.
+func RunSuite(ctx context.Context, r *core.Runner, l *Launcher, level Level, python, work string, ignore []string) (*Outcome, error) {
+	var tests []string
+	switch level {
+	case LevelCore:
+		tests = CoreTests
+	case LevelFull:
+	default:
+		return nil, fmt.Errorf("level %q does not run CPython's test suite", level)
 	}
 
-	testTimeout := opts.TestTimeout
-	if testTimeout <= 0 {
-		testTimeout = DefaultTestTimeout
-	}
-
-	args := append([]string(nil), opts.PythonArgs...)
-	args = append(args, "-m", "test", "--timeout", strconv.Itoa(int(testTimeout.Seconds())))
-	if opts.Jobs > 1 {
-		args = append(args, "-j", strconv.Itoa(opts.Jobs))
-	}
-	for _, pat := range opts.Ignore {
+	args := []string{"-m", "test", "--timeout", strconv.Itoa(int(DefaultTestTimeout.Seconds()))}
+	for _, pat := range ignore {
 		args = append(args, "-i", pat)
 	}
-	args = append(args, opts.Extra...)
 	args = append(args, tests...)
 
 	dir := filepath.Join(work, "suite")
@@ -163,10 +135,7 @@ func RunSuite(ctx context.Context, r *core.Runner, l *Launcher, level Level, pyt
 	}
 
 	prev := l.Timeout
-	l.Timeout = opts.Timeout
-	if l.Timeout <= 0 {
-		l.Timeout = DefaultSuiteTimeout(level)
-	}
+	l.Timeout = DefaultSuiteTimeout(level)
 	start := time.Now()
 	res, err := l.Run(ctx, r, "suite-"+string(level), dir, python, args...)
 	l.Timeout = prev

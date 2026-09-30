@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -71,10 +70,10 @@ func (c *Config) chain(profileName string) ([]string, error) {
 		p, ok := c.Profiles[name]
 		if !ok {
 			if name == profileName {
-				return nil, fmt.Errorf("unknown profile %q (have %s)", name, c.profileNames())
+				return nil, fmt.Errorf("unknown profile %q (have %s)", name, keysOf(c.Profiles))
 			}
 			return nil, fmt.Errorf("profile %q inherits %q, which is not defined (have %s)",
-				out[len(out)-1], name, c.profileNames())
+				out[len(out)-1], name, keysOf(c.Profiles))
 		}
 		seen[name] = true
 		out = append(out, name)
@@ -84,15 +83,6 @@ func (c *Config) chain(profileName string) ([]string, error) {
 		out[i], out[j] = out[j], out[i]
 	}
 	return out, nil
-}
-
-func (c *Config) profileNames() string {
-	names := make([]string, 0, len(c.Profiles))
-	for n := range c.Profiles {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	return strings.Join(names, ", ")
 }
 
 func scopeLayers(scope string) ([]string, error) {
@@ -191,7 +181,9 @@ func remove(list, drop []string, where, field string) ([]string, error) {
 // concept of PGO, of a module set, or of whether CPython ships its test suite.
 // Hashing those into its key anyway means one PGO knob rebuilds openssl on every
 // target, so the scope decides what counts.
-func (r Resolved) keyInputs() map[string]string {
+//
+// It must contain no absolute path and no value that varies between runs.
+func (r Resolved) KeyInputs() map[string]string {
 	in := map[string]string{
 		"cflags":   strings.Join(r.CFlags, " "),
 		"cxxflags": strings.Join(r.CXXFlags, " "),
@@ -237,7 +229,7 @@ func (c *Config) packageFor(name, profileName string) (Package, bool, error) {
 	skip := false
 	pkg, ok := c.Packages[name]
 	if !ok {
-		return Package{}, false, fmt.Errorf("package %q is not in packages.toml (have %s)", name, c.packageNames())
+		return Package{}, false, fmt.Errorf("package %q is not in packages.toml (have %s)", name, keysOf(c.Packages))
 	}
 	chain, err := c.chain(profileName)
 	if err != nil {
@@ -265,13 +257,4 @@ func (c *Config) packageFor(name, profileName string) (Package, bool, error) {
 	// overrides into this job's key.
 	pkg.Variants = nil
 	return pkg, skip, nil
-}
-
-func (c *Config) packageNames() string {
-	names := make([]string, 0, len(c.Packages))
-	for n := range c.Packages {
-		names = append(names, n)
-	}
-	sort.Strings(names)
-	return strings.Join(names, ", ")
 }

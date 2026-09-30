@@ -10,7 +10,7 @@ import (
 )
 
 func TestPyperformanceSpecsArePinned(t *testing.T) {
-	joined := strings.Join(PipInstallArgs(Pins{}), " ")
+	joined := strings.Join(PipInstallArgsFrom(Pins{}, ""), " ")
 	for _, want := range []string{"--no-deps", "pyperformance==1.14.0", "pyperf==2.10.0"} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("PipInstallArgs missing %q: %s", want, joined)

@@ -77,7 +77,7 @@ func Plan(cfg *config.Config, assets fs.FS, o PlanOptions) ([]core.Job, error) {
 		}
 		final := interp
 		if o.Verify != "" {
-			if final, err = Verify(cfg, assets, t, o.Profile, o.Verify, interp); err != nil {
+			if final, err = Verify(cfg, t, o.Profile, o.Verify, interp); err != nil {
 				return nil, err
 			}
 		}
@@ -93,7 +93,7 @@ func Plan(cfg *config.Config, assets fs.FS, o PlanOptions) ([]core.Job, error) {
 
 // No caller has to know which shape it is asking for.
 func Interpreter(cfg *config.Config, assets fs.FS, host, target config.Target, profile, bundle string) (core.Job, error) {
-	res, err := resolveScope(cfg, profile, config.ScopePython)
+	res, err := cfg.Resolve(profile, config.ScopePython)
 	if err != nil {
 		return nil, err
 	}
@@ -106,8 +106,5 @@ func Interpreter(cfg *config.Config, assets fs.FS, host, target config.Target, p
 		}
 		return PyRef(cfg, assets, target, profile)
 	}
-	if host.Triple == target.Triple {
-		return PyNative(cfg, assets, target, profile, bundle)
-	}
-	return PyCross(cfg, assets, host, target, profile, bundle)
+	return newPyBuild(cfg, assets, host, target, profile, bundle, host.Triple != target.Triple)
 }

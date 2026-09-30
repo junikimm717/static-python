@@ -14,9 +14,7 @@ import (
 // what makes the shared-read discipline work across goroutines too; the
 // per-slug mutex on top makes exclusive intent explicit and avoids spinning.
 type flockLease struct {
-	f    *os.File
-	path string
-	excl bool
+	f *os.File
 }
 
 var (
@@ -51,7 +49,7 @@ func acquire(ctx context.Context, e *Env, slug string, excl bool) (*flockLease, 
 	for {
 		err := syscall.Flock(int(f.Fd()), how|syscall.LOCK_NB)
 		if err == nil {
-			return &flockLease{f: f, path: path, excl: excl}, nil
+			return &flockLease{f: f}, nil
 		}
 		if err != syscall.EWOULDBLOCK && err != syscall.EAGAIN && err != syscall.EINTR {
 			f.Close()

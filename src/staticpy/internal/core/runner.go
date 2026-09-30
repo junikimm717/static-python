@@ -172,10 +172,9 @@ func (r *Runner) run(ctx context.Context, c Cmd, capture bool) (string, error) {
 
 	tail := newTailWriter(TailLines)
 	ws := []io.Writer{f, tail}
-	var buf *bytes.Buffer
+	var buf bytes.Buffer
 	if capture {
-		buf = &bytes.Buffer{}
-		ws = append(ws, buf)
+		ws = append(ws, &buf)
 	}
 	if r.log.Enabled(logging.LevelDebug) {
 		ws = append(ws, newLineWriter(func(line string) {
@@ -234,17 +233,10 @@ func (r *Runner) run(ctx context.Context, c Cmd, capture bool) (string, error) {
 		} else {
 			r.log.Error("command failed", "step", step, "cmd", name, "exit", ce.ExitCode, "log", logPath)
 		}
-		outStr := ""
-		if buf != nil {
-			outStr = buf.String()
-		}
-		return outStr, ce
+		return buf.String(), ce
 	}
 	r.log.Debug("command ok", "step", step, "cmd", name, "duration", dur.Round(time.Millisecond))
-	if capture {
-		return buf.String(), nil
-	}
-	return "", nil
+	return buf.String(), nil
 }
 
 func exitCode(err error) int {

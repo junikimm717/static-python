@@ -33,12 +33,6 @@ var bound atomic.Pointer[core.Env]
 
 func Bind(e *core.Env) { bound.Store(e) }
 
-// resolveScope is the only call the recipe package makes into profile
-// resolution, so the whole package moves together if that API changes.
-func resolveScope(cfg *config.Config, profile, scope string) (config.Resolved, error) {
-	return cfg.Resolve(profile, scope)
-}
-
 // Slugs carry ':' to stay readable on the CLI; paths get '_', matching what
 // core does for locks.
 func artifactName(slug string) string {
@@ -696,9 +690,9 @@ func lookHostTool(names ...string) (string, error) {
 
 // Dispatching here is what keeps every job family from having to know that
 // host-built profiles exist.
-func toolchainFor(e *core.Env, res config.Resolved, triple string) (ToolchainID, error) {
+func toolchainFor(res config.Resolved, triple string) (ToolchainID, error) {
 	if res.HostBuilt() {
 		return ToolchainHost(context.Background())
 	}
-	return Toolchain(e, triple)
+	return Toolchain(nil, triple)
 }

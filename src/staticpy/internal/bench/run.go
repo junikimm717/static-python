@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -235,7 +236,7 @@ func Compare(res Results, baseline string, arms []string) ([]Row, map[string]flo
 	for n := range names {
 		ordered = append(ordered, n)
 	}
-	sortStrings(ordered)
+	sort.Strings(ordered)
 
 	var rows []Row
 	ratios := map[string][]float64{}
@@ -264,12 +265,4 @@ func Compare(res Results, baseline string, arms []string) ([]Row, map[string]flo
 		geo[a] = Geomean(rs)
 	}
 	return rows, geo
-}
-
-func sortStrings(xs []string) {
-	for i := 1; i < len(xs); i++ {
-		for j := i; j > 0 && xs[j] < xs[j-1]; j-- {
-			xs[j], xs[j-1] = xs[j-1], xs[j]
-		}
-	}
 }

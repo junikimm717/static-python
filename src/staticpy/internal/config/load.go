@@ -14,8 +14,6 @@ import (
 )
 
 type Options struct {
-	// Not read by Load.
-	RepoRoot string
 	// Dir is an explicit --config directory, applied last. It must exist.
 	Dir string
 	// SourcesDir overrides where sources.toml and patches/ are read from. Empty

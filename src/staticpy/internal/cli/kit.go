@@ -2,9 +2,7 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"strings"
-	"time"
 
 	"github.com/junikimm717/static-python/src/staticpy/internal/core"
 	"github.com/junikimm717/static-python/src/staticpy/internal/ensure"
@@ -92,31 +90,5 @@ func runKit(g *Global, args []string) error {
 		return s.printPlan(nodes, "would kit")
 	}
 
-	todo := 0
-	for _, n := range nodes {
-		if nodeState(s.e, n) != stateOK {
-			todo++
-		}
-	}
-	fmt.Fprintf(os.Stderr, "%s %s   kit %s   %d of %d job%s to build\n",
-		bold("kit:"), host, *name, todo, len(nodes), plural(len(nodes)))
-	fmt.Fprintf(os.Stderr, "%s\n", dim(fmt.Sprintf("dist %s   %d worker%s x make -j%d   logs %s",
-		s.e.Dist, s.e.Workers(), plural(s.e.Workers()), s.e.MakeJobs(), s.e.Path(core.DirLogs))))
-
-	ctx, stop := signalContext()
-	defer stop()
-	started := time.Now()
-	runErr := core.Run(ctx, s.e, s.jobs)
-	after, planErr := core.Plan(s.e, s.jobs)
-	if planErr == nil {
-		printVerifyReports(s.e, after)
-	}
-	if runErr != nil {
-		return runErr
-	}
-	fmt.Fprintf(os.Stderr, "\n%s kit %s in %s\n", green("packed"), *name, humanDur(time.Since(started)))
-	if planErr == nil {
-		printArtifacts(s.e, s.jobs, after)
-	}
-	return nil
+	return s.run(nodes, fmt.Sprintf("%s %s   kit %s", bold("kit:"), host, *name), "packed", "kit "+*name)
 }

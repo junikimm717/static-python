@@ -121,7 +121,6 @@ func targetMenu(g *Global, cfg *config.Config, host string) (tui.Menu, error) {
 		Default: host,
 	}
 	selectable := 0
-	var grp tui.Group
 	for _, name := range sortedKeys(cfg.Targets) {
 		t := cfg.Targets[name]
 		st := g.toolchainState(t.Triple)
@@ -156,12 +155,11 @@ func targetMenu(g *Global, cfg *config.Config, host string) (tui.Menu, error) {
 		} else {
 			selectable++
 		}
-		grp.Choices = append(grp.Choices, ch)
+		m.Choices = append(m.Choices, ch)
 	}
 	if selectable == 0 {
 		return tui.Menu{}, fmt.Errorf("no target has a toolchain on this machine; run through the ./staticpy shim, which fetches them, or pass --toolchains <dir> (`staticpy doctor` has the details)")
 	}
-	m.Groups = []tui.Group{grp}
 	return m, nil
 }
 
@@ -184,9 +182,9 @@ var profileNotes = map[string]string{
 }
 
 func profileMenu(cfg *config.Config, def string) tui.Menu {
-	var grp tui.Group
+	var choices []tui.Choice
 	for _, name := range sortedKeys(cfg.Profiles) {
-		grp.Choices = append(grp.Choices, tui.Choice{
+		choices = append(choices, tui.Choice{
 			Value: name, Cells: []string{name}, Note: profileNotes[name],
 		})
 	}
@@ -196,7 +194,7 @@ func profileMenu(cfg *config.Config, def string) tui.Menu {
 		Headers: []string{"profile"},
 		Flag:    "--profile",
 		Default: def,
-		Groups:  []tui.Group{grp},
+		Choices: choices,
 	}
 }
 
@@ -208,12 +206,12 @@ func verifyMenu(g *Global, cfg *config.Config) tui.Menu {
 		Headers: []string{"level", "what runs", "cost"},
 		Flag:    "--verify",
 		Default: "none",
-		Groups: []tui.Group{{Choices: []tui.Choice{
+		Choices: []tui.Choice{
 			{Value: "none", Cells: []string{"none", "nothing", "-"}},
 			{Value: string(ensure.LevelSmoke), Cells: []string{"smoke", "import probes", "seconds"}},
 			{Value: string(ensure.LevelCore), Cells: []string{"core", "language core + every hand-linked extension", "minutes"}, Note: "recommended"},
 			{Value: string(ensure.LevelFull), Cells: []string{"full", "CPython's whole test suite", "hours under qemu"}},
-		}}},
+		},
 	}
 	if blocked := unrunnable(g, cfg); len(blocked) > 0 {
 		m.Help += "\nVerification executes the target's binaries, and no qemu was found\n" +
@@ -245,19 +243,19 @@ func packMenu(g *Global) tui.Menu {
 		Headers: []string{"pack", "result"},
 		Flag:    "--pack",
 		Default: "no",
-		Groups: []tui.Group{{Choices: []tui.Choice{
+		Choices: []tui.Choice{
 			{Value: "no", Cells: []string{"no", "artifact directory only"}},
 			{Value: "yes", Cells: []string{"yes", "artifact directory + tarball"}},
-		}}},
+		},
 	}
 }
 
 func bundleMenu(cfg *config.Config) tui.Menu {
-	grp := tui.Group{Choices: []tui.Choice{
+	choices := []tui.Choice{
 		{Value: "none", Cells: []string{"none", "whatever the profile selects"}},
-	}}
+	}
 	for _, name := range sortedKeys(cfg.Bundles) {
-		grp.Choices = append(grp.Choices, tui.Choice{
+		choices = append(choices, tui.Choice{
 			Value: name, Cells: []string{name, strings.Join(cfg.Bundles[name].Packages, " ")},
 		})
 	}
@@ -268,6 +266,6 @@ func bundleMenu(cfg *config.Config) tui.Menu {
 		Headers: []string{"bundle", "packages"},
 		Flag:    "--bundle",
 		Default: "none",
-		Groups:  []tui.Group{grp},
+		Choices: choices,
 	}
 }

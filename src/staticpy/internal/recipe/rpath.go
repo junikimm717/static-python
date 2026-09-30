@@ -36,16 +36,9 @@ func rewriteRootfsRpaths(root string) error {
 }
 
 func originRunpath(rel string) string {
-	dir := filepath.ToSlash(filepath.Dir(rel))
-	if dir == "." {
-		dir = ""
-	}
+	from := filepath.Dir(rel)
 	var parts []string
 	for _, lib := range []string{"lib", "lib64"} {
-		from := filepath.FromSlash(dir)
-		if from == "" {
-			from = "."
-		}
 		relLib, err := filepath.Rel(from, lib)
 		if err != nil {
 			continue

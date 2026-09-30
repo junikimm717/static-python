@@ -46,16 +46,12 @@ func (c Case) Label() string {
 // and pip-installs its requirements, neither of which a --with-ensurepip=no
 // static interpreter can do. The benchmark scripts are ordinary pyperf
 // programs, so running them directly needs none of that.
-//
-// Skipped names are returned so the report can say what was left out instead
-// of quietly narrowing its own scope.
-func DiscoverSuite(root string) (*Suite, []string, error) {
+func DiscoverSuite(root string) (*Suite, error) {
 	ents, err := os.ReadDir(root)
 	if err != nil {
-		return nil, nil, fmt.Errorf("pyperformance benchmarks not found at %s: %w", root, err)
+		return nil, fmt.Errorf("pyperformance benchmarks not found at %s: %w", root, err)
 	}
 	s := &Suite{Root: root}
-	var skipped []string
 	for _, e := range ents {
 		if !e.IsDir() || !strings.HasPrefix(e.Name(), "bm_") {
 			continue
@@ -68,11 +64,10 @@ func DiscoverSuite(root string) (*Suite, []string, error) {
 		s.Cases = append(s.Cases, Case{Name: e.Name(), Script: script, Dir: dir})
 	}
 	sort.Slice(s.Cases, func(i, j int) bool { return s.Cases[i].Name < s.Cases[j].Name })
-	sort.Strings(skipped)
 	if len(s.Cases) == 0 {
-		return nil, skipped, fmt.Errorf("no runnable benchmarks under %s", root)
+		return nil, fmt.Errorf("no runnable benchmarks under %s", root)
 	}
-	return s, skipped, nil
+	return s, nil
 }
 
 // --affinity is passed on top of the inherited CPU mask: pyperf re-pins its

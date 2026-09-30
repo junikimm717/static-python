@@ -59,14 +59,13 @@ func readTopology(root string) (*Topology, error) {
 			continue // "cpufreq", "cpuidle" and friends
 		}
 		dir := filepath.Join(root, name)
-		coreID, _ := strconv.Atoi(readFile(filepath.Join(dir, "topology", "core_id")))
 		t.CPUs = append(t.CPUs, CPU{
 			ID:       id,
 			capacity: readInt(filepath.Join(dir, "cpu_capacity")),
 			maxFreq:  readInt(filepath.Join(dir, "cpufreq", "cpuinfo_max_freq")),
-			Rank:     readRank(dir),
-			CoreID:   coreID,
-			Siblings: parseCPUList(readFile(filepath.Join(dir, "topology", "thread_siblings_list"))),
+			Rank:     readInt(filepath.Join(dir, "acpi_cppc", "highest_perf")),
+			CoreID:   readInt(filepath.Join(dir, "topology", "core_id")),
+			Siblings: parseCPUList(readTrim(filepath.Join(dir, "topology", "thread_siblings_list"))),
 		})
 	}
 	if len(t.CPUs) == 0 {
@@ -113,27 +112,11 @@ func classSource(t *Topology) {
 }
 
 func readInt(path string) int {
-	v, err := strconv.Atoi(readFile(path))
+	v, err := strconv.Atoi(readTrim(path))
 	if err != nil {
 		return 0
 	}
 	return v
-}
-
-func readRank(dir string) int {
-	v, err := strconv.Atoi(readFile(filepath.Join(dir, "acpi_cppc", "highest_perf")))
-	if err != nil {
-		return 0
-	}
-	return v
-}
-
-func readFile(p string) string {
-	b, err := os.ReadFile(p)
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(b))
 }
 
 // "0,3-5" is 0,3,4,5.

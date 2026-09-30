@@ -101,10 +101,8 @@ func init() {
 	}
 }
 
-func commands() []*command { return registry }
-
 func lookup(name string) *command {
-	for _, c := range commands() {
+	for _, c := range registry {
 		if c.Name == name {
 			return c
 		}
@@ -362,9 +360,6 @@ func (g *Global) resolve() error {
 		return fmt.Errorf("resolve --dist %s: %w", g.Dist, err)
 	}
 	g.Dist = abs
-	if g.repoRoot == "" {
-		g.repoRoot = filepath.Dir(abs)
-	}
 	if g.Toolchains != "" {
 		if g.Toolchains, err = filepath.Abs(g.Toolchains); err != nil {
 			return err
@@ -377,8 +372,8 @@ func (g *Global) resolve() error {
 	return nil
 }
 
-// A run from a clone picks up the editable config/ tree next to the shim; a
-// released binary finds nothing and uses only what is embedded in it.
+// A run from a clone defaults --dist to the dist/ next to the shim; a released
+// binary finds nothing and uses ./dist.
 func findRepoRoot() string {
 	var starts []string
 	if exe, err := os.Executable(); err == nil {
@@ -418,7 +413,6 @@ func (g *Global) load() (*config.Config, error) {
 		fmt.Fprintf(os.Stderr, "  Checksums and patches are the supply chain; anything built this way is stamped with that provenance in its manifest.\n")
 	}
 	cfg, err := config.Load(config.Options{
-		RepoRoot:   g.repoRoot,
 		Dir:        g.ConfigDir,
 		SourcesDir: g.SourcesDir,
 	})
@@ -494,18 +488,9 @@ func (g *Global) selectTargets(cfg *config.Config, host string) ([]string, error
 	seen := map[string]bool{}
 	var out []string
 	for _, name := range g.Targets {
-		if name == "all" {
+		if name == "all" || name == "proven" {
 			for _, n := range sortedKeys(cfg.Targets) {
-				if !seen[n] {
-					seen[n] = true
-					out = append(out, n)
-				}
-			}
-			continue
-		}
-		if name == "proven" {
-			for _, n := range sortedKeys(cfg.Targets) {
-				if cfg.Targets[n].Status == "proven" && !seen[n] {
+				if (name == "all" || cfg.Targets[n].Status == "proven") && !seen[n] {
 					seen[n] = true
 					out = append(out, n)
 				}
@@ -608,7 +593,6 @@ func (g *Global) newEnv(cfg *config.Config, runLog bool) (*core.Env, func(), err
 	workers, jobs := defaultParallelism(g.Workers, g.Jobs)
 	e := &core.Env{
 		Dist:       g.Dist,
-		RepoRoot:   g.repoRoot,
 		Toolchains: g.Toolchains,
 		Overrides:  g.Overrides,
 		Qemu:       g.qemuMap(cfg),
@@ -627,12 +611,10 @@ func (g *Global) newEnv(cfg *config.Config, runLog bool) (*core.Env, func(), err
 // machine without the shim having to hand every path in.
 func (g *Global) qemuMap(cfg *config.Config) map[string]string {
 	out := map[string]string{}
-	if cfg != nil {
-		for _, name := range sortedKeys(cfg.Targets) {
-			t := cfg.Targets[name]
-			if p, err := exec.LookPath(ensure.QemuBinaryName(t)); err == nil {
-				out[t.Triple] = p
-			}
+	for _, name := range sortedKeys(cfg.Targets) {
+		t := cfg.Targets[name]
+		if p, err := exec.LookPath(ensure.QemuBinaryName(t)); err == nil {
+			out[t.Triple] = p
 		}
 	}
 	for k, v := range g.Qemu {
@@ -649,16 +631,6 @@ type toolchainState struct {
 	Override string
 	Cross    string
 	Native   string
-}
-
-func (s toolchainState) any() string {
-	switch {
-	case s.Override != "":
-		return s.Override
-	case s.Cross != "":
-		return s.Cross
-	}
-	return s.Native
 }
 
 func (g *Global) toolchainState(triple string) toolchainState {

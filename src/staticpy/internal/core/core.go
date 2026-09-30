@@ -94,8 +94,7 @@ type Cmd struct {
 // Set Dist to an absolute path: EnsureDirs will otherwise rewrite it, which is
 // unsafe once other goroutines are reading the Env.
 type Env struct {
-	Dist     string
-	RepoRoot string
+	Dist string
 
 	// Toolchains is the directory holding one subdir per <triple>-<cross|native>.
 	// Provisioned by the shim; staticpy never fetches it. Overrides maps a

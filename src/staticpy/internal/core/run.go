@@ -113,10 +113,7 @@ func Run(ctx context.Context, e *Env, jobs []Job) error {
 	if firstErr != nil {
 		return firstErr
 	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return nil
+	return ctx.Err()
 }
 
 // Retries if a dependency is republished out from under us between our
@@ -231,12 +228,7 @@ func stampManifest(e *Env, n *node, stage string, dur time.Duration) error {
 	}
 	var prov map[string]string
 	if p, ok := n.job.(Provenancer); ok {
-		if got := p.Provenance(); len(got) > 0 {
-			prov = make(map[string]string, len(got))
-			for k, v := range got {
-				prov[k] = v
-			}
-		}
+		prov = p.Provenance() // omitempty drops an empty map
 	}
 	return writeManifest(stage, &Manifest{
 		Key:         n.key,

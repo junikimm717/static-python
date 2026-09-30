@@ -78,11 +78,9 @@ func findStaticArchives(stage string) ([]string, error) {
 	return out, nil
 }
 
+// ar was found by walking under stage, so Rel cannot fail.
 func archiveRelName(stage, ar string) string {
-	rel, err := filepath.Rel(stage, ar)
-	if err != nil {
-		return strings.ReplaceAll(filepath.Base(ar), ".", "_")
-	}
+	rel, _ := filepath.Rel(stage, ar)
 	return strings.ReplaceAll(rel, string(os.PathSeparator), "_")
 }
 

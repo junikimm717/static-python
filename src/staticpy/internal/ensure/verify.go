@@ -31,16 +31,8 @@ var SymbolsExpected = []string{"Py_GetVersion", "Py_Initialize"}
 
 type Options struct {
 	PythonRel string
-	// Checked against .symtab when the binary is not stripped.
-	Symbols []string
 	// If set, the version prefix sys.version must report.
 	WantVersion string
-	// Overrides the smoke tier's import list.
-	Modules []string
-	// Jobs is regrtest's -j for the full level.
-	Jobs         int
-	TestTimeout  time.Duration
-	SuiteTimeout time.Duration
 	// The host-built reference: shared libpython, a PT_INTERP,
 	// no staticapi symbol table in the executable.
 	WantDynamic bool
@@ -62,9 +54,6 @@ type Job struct {
 func NewJob(interp core.Job, target config.Target, profile string, level Level, expect config.TestExpect, opts Options) *Job {
 	if opts.PythonRel == "" {
 		opts.PythonRel = DefaultPythonRel
-	}
-	if opts.Symbols == nil {
-		opts.Symbols = SymbolsExpected
 	}
 	return &Job{interp: interp, target: target, profile: profile, level: level, expect: expect, opts: opts}
 }
@@ -138,10 +127,8 @@ func (j *Job) Build(ctx context.Context, e *core.Env, r *core.Runner, work, stag
 	if werr := writeReport(stage, rep); werr != nil && err == nil {
 		err = werr
 	}
-	if rep != nil {
-		e.Log.Info("verification finished", "target", j.target.Triple, "level", string(j.level),
-			"report", rep.String())
-	}
+	e.Log.Info("verification finished", "target", j.target.Triple, "level", string(j.level),
+		"report", rep.String())
 	return err
 }
 
@@ -152,20 +139,13 @@ func Verify(ctx context.Context, e *core.Env, r *core.Runner, t config.Target, l
 	rep := NewReport(fmt.Sprintf("verify %s %s", t.Triple, level))
 	defer func() { rep.Dur = time.Since(start) }()
 
-	if opts.PythonRel == "" {
-		opts.PythonRel = DefaultPythonRel
-	}
-	if opts.Symbols == nil {
-		opts.Symbols = SymbolsExpected
-	}
-
 	if st, err := os.Stat(python); err != nil || st.IsDir() {
 		rep.Failf("interpreter", "%s is not a file: the interpreter job did not produce %s",
 			python, opts.PythonRel)
 		return rep, rep.Err()
 	}
 
-	CheckELF(rep, python, t, opts.Symbols, opts.WantDynamic)
+	CheckELF(rep, python, t, SymbolsExpected, opts.WantDynamic)
 
 	l, err := NewLauncher(e, t)
 	if err != nil {
@@ -174,14 +154,9 @@ func Verify(ctx context.Context, e *core.Env, r *core.Runner, t config.Target, l
 	}
 	rep.Pass("runner", "%s%s", l.Runner, launcherDetail(l))
 
-	if r != nil {
-		r.Step("verify " + t.Triple + " " + string(level))
-	}
+	r.Step("verify " + t.Triple + " " + string(level))
 
-	rep.Absorb("", RunProbes(ctx, r, l, t, python, work, ProbeOptions{
-		Modules:     opts.Modules,
-		WantVersion: opts.WantVersion,
-	}))
+	rep.Absorb(RunProbes(ctx, r, l, t, python, work, opts.WantVersion))
 
 	// The suite is worth nothing if the interpreter cannot import its own
 	// modules, and running it anyway would bury the real failure under
@@ -195,12 +170,7 @@ func Verify(ctx context.Context, e *core.Env, r *core.Runner, t config.Target, l
 	for _, e := range expect.Ignore {
 		ignore = append(ignore, e.Test)
 	}
-	out, err := RunSuite(ctx, r, l, level, python, work, SuiteOptions{
-		Ignore:      ignore,
-		Jobs:        opts.Jobs,
-		TestTimeout: opts.TestTimeout,
-		Timeout:     opts.SuiteTimeout,
-	})
+	out, err := RunSuite(ctx, r, l, level, python, work, ignore)
 	if err != nil {
 		rep.Fail("suite", err, "CPython's test suite could not be run")
 		return rep, rep.Err()
@@ -215,7 +185,7 @@ func Verify(ctx context.Context, e *core.Env, r *core.Runner, t config.Target, l
 	}
 
 	class := Classify(out, expect, t.Triple)
-	rep.Absorb("", class.Report(time.Since(suiteStart)))
+	rep.Absorb(class.Report(time.Since(suiteStart)))
 	return rep, rep.Err()
 }
 
@@ -231,9 +201,6 @@ func launcherDetail(l *Launcher) string {
 }
 
 func writeReport(stage string, rep *Report) error {
-	if rep == nil {
-		return nil
-	}
 	b, err := rep.JSON()
 	if err != nil {
 		return fmt.Errorf("encode verification report: %w", err)

@@ -206,9 +206,6 @@ const LTOModeWholeGraph = "whole-graph"
 // slim IR for the python link to WHOPR over.
 const LTOModePerDep = "per-dep"
 
-// It must contain no absolute path and no value that varies between runs.
-func (r Resolved) KeyInputs() map[string]string { return r.keyInputs() }
-
 type Bundle struct {
 	Packages []string `toml:"packages"`
 }

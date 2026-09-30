@@ -113,9 +113,6 @@ func (p DurationPrior) Remaining(observed []obs, remaining []cellKey, elapsed ti
 }
 
 func meanFloat(xs []float64) float64 {
-	if len(xs) == 0 {
-		return 0
-	}
 	var s float64
 	for _, x := range xs {
 		s += x

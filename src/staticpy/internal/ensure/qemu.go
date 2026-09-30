@@ -76,10 +76,7 @@ func NewLauncher(e *core.Env, t config.Target) (*Launcher, error) {
 	}
 	l.Runner = RunnerQemu
 
-	qemu := ""
-	if e != nil {
-		qemu = e.Qemu[t.Triple]
-	}
+	qemu := e.Qemu[t.Triple]
 	if qemu == "" {
 		return nil, fmt.Errorf("cannot run %s binaries: no qemu configured for %s. "+
 			"staticpy does not fetch qemu; the shim provisions %s and passes it in as Env.Qemu[%q]. "+
@@ -122,9 +119,6 @@ func QemuBinaryName(t config.Target) string {
 
 // <toolchain>/<triple>, matching the musl-cross-make layout gccfactory emits.
 func Sysroot(e *core.Env, t config.Target) (string, error) {
-	if e == nil {
-		return "", fmt.Errorf("no build environment, so the sysroot for %s cannot be resolved", t.Triple)
-	}
 	dir, err := e.ToolchainDir(t.Triple, core.KindCross)
 	if err != nil {
 		var nerr error
@@ -159,9 +153,7 @@ func (l *Launcher) Run(ctx context.Context, r *core.Runner, name, dir, prog stri
 	runCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	if r != nil {
-		r.Step(name)
-	}
+	r.Step(name)
 
 	cmd := exec.CommandContext(runCtx, argv[0], argv[1:]...)
 	cmd.Dir = dir
@@ -188,9 +180,7 @@ func (l *Launcher) Run(ctx context.Context, r *core.Runner, name, dir, prog stri
 		}
 		res.ExitCode = ee.ExitCode()
 	}
-	if r != nil {
-		r.RecordRun(name, dir, argv, l.overlay(), res.Stdout, res.Stderr, res.ExitCode, start, res.Dur)
-	}
+	r.RecordRun(name, dir, argv, l.overlay(), res.Stdout, res.Stderr, res.ExitCode, start, res.Dur)
 	return res, nil
 }
 

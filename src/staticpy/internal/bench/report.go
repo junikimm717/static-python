@@ -107,7 +107,7 @@ func writeExperimentHTML(b *strings.Builder, row func(k, v string) string, e Exp
 }
 
 func EnvMarkdown(m Machine, protocol int, pins Pins, suiteName string) string {
-	return envMarkdown(m, protocol, pins, suiteName, Experiment{}.withGit())
+	return envMarkdown(m, protocol, pins, suiteName, Experiment{})
 }
 
 func envMarkdown(m Machine, protocol int, pins Pins, suiteName string, exp Experiment) string {
@@ -192,11 +192,7 @@ func (r SuiteReport) Markdown() string {
 	b.WriteString(envMarkdown(r.Machine, r.protocol(), r.pins(), r.suiteName(), r.experiment()))
 	fmt.Fprintf(&b, "- baseline: %s\n", r.Baseline)
 	fmt.Fprintf(&b, "- rows: %d\n", len(r.Rows))
-	if r.Skipped > 0 {
-		fmt.Fprintf(&b, "- skipped: %d (see skipped.json)\n", r.Skipped)
-	} else {
-		b.WriteString("- skipped: 0 (see skipped.json)\n")
-	}
+	fmt.Fprintf(&b, "- skipped: %d (see skipped.json)\n", r.Skipped)
 	b.WriteString("\n")
 
 	if len(r.Identities) > 0 {
@@ -382,10 +378,7 @@ func (r SuiteReport) geomeanSVG() string {
 		label := html.EscapeString(a)
 		fmt.Fprintf(&b, `<text x="%d" y="%d" text-anchor="end" font-size="13" fill="#1a202c">%s</text>`+"\n",
 			left+labelW-8, y+barH-6, label)
-		bw := 0.0
-		if maxV > 0 {
-			bw = vals[i] / maxV * barMax
-		}
+		bw := vals[i] / maxV * barMax
 		fill := "#2b6cb0"
 		if a == r.Baseline {
 			fill = "#4a5568"

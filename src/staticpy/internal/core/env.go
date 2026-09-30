@@ -210,13 +210,10 @@ func pidFromScratchName(name string) (int, bool) {
 }
 
 func slugFromScratchName(name string) (string, bool) {
-	parts := strings.Split(name, ".")
-	if len(parts) < 3 {
-		return "", false
-	}
 	if _, ok := pidFromScratchName(name); !ok {
 		return "", false
 	}
+	parts := strings.Split(name, ".")
 	return strings.Join(parts[:len(parts)-2], "."), true
 }
 

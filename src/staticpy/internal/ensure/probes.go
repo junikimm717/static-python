@@ -19,15 +19,6 @@ var ProbeModules = []string{
 	"ssl", "zlib", "sqlite3", "ctypes", "_lzma", "_hashlib", "readline", "curses", "uuid", "compression.zstd",
 }
 
-type ProbeOptions struct {
-	// Modules overrides ProbeModules.
-	Modules []string
-	// WantVersion, if set, is the prefix sys.version must start with.
-	WantVersion string
-	// PythonArgs is inserted before the script path.
-	PythonArgs []string
-}
-
 const probeScriptName = "staticpy_probe.py"
 
 // One PROBE line per check, so a single interpreter start covers the whole smoke tier — under qemu, process startup dominates
@@ -134,16 +125,14 @@ guard("ctypes.pythonapi", _pythonapi)
 `
 
 // The smoke tier: import everything the recipe promised and confirm the
-// interpreter agrees with the target it was built for.
-func RunProbes(ctx context.Context, r *core.Runner, l *Launcher, t config.Target, python, work string, opts ProbeOptions) *Report {
+// interpreter agrees with the target it was built for. wantVersion, if set, is
+// the prefix sys.version must start with.
+func RunProbes(ctx context.Context, r *core.Runner, l *Launcher, t config.Target, python, work, wantVersion string) *Report {
 	rep := NewReport(fmt.Sprintf("smoke %s (%s)", t.Triple, l.Runner))
 	start := time.Now()
 	defer func() { rep.Dur = time.Since(start) }()
 
-	modules := opts.Modules
-	if modules == nil {
-		modules = ProbeModules
-	}
+	modules := ProbeModules
 	bits := t.Bits
 	if bits == 0 {
 		bits = 64
@@ -160,8 +149,7 @@ func RunProbes(ctx context.Context, r *core.Runner, l *Launcher, t config.Target
 		return rep
 	}
 
-	args := append(append([]string(nil), opts.PythonArgs...), "-B", script,
-		strconv.Itoa(bits), opts.WantVersion, strings.Join(modules, ","))
+	args := []string{"-B", script, strconv.Itoa(bits), wantVersion, strings.Join(modules, ",")}
 	// The artifact directory is published read-only; a stray .pyc write would
 	// fail the run for a reason that has nothing to do with the interpreter.
 	l.Env["PYTHONDONTWRITEBYTECODE"] = "1"

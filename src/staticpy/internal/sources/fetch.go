@@ -102,7 +102,13 @@ func lockPath(e *core.Env, s config.Source) string {
 }
 
 // Checks without taking the lock or hashing anything.
-func Fetched(e *core.Env, s config.Source) bool { return verified(e, s) }
+func Fetched(e *core.Env, s config.Source) bool {
+	if _, err := os.Stat(donePath(e, s)); err != nil {
+		return false
+	}
+	fi, err := os.Stat(Path(e, s))
+	return err == nil && fi.Mode().IsRegular()
+}
 
 // Idempotent and safe against concurrent workers and concurrent staticpy
 // processes: everything past the fast path happens under an exclusive flock on
@@ -120,7 +126,7 @@ func Fetch(ctx context.Context, e *core.Env, s config.Source) (string, error) {
 
 	// Fast path: a .done marker means some process already verified this exact
 	// content, so we do not re-hash a 25 MB tarball on every build.
-	if verified(e, s) {
+	if Fetched(e, s) {
 		return dst, nil
 	}
 
@@ -131,7 +137,7 @@ func Fetch(ctx context.Context, e *core.Env, s config.Source) (string, error) {
 	defer unlock()
 
 	// Another process may have finished while we waited on the lock.
-	if verified(e, s) {
+	if Fetched(e, s) {
 		return dst, nil
 	}
 	// The file can exist without a marker: an older run, or a marker someone
@@ -260,8 +266,7 @@ func download(ctx context.Context, url, dst string, s config.Source) (err error)
 	// Verified before the rename, so a file at the real path is always a file
 	// whose bytes matched the pin.
 	if got := hex.EncodeToString(h.Sum(nil)); got != s.SHA256 {
-		err = &ChecksumError{Source: s, URL: url, Actual: got}
-		return err
+		return &ChecksumError{Source: s, URL: url, Actual: got}
 	}
 	if err = os.Chmod(tmpName, 0o444); err != nil {
 		return err
@@ -270,14 +275,6 @@ func download(ctx context.Context, url, dst string, s config.Source) (err error)
 		return fmt.Errorf("sources: publishing %s: %w", dst, err)
 	}
 	return nil
-}
-
-func verified(e *core.Env, s config.Source) bool {
-	if _, err := os.Stat(donePath(e, s)); err != nil {
-		return false
-	}
-	fi, err := os.Stat(Path(e, s))
-	return err == nil && fi.Mode().IsRegular()
 }
 
 // Every caller reaches this only after the bytes on disk have been hashed

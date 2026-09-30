@@ -17,8 +17,8 @@ import (
 	"github.com/junikimm717/static-python/src/staticpy/internal/sources"
 )
 
-// The recipe shapes a package can declare. Anything else is a typo in
-// packages.toml, and is rejected rather than silently treated as autotools.
+// The recipe shapes a package can declare. config.Validate rejects anything
+// else rather than silently treating it as autotools.
 const (
 	buildAutotools = "autotools"
 	buildOpenSSL   = "openssl"
@@ -71,22 +71,17 @@ func (b *depBuilder) job(name string) (*depJob, error) {
 	if err != nil {
 		return nil, fmt.Errorf("recipe: %w", err)
 	}
+	// config.Validate guarantees the source exists and that Name is the key.
 	srcName := pkg.Source
 	if srcName == "" {
 		srcName = pkg.Name
 	}
-	if srcName == "" {
-		srcName = name
-	}
-	src, ok := b.cfg.Sources[srcName]
-	if !ok {
-		return nil, fmt.Errorf("recipe: package %s names source %q, which is not in sources.toml", name, srcName)
-	}
-	res, err := resolveScope(b.cfg, b.profile, depScope(name))
+	src := b.cfg.Sources[srcName]
+	res, err := b.cfg.Resolve(b.profile, depScope(name))
 	if err != nil {
 		return nil, err
 	}
-	id, err := toolchainFor(nil, res, b.target.Triple)
+	id, err := toolchainFor(res, b.target.Triple)
 	if err != nil {
 		return nil, err
 	}
@@ -101,13 +96,9 @@ func (b *depBuilder) job(name string) (*depJob, error) {
 	if j.tgtPatchHash, err = sources.TargetPatchSetHash(b.assets, src, b.target.Triple); err != nil {
 		return nil, err
 	}
+	// config.Validate guarantees every target sets the map a package names.
 	if pkg.PlatformMap != "" {
-		j.platform, ok = b.target.Maps[pkg.PlatformMap]
-		if !ok || j.platform == "" {
-			return nil, fmt.Errorf("recipe: %s needs maps.%s for target %s, which targets.toml does not set; "+
-				"these platform names do not follow from the triple and have to be written down",
-				name, pkg.PlatformMap, b.target.Triple)
-		}
+		j.platform = b.target.Maps[pkg.PlatformMap]
 	}
 
 	b.onStack[name] = true
@@ -297,9 +288,6 @@ func (j *depJob) Build(ctx context.Context, e *core.Env, r *core.Runner, work, s
 		err = j.plainMake(ctx, e, r, te, src, stage)
 	case buildSources:
 		err = j.fromSources(ctx, r, te, src, stage)
-	default:
-		err = fmt.Errorf("recipe: package %s declares build = %q; valid shapes are %q, %q, %q and %q",
-			j.name, j.pkg.Build, buildAutotools, buildOpenSSL, buildMake, buildSources)
 	}
 	if err != nil {
 		return err
@@ -437,9 +425,6 @@ func (j *depJob) fromSources(ctx context.Context, r *core.Runner, te *toolenv, s
 	if j.pkg.Libname == "" {
 		return fmt.Errorf("recipe: package %s has build = %q but no libname, so there is no archive to write",
 			j.name, buildSources)
-	}
-	if len(j.pkg.Sources) == 0 {
-		return fmt.Errorf("recipe: package %s has build = %q but lists no sources", j.name, buildSources)
 	}
 
 	// One cc -c over the whole list drops the objects next to their sources,

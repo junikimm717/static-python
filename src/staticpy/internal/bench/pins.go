@@ -44,10 +44,6 @@ func PyperformanceSpecs(pyperformance, pyperf string) []string {
 // here.
 // --no-deps does not skip PEP 517 build-system.requires; a --find-links
 // directory must also contain a setuptools wheel.
-func PipInstallArgs(pins Pins) []string {
-	return PipInstallArgsFrom(pins, "")
-}
-
 func PipInstallArgsFrom(pins Pins, findLinks string) []string {
 	args := []string{"install", "--quiet", "--no-deps"}
 	if findLinks != "" {

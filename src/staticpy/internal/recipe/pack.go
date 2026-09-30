@@ -37,7 +37,7 @@ func Pack(cfg *config.Config, target config.Target, profile string, interp, afte
 		return nil, err
 	}
 	j := &pack{interp: interp, after: after, target: target, profile: profile, version: src.Version}
-	if after != nil && after.Slug() == interp.Slug() {
+	if after.Slug() == interp.Slug() {
 		j.after = nil
 	}
 	return j, nil

@@ -20,10 +20,8 @@ func profileForInterp(g *Global, cfg *config.Config, label string) string {
 	case "system":
 		return ""
 	}
-	if cfg != nil {
-		if _, ok := cfg.Profiles[label]; ok {
-			return label
-		}
+	if _, ok := cfg.Profiles[label]; ok {
+		return label
 	}
 	return ""
 }
@@ -98,24 +96,16 @@ func hostLibcName() string {
 }
 
 func toolchainFactor(e *core.Env, py config.Resolved, host string) string {
-	if e == nil {
-		return ""
-	}
 	recipe.Bind(e)
-	triple := host
-	if triple == "" {
-		triple = e.Host
+	var id recipe.ToolchainID
+	var err error
+	if py.HostBuilt() {
+		id, err = recipe.ToolchainHost(context.Background())
+	} else {
+		id, err = recipe.Toolchain(nil, host)
 	}
-	id, err := recipeToolchain(py, triple)
 	if err != nil {
 		return ""
 	}
 	return id.Factor()
-}
-
-func recipeToolchain(py config.Resolved, triple string) (recipe.ToolchainID, error) {
-	if py.HostBuilt() {
-		return recipe.ToolchainHost(context.Background())
-	}
-	return recipe.Toolchain(nil, triple)
 }

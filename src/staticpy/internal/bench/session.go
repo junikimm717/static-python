@@ -51,9 +51,7 @@ func updateLatest(base, name string) {
 }
 
 func (s *Session) Close() error {
-	if s.timeline != nil {
-		s.timeline.Close()
-	}
+	s.timeline.Close()
 	return nil
 }
 
@@ -74,9 +72,6 @@ type Event struct {
 }
 
 func (s *Session) Record(e Event) {
-	if s.timeline == nil {
-		return
-	}
 	b, err := json.Marshal(e)
 	if err != nil {
 		return
