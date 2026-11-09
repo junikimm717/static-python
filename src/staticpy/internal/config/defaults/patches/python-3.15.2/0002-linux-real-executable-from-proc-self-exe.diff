@@ -1,7 +1,7 @@
 --- a/Modules/getpath.c
 +++ b/Modules/getpath.c
-@@ -21,6 +21,10 @@
- #  include <mach-o/dyld.h>
+@@ -24,6 +24,10 @@
+ #  include <dlfcn.h>
  #endif
  
 +#ifdef __linux__
@@ -11,7 +11,7 @@
  /* Reference the precompiled getpath.py */
  #include "Python/frozen_modules/getpath.h"
  
-@@ -794,6 +798,18 @@
+@@ -803,6 +807,18 @@
          PyMem_RawFree(path);
          break;
      }

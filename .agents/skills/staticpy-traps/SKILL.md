@@ -314,6 +314,25 @@ prefix.
 The root of most cross-build wrongness: `AC_RUN_IFELSE`'s cross fallback is a
 guess.
 
+**`test_complete_functions` sees `AVG( 1)`, or `readline.append_history_file`
+is missing.** Static `libreadline.a` needs ncurses, and configure's fallback
+probe links `-lreadline` alone (`readline.pc` fails too: no `ncursesw.pc`).
+configure records no readline and every `HAVE_RL_*` is undefined, while
+`Setup` still force-builds the module, so it compiles in a degraded form. Check
+`pyconfig.h`, not `import readline`. `LIBREADLINE_LIBS` in `decisionFlags`
+fixes the probe.
+
+**`mpdecimal.h: No such file` compiling `_decimal` on 3.15.** configure dropped
+the implicit fallback to the bundled libmpdec (gh-115119), so both static and
+`pyref` pass `--with-system-libmpdec=no`. Without the flag `pyref` doesn't fail:
+it silently gets pure-Python `decimal` and skews benchmarks. The bundled copy is
+scheduled for removal in 3.16, which will need a pinned `mpdecimal` package.
+
+**`cannot find .../sysroot_*/lib/mimalloc.o`, reported by configure as "C
+compiler cannot create executables".** `sysroot` holds absolute symlinks but its
+key has no path in it, so a sysroot built on the host is a cache hit in the
+container, where `/home/...` does not exist. Read `config.log`, not the summary.
+
 **`ac_cv_aligned_required` defaults to `yes` on a cross build** (`no` only on
 Linux-android). Safe, but it switches the hash to FNV, so every little-endian
 target silently pays. Probed now; don't let it regress to a guess.

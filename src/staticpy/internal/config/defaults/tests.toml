@@ -72,6 +72,15 @@ makes this an unexpected pass, which is the signal to delete this entry.\
 """
 
 [[expect.static.ignore]]
+test = "*test_posix*test_nodev*"
+why = """
+musl defines no NODEV, so posix has no such attribute. CPython skips this on \
+musl through support.linked_to_musl(), but that probe shells out to ldd and \
+cannot recognise a fully static binary, the same blind spot as \
+test_fma_zero_result.\
+"""
+
+[[expect.static.ignore]]
 test = "*test_ctypes.test_dlerror*"
 why = "Asserts on dlerror() text from a dlopen that cannot happen."
 

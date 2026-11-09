@@ -264,6 +264,8 @@ func (j *pyRef) cpython(ctx context.Context, e *core.Env, r *core.Runner, work, 
 		// The build finds OpenSSL in the shadow; the rpath below is what finds
 		// it at run time. Letting configure add its own would bake the shadow.
 		"--with-openssl-rpath=no",
+		// Without it, a host lacking libmpdec silently gets pure-Python decimal.
+		"--with-system-libmpdec=no",
 		"--enable-loadable-sqlite-extensions",
 		"--with-computed-gotos",
 	}
@@ -390,7 +392,7 @@ func (j *pyRef) assertUsable(rootfs string) error {
 // that reach a published artifact once.
 var modulesFromDeps = []string{
 	"_ssl", "_hashlib", "_sqlite3", "_lzma", "_bz2", "_zstd", "zlib",
-	"_ctypes", "_curses", "_uuid", "readline",
+	"_ctypes", "_curses", "_uuid", "_decimal", "readline",
 	"ssl", "sqlite3", "lzma", "bz2", "compression.zstd", "ctypes", "curses", "uuid", "decimal", "hashlib",
 }
 

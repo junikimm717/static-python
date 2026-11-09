@@ -23,9 +23,9 @@ rebuilds recover it):
 
 | path | contents |
 |---|---|
-| `dist/artifacts/pynative_<profile>_<triple>/bin/python3.14` | native interpreter |
+| `dist/artifacts/pynative_<profile>_<triple>/bin/python3.15` | native interpreter |
 | `dist/artifacts/pycross_<profile>_<host>_<triple>/` | cross interpreter |
-| `dist/artifacts/pyref_reference_<triple>/rootfs/bin/python3.14` | dynamic baseline (stock `--enable-shared`, same pins, container gcc) |
+| `dist/artifacts/pyref_reference_<triple>/rootfs/bin/python3.15` | dynamic baseline (stock `--enable-shared`, same pins, container gcc) |
 | `dist/out/<profile>/<triple>/` | `--pack` tarballs |
 | `dist/src/`, `dist/srctrees/`, `dist/work/` | verified tarballs, extracted sources, job intermediates |
 | `dist/toolchains/` | fetched toolchains (not hashed here; gccfactory verifies them) |

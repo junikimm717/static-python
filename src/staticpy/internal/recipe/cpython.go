@@ -337,7 +337,10 @@ func (j *pyBuild) pgo() bool {
 // machine-specific, and the dependency keys already cover what lives behind
 // it.
 func (j *pyBuild) decisionFlags() []string {
-	flags := []string{"--disable-shared", "--with-ensurepip=no", "MODULE_BUILDTYPE=static"}
+	// configure no longer falls back to the bundled libmpdec on its own (3.15).
+	flags := []string{"--disable-shared", "--with-ensurepip=no", "--with-system-libmpdec=no", "MODULE_BUILDTYPE=static",
+		// Static readline needs ncurses at configure's link probe; see staticpy-traps.
+		"LIBREADLINE_LIBS=-lreadline -lncursesw"}
 	if j.cross {
 		flags = append(flags, "--build="+j.host.Triple, "--host="+j.target.Triple)
 	} else {
