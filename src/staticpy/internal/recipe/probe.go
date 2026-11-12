@@ -20,8 +20,9 @@ import (
 )
 
 const (
-	patcherAsset   = "patcher.c"
-	ConfigSiteName = "config.site"
+	patcherAsset        = "patcher.c"
+	commonPyconfigAsset = "pyconfig/common.h"
+	ConfigSiteName      = "config.site"
 )
 
 // Holds the facts the probe cannot produce: inline-asm availability, atomics
@@ -46,11 +47,17 @@ func Probe(cfg *config.Config, srcAssets fs.FS, t config.Target) (core.Job, erro
 		return nil, err
 	}
 	patchAsset := PyconfigPatchAsset(t)
-	patches, err := assets.Get(patchAsset)
+	own, err := assets.Get(patchAsset)
 	if err != nil {
 		return nil, fmt.Errorf("recipe: no pyconfig fragment for %s: %w. "+
 			"Adding an architecture is a row in targets.toml plus an assets/files/%s", t.Triple, err, patchAsset)
 	}
+	common, err := assets.Get(commonPyconfigAsset)
+	if err != nil {
+		return nil, err
+	}
+	// Every target is musl, so decisions about musl itself are stated once.
+	patches := append(append(append([]byte{}, common...), '\n'), own...)
 	if _, err := assets.Get(patcherAsset); err != nil {
 		return nil, err
 	}

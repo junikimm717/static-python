@@ -50,6 +50,9 @@ image pins qemu-user 11.1.1 and shims Ubuntu `*-binfmt-P` names to it.
   libatomic (C probe) and mimalloc `mi_lock_t` (CPython test on default eabi).
   Fix is spinlocks + pid-steal — not an `[expect]`, not `-march=armv7`, not
   "skip mimalloc on eabi".
+- **`references/S390X_SIGSETJMP_PC16.md`** — musl's s390x `sigsetjmp` uses a
+  16-bit `jz ___setjmp`; ld 2.44 wraps it silently once `setjmp.o` is >64 KiB
+  away, so `sigsetjmp(buf, 0)` SIGILLs. Toolchain fix, not an `[expect]`.
 - **`references/PYREF_RPATH.md`** — two host compilers wrote one pyref prefix;
   Alpine `-lreadline` then opened a leftover glibc `libncursesw` because
   `-rpath` named that prefix. Key the publish path on hostcc. Shadow rpath is a
@@ -113,19 +116,45 @@ which qemu < 9.1 (host Ubuntu 8.2.2) leaves `0`. A missing shim falls through to
 host qemu; a present one keeps re-exec on the image's 11.1.1. Doctor must require
 the binfmt interpreter to exist *and* be ≥ 9.1. Don't restore `[expect.qemu]`.
 
-**`suite:test_threading` SIGSEGV on s390x: `test_recursion_limit` (Issue 9670).**
-The recursing subprocess thread should raise RecursionError; qemu-s390x dies
-`uncaught target signal 11`. Not qemu, not libatomic: the script exits 0 on
-aarch64/i386/mips64/ppc64le qemu and native x86_64 static; main-thread recursion
-on s390x is fine; `threading.stack_size(8<<20)` and `sys.setrecursionlimit(100)`
-both pass. musl's default pthread stack is **128 KiB on every triple**
-(measured `pthread_attr_getstacksize` under qemu-s390x and qemu-aarch64).
-CPython 3.14 skips `pthread_getattr_np` on musl and guesses `Py_C_STACK_SIZE`
-(320000 on `__s390x__`, 4 MiB elsewhere); s390x frames are big enough that 1000
-calls overflow 128 KiB before that or `py_recursion_remaining` fires. Fix:
-`THREAD_STACK_SIZE 0x400000` in the s390x pyconfig fragment (what CPython
-already does for FreeBSD/AIX). Don't add `[expect.s390x]`. Watch powerpc64
-(`Py_C_STACK_SIZE` 2 MiB): if it SIGSEGVs, same define, not an ignore.
+**`suite:test_threading` SIGSEGV: `test_recursion_limit` (Issue 9670).**
+The recursing subprocess thread should raise RecursionError; qemu dies
+`uncaught target signal 11`. Seen on s390x (3.14), then powerpc64 (3.15).
+musl's default pthread stack is **128 KiB on every triple**; CPython skips
+`pthread_getattr_np` on musl and guesses `Py_C_STACK_SIZE` (320000 on s390x,
+2 MB on ppc64, 4 MB elsewhere) below the thread's start. The guard and the
+trashcan both trust that guess. On 3.15 the RecursionError is *caught* at
+depth ~995; the crash is the C-recursive dealloc of that traceback chain when
+the `except` clears it, which the trashcan should have bounded. Not per-triple:
+aarch64 survives 1000 but SIGSEGVs at `setrecursionlimit(20000)` in a thread,
+same shape. Fix: `THREAD_STACK_SIZE 0x400000` in `pyconfig/common.h`, which
+`Probe` prepends to every target's fragment (0x400000 ≥ every
+`Py_C_STACK_SIZE` guess, so the guess lies inside the real stack; FreeBSD gets
+the same define upstream). Don't add `[expect.<triple>]`, and don't move it
+back into one triple's fragment.
+
+**s390x `test_sqlite3.test_cli.Completion`: SIGILL in the pty child.**
+`qemu: uncaught target signal 4`, seven completion methods, `.core` files left
+in cwd. readline calls `sigsetjmp(buf, 0)`; musl's s390x asm short-branches to
+`___setjmp` in another object and ld wraps the out-of-range `PC16DBL` without
+an error. Layout-dependent, so it can come and go with unrelated size changes.
+Same SIGILL under qemu 10.2.2 and 11.1.1. Override in
+`assets/files/libcfix/s390x-linux-musl.s` until gccfactory#16 lands.
+`references/S390X_SIGSETJMP_PC16.md`.
+
+**`test_posix.test_fexecve` fails under qemu, then verify hangs for hours.**
+`FileNotFoundError: [Errno 2] No such file or directory: 3`. `os.open` is
+`O_CLOEXEC`, and an `execveat(fd, "", AT_EMPTY_PATH)` of a foreign ELF goes
+through binfmt_misc, whose `load_misc_binary` returns ENOENT for
+`BINPRM_FLAGS_PATH_INACCESSIBLE` *before* it looks at the flags: `O`/`C` do not
+help (tested `F` and `OF` in a private `unshare -Urm` binfmt mount). Inheritable
+fd and native both pass. The child's exception then propagates, so the fork
+keeps running regrtest, deadlocks on a semaphore (`futex(…, 0x80000000)`, musl's
+"count 0, waiters") whose poster thread didn't survive fork, and holds the job's
+stdout pipe: staticpy waits for EOF forever, one CPU-idle `qemu-*` with no
+children. Under `[expect.qemu.ignore]`. New in 3.15 only because `test_posix`
+moved into the `test_os` package that core runs. Separately: on Fedora the
+host's `qemu-user-static` registers `F` first, so the image's `FCP` entry is
+skipped and suite re-execs run host qemu (10.2.2), not the image's 11.1.1.
 
 **sqlite configure: `s390x-binfmt-P: Could not open '/lib/ld-musl-s390x.so.1'`.**
 sqlite's configure builds a bootstrap `jimsh0` with the *target* CC and runs

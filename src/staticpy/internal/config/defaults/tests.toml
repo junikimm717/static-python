@@ -150,6 +150,17 @@ why = "IPv6 ancillary data (RFC 3542) is not reproduced by qemu-user's recvmsg."
 test = "*BasicCANTest*"
 why = "AF_CAN sockets are unavailable under qemu-user."
 
+[[expect.qemu.ignore]]
+test = "*test_posix*test_fexecve*"
+why = """
+execve() on an O_CLOEXEC fd of a foreign ELF goes through binfmt_misc, which \
+refuses with ENOENT whatever its flags: the interpreter would be handed a \
+/dev/fd path the exec has just closed. Fails with F and with OF in a private \
+binfmt table; passes with an inheritable fd and natively. The failed child \
+then keeps running regrtest and holds the job's pipe, so this hangs verify. \
+See staticpy-traps.\
+"""
+
 # i386 x87
 
 [[expect.i386-linux-musl.ignore]]
