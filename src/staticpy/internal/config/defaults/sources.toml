@@ -113,17 +113,13 @@ sha256 = "e73fe91d9b536c6e3548132c1e327843b0bac3c94be9f158ce112eb989d25fc7"
 
 [source.python]
 name = "python"
-version = "3.14.7"
-file = "Python-3.14.7.tgz"
-topdir = "Python-3.14.7"
-urls = ["https://www.python.org/ftp/python/3.14.7/Python-3.14.7.tgz"]
-sha256 = "62859805f6fdf25e2bcbf3fa3217801e1996887ca33e6a2af80674bdfa2dbe07"
+version = "3.15.2"
+file = "Python-3.15.2.tgz"
+topdir = "Python-3.15.2"
+urls = ["https://www.python.org/ftp/python/3.15.2/Python-3.15.2.tgz"]
+sha256 = "f74e1db0eabd651cd01e4e2a00201bd41866abe74869ab716f9bf33cbbaa0943"
 
-# Programs/_freeze_module links getpath_noop.o rather than getpath.o, and with
-# the _test* modules built in, _testinternalcapi.o joins that link referencing
-# _Py_Get_Getpath_CodeObject. Give the stub file the stub.
 patches = [
-  "0001-stub-getpath-codeobject-for-the-freeze-bootstrap.diff",
   "0002-linux-real-executable-from-proc-self-exe.diff",
 ]
 
@@ -140,10 +136,14 @@ why = "StaticCDLL has to exist before the CDLL block that follows this banner."
 
 [[source.python.edits]]
 file = "Lib/ctypes/__init__.py"
-anchor = "    pythonapi = PyDLL(None)"
+anchor = "        pythonapi = None"
 action = "insert_after"
 text_file = "ctypes_patch_2.py"
-why = "PyDLL(None) is dlopen(NULL); rebind pythonapi onto the static symbol table."
+why = """
+PyDLL(None) is dlopen(NULL); rebind pythonapi onto the static symbol table. \
+The anchor closes the try/except around that call, so the unindented rebind \
+lands after the whole statement.\
+"""
 
 [[source.python.edits]]
 file = "Lib/ctypes/__init__.py"
