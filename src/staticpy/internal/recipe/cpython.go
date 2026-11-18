@@ -304,6 +304,9 @@ func (j *pyBuild) KeyInputs() map[string]string {
 	if j.target.Libatomic {
 		in["libat_atfork"] = assets.Hash("libat_atfork.c")
 	}
+	if _, err := assets.Get(libcFixAsset(j.target)); err == nil {
+		in["libcfix"] = assets.Hash(libcFixAsset(j.target))
+	}
 	if j.cross {
 		in["build"] = j.host.Triple
 	}
@@ -337,7 +340,10 @@ func (j *pyBuild) pgo() bool {
 // machine-specific, and the dependency keys already cover what lives behind
 // it.
 func (j *pyBuild) decisionFlags() []string {
-	flags := []string{"--disable-shared", "--with-ensurepip=no", "MODULE_BUILDTYPE=static"}
+	// configure no longer falls back to the bundled libmpdec on its own (3.15).
+	flags := []string{"--disable-shared", "--with-ensurepip=no", "--with-system-libmpdec=no", "MODULE_BUILDTYPE=static",
+		// Static readline needs ncurses at configure's link probe; see staticpy-traps.
+		"LIBREADLINE_LIBS=-lreadline -lncursesw"}
 	if j.cross {
 		flags = append(flags, "--build="+j.host.Triple, "--host="+j.target.Triple)
 	} else {
@@ -424,6 +430,13 @@ func (j *pyBuild) Build(ctx context.Context, e *core.Env, r *core.Runner, work, 
 		return oerr
 	}
 	libs := append([]string{}, objs...)
+	fixObj, ferr := j.assembleLibcFix(ctx, r, te, work)
+	if ferr != nil {
+		return ferr
+	}
+	if fixObj != "" {
+		libs = append(libs, fixObj)
+	}
 	if libatObj != "" {
 		// LIBS is after the python objects. -latomic in LDFLAGS can pull
 		// lock.o before our replacement and then multiple-define.
@@ -521,6 +534,28 @@ func hostRunner(e *core.Env, t config.Target) string {
 		return qemu + " -L " + sysroot
 	}
 	return qemu
+}
+
+func libcFixAsset(t config.Target) string { return "libcfix/" + t.Triple + ".s" }
+
+// Replaces a toolchain libc member that is wrong for this triple; an explicit
+// object is linked before libc.a is searched, so the archive copy is never pulled.
+func (j *pyBuild) assembleLibcFix(ctx context.Context, r *core.Runner, te *toolenv, work string) (string, error) {
+	name := libcFixAsset(j.target)
+	if _, err := assets.Get(name); err != nil {
+		return "", nil
+	}
+	if err := assets.WriteTo(work, name); err != nil {
+		return "", err
+	}
+	obj := filepath.Join(work, "libcfix.o")
+	r.Step("assembling libc fix")
+	if err := r.Run(ctx, te.cmd(j.Name()+"-libcfix", work, []string{
+		te.tools.CC, "-c", "-o", obj, filepath.Join(work, filepath.FromSlash(name)),
+	}, nil)); err != nil {
+		return "", err
+	}
+	return obj, nil
 }
 
 // A libatomic lock-table replacement that registers pthread_atfork. Compiled without -flto so WPA cannot drop the constructor.
